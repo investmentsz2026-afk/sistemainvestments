@@ -1,0 +1,76 @@
+// backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          String    @default("USER")
+  movements     Movement[]
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Product {
+  id               String        @id @default(cuid())
+  sku              String        @unique
+  name             String
+  category         String
+  inventoryType    String        @default("TERMINADOS") @map("inventory_type")
+  description      String?       @db.Text
+  purchasePrice    Float         @map("purchase_price")
+  sellingPrice     Float         @map("selling_price")
+  minStock         Int           @default(5) @map("min_stock")
+  isActive         Boolean       @default(true) @map("is_active")
+  variants         ProductVariant[]
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id               String        @id @default(cuid())
+  productId        String        @map("product_id")
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size             String
+  color            String
+  stock            Int           @default(0)
+  variantSku       String        @unique @map("variant_sku")
+  movements        Movement[]
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@unique([productId, size, color])
+  @@index([variantSku])
+  @@map("product_variants")
+}
+
+model Movement {
+  id               String        @id @default(cuid())
+  type             String        // "ENTRY" o "EXIT"
+  quantity         Int
+  reason           String
+  reference        String?
+  previousStock    Int           @map("previous_stock")
+  newStock         Int           @map("new_stock")
+  variantId        String        @map("variant_id")
+  variant          ProductVariant @relation(fields: [variantId], references: [id])
+  userId           String        @map("user_id")
+  user             User          @relation(fields: [userId], references: [id])
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  @@index([variantId])
+  @@index([createdAt])
+  @@map("movements")
+}
