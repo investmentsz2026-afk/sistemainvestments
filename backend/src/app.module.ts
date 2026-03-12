@@ -1,4 +1,3 @@
-// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
@@ -13,6 +12,8 @@ import { QualityModule } from './modules/quality/quality.module';
 import { ProcessAuditsModule } from './modules/process-audits/process-audits.module';
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { SamplesModule } from './modules/samples/samples.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -32,5 +33,7 @@ import { SamplesModule } from './modules/samples/samples.module';
     CommercialModule,
     SamplesModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule { }
