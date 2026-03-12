@@ -17,8 +17,17 @@ import {
   Settings,
   User,
   ChevronDown,
-  BookOpen
+  BookOpen,
+  CreditCard,
+  Truck,
+  Loader2,
+  Building2,
+  ShieldCheck,
+  FileSearch,
+  Users,
+  Beaker
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -26,16 +35,55 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showTopUserMenu, setShowTopUserMenu] = useState(false);
+  const [showSidebarUserMenu, setShowSidebarUserMenu] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, logout } = useAuth();
   const pathname = usePathname();
 
+  const handleLogoutClick = () => {
+    setShowTopUserMenu(false);
+    setShowSidebarUserMenu(false);
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    setIsLoggingOut(true);
+    // Pequeño delay para mostrar la animación
+    setTimeout(() => {
+      logout();
+    }, 1500);
+  };
+
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Productos', href: '/products', icon: Package },
-    { name: 'Inventario', href: '/inventory', icon: ShoppingCart },
-    { name: 'Kardex', href: '/kardex', icon: BookOpen },
-    { name: 'Reportes', href: '/reports', icon: BarChart3 },
+    ...(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' ? [
+      { name: 'Productos', href: '/products', icon: Package },
+      { name: 'Inventario', href: '/inventory', icon: ShoppingCart },
+      { name: 'Kardex', href: '/kardex', icon: BookOpen },
+      { name: 'Reportes', href: '/reports', icon: BarChart3 },
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' ? [
+      { name: 'Compras', href: '/purchases', icon: CreditCard },
+      { name: 'Despacho', href: '/dispatch', icon: Truck }
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'ODP' || user?.role === 'COMERCIAL' ? [
+      { name: 'Muestras', href: '/samples', icon: Beaker }
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'ODP' ? [
+      { name: 'Calidad', href: '/quality', icon: ShieldCheck },
+      { name: 'Auditoría', href: '/audit', icon: FileSearch }
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' ? [
+      { name: 'Ventas', href: '/sales', icon: ShoppingCart },
+      { name: 'Clientes', href: '/sales/clients', icon: Users }
+    ] : []),
+    ...(user?.role === 'ADMIN' ? [
+      { name: 'Proveedores', href: '/suppliers', icon: Building2 },
+      { name: 'Usuarios', href: '/users', icon: User }
+    ] : []),
   ];
 
   return (
@@ -70,7 +118,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {/* User menu */}
               <div className="relative">
                 <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={() => {
+                    setShowTopUserMenu(!showTopUserMenu);
+                    setShowSidebarUserMenu(false);
+                  }}
                   className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
                 >
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
@@ -83,21 +134,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
 
                 {/* Dropdown menu */}
-                {showUserMenu && (
+                {showTopUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
                     <Link
                       href="/profile"
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => setShowTopUserMenu(false)}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                     >
                       <User className="w-4 h-4 text-gray-400" />
                       Ver perfil
                     </Link>
                     <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        logout();
-                      }}
+                      onClick={handleLogoutClick}
                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2 border-t border-gray-100"
                     >
                       <LogOut className="w-4 h-4" />
@@ -141,6 +189,61 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               );
             })}
           </nav>
+
+          {/* User Profile Section (Mobile Sidebar Bottom) */}
+          <div className="p-4 border-t border-gray-100 bg-gray-50/50 mt-auto">
+            <button
+              onClick={() => {
+                setShowSidebarUserMenu(!showSidebarUserMenu);
+                setShowTopUserMenu(false);
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-300 group"
+            >
+              <div className="relative">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/30">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{user?.role || 'User'}</p>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showSidebarUserMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Expanded Profile Menu for Mobile */}
+            {showSidebarUserMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-2 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden"
+              >
+                <Link
+                  href="/profile"
+                  onClick={() => {
+                    setShowSidebarUserMenu(false);
+                    setSidebarOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                >
+                  <div className="p-1.5 bg-blue-50 rounded-lg">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-semibold">Ver perfil</span>
+                </Link>
+                <button
+                  onClick={handleLogoutClick}
+                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 border-t border-gray-100 transition-colors"
+                >
+                  <div className="p-1.5 bg-red-100/50 rounded-lg">
+                    <LogOut className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold">Cerrar sesión</span>
+                </button>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -151,7 +254,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Package className="w-8 h-8 text-blue-600" />
             <span className="ml-2 text-lg font-bold text-gray-900">StockMaster</span>
           </div>
-          <nav className="flex-1 px-2 py-4 space-y-1">
+          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
@@ -159,8 +262,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg ${isActive
-                    ? 'bg-blue-50 text-blue-700'
+                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
+                    ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10'
                     : 'text-gray-700 hover:bg-gray-50'
                     }`}
                 >
@@ -170,6 +273,68 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               );
             })}
           </nav>
+
+          {/* User Profile Section (Sidebar Bottom) */}
+          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+            <button
+              onClick={() => {
+                setShowSidebarUserMenu(!showSidebarUserMenu);
+                setShowTopUserMenu(false);
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white hover:shadow-lg hover:shadow-gray-200/50 transition-all duration-300 group"
+            >
+              <div className="relative">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform duration-300">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{user?.role || 'User'}</p>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showSidebarUserMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Expanded Profile Menu */}
+            {showSidebarUserMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-2 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden"
+              >
+                <Link
+                  href="/profile"
+                  onClick={() => setShowSidebarUserMenu(false)}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                >
+                  <div className="p-1.5 bg-blue-50 rounded-lg">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-semibold">Ver perfil</span>
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setShowSidebarUserMenu(false)}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                >
+                  <div className="p-1.5 bg-gray-50 rounded-lg">
+                    <Settings className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <span className="font-semibold">Ajustes</span>
+                </Link>
+                <button
+                  onClick={handleLogoutClick}
+                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 border-t border-gray-100 transition-colors"
+                >
+                  <div className="p-1.5 bg-red-100/50 rounded-lg">
+                    <LogOut className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold">Cerrar sesión</span>
+                </button>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -179,6 +344,75 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+              onClick={() => setShowLogoutConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden p-8 text-center"
+            >
+              <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <LogOut className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">¿Cerrar Sesión?</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed">
+                Estás a punto de salir del sistema. Tendrás que volver a ingresar tus credenciales para acceder nuevamente.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={confirmLogout}
+                  className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold shadow-lg shadow-red-500/30 transition-all active:scale-95"
+                >
+                  Sí, cerrar sesión
+                </button>
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="w-full py-4 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-2xl font-bold transition-all"
+                >
+                  No, mantener sesión
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Logging Out Animation Overlay */}
+      <AnimatePresence>
+        {isLoggingOut && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[110] bg-white flex flex-col items-center justify-center"
+          >
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+                opacity: [1, 0.8, 1]
+              }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-24 h-24 bg-indigo-600 rounded-[2.5rem] shadow-2xl shadow-indigo-600/40 flex items-center justify-center mb-8">
+                <Loader2 className="w-12 h-12 text-white animate-spin" />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Cerrando sesión</h2>
+              <p className="text-gray-400 font-medium">Finalizando tu sesión de forma segura...</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

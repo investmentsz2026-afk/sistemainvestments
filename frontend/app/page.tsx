@@ -19,11 +19,15 @@ import {
   XCircle,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  User as UserIcon,
+  CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ODPDashboard } from '../components/dashboard/ODPDashboard';
+import { CommercialDashboard } from '../components/dashboard/CommercialDashboard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -109,7 +113,7 @@ export default function DashboardPage() {
     { name: 'Dom', entradas: 2, salidas: 1 },
   ];
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -119,7 +123,7 @@ export default function DashboardPage() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
@@ -130,6 +134,22 @@ export default function DashboardPage() {
       }
     }
   };
+
+  if (user?.role === 'ODP') {
+    return (
+      <Layout>
+        <ODPDashboard />
+      </Layout>
+    );
+  }
+
+  if (user?.role === 'COMERCIAL') {
+    return (
+      <Layout>
+        <CommercialDashboard />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -156,8 +176,8 @@ export default function DashboardPage() {
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${selectedPeriod === period
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 {period === 'day' ? 'Hoy' :
@@ -197,7 +217,7 @@ export default function DashboardPage() {
               <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
                 <div
                   className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${(totalVariants / (totalProducts * 3)) * 100}%` }}
+                  style={{ width: `${totalProducts > 0 ? (totalVariants / (totalProducts * 3)) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -436,6 +456,30 @@ export default function DashboardPage() {
               <p className="text-[10px] text-gray-400 mt-0.5">Registro rápido con lector</p>
             </div>
           </Link>
+
+          {(user?.role === 'ADMIN' || user?.role === 'LOGISTICA') && (
+            <Link href="/purchases" className="group">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-xl hover:shadow-emerald-100/50 hover:-translate-y-1 transition-all duration-300 text-center h-full">
+                <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <CreditCard className="w-7 h-7 text-white" />
+                </div>
+                <p className="font-bold text-gray-900 text-sm">Registrar Compra</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Facturas y nuevos pedidos</p>
+              </div>
+            </Link>
+          )}
+
+          {user?.role === 'ADMIN' && (
+            <Link href="/users" className="group col-span-2 lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-xl hover:shadow-indigo-100/50 hover:-translate-y-1 transition-all duration-300 text-center h-full">
+                <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-110 transition-transform duration-300">
+                  <UserIcon className="w-7 h-7 text-white" />
+                </div>
+                <p className="font-bold text-gray-900 text-sm">Gestionar Usuarios</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Control de accesos y roles</p>
+              </div>
+            </Link>
+          )}
         </div>
       </motion.div>
 

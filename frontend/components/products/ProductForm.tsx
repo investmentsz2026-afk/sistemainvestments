@@ -11,14 +11,38 @@ const productSchema = z.object({
   inventoryType: z.string().min(1, 'El tipo de inventario es requerido'),
   description: z.string().optional(),
   purchasePrice: z.number().min(0.01, 'El precio de compra debe ser mayor a 0'),
-  sellingPrice: z.number().min(0.01, 'El precio de venta debe ser mayor a 0'),
+  sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0'),
   minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0').default(5),
   variants: z.array(z.object({
     id: z.string().optional(),
-    size: z.string().min(1, 'La talla es requerida'),
+    size: z.string().optional(),
     color: z.string().min(1, 'El color es requerido'),
     initialStock: z.number().min(0, 'El stock inicial debe ser mayor o igual a 0').default(0),
   })).min(1, 'Debe agregar al menos una variante'),
+}).superRefine((data, ctx) => {
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA'].includes(data.inventoryType);
+
+  // Validar precio de venta solo si NO es material/maquinaria
+  if (!isMaterialOrMachinery && data.sellingPrice <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El precio de venta es requerido para este tipo de producto',
+      path: ['sellingPrice'],
+    });
+  }
+
+  // Validar talla solo si NO es material/maquinaria
+  if (!isMaterialOrMachinery) {
+    data.variants.forEach((variant, index) => {
+      if (!variant.size || variant.size.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'La talla es requerida',
+          path: ['variants', index, 'size'],
+        });
+      }
+    });
+  }
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -43,6 +67,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     formState: { errors },
     watch,
     setValue,
+    reset,
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: initialData || {
@@ -57,6 +82,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     },
   });
 
+  // Reset form when initialData changes (e.g., when importing from purchases)
+  React.useEffect(() => {
+    if (initialData) {
+      reset(initialData);
+    }
+  }, [initialData, reset]);
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'variants',
@@ -64,9 +96,30 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const watchPurchasePrice = watch('purchasePrice');
   const watchSellingPrice = watch('sellingPrice');
+  const watchInventoryType = watch('inventoryType');
+
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA'].includes(watchInventoryType);
+
   const margin = watchPurchasePrice > 0 && watchSellingPrice > 0
     ? ((watchSellingPrice - watchPurchasePrice) / watchPurchasePrice * 100)
     : 0;
+
+  // Si cambia a material/maquinaria, limpiar campos que se ocultan
+  React.useEffect(() => {
+    if (isMaterialOrMachinery) {
+      setValue('sellingPrice', 0);
+      const currentVariants = watch('variants');
+      currentVariants.forEach((_, idx) => {
+        setValue(`variants.${idx}.size`, 'N/A');
+      });
+    } else {
+      // Si vuelve a ser producto, quitar el N/A si estaba antes
+      const currentVariants = watch('variants');
+      currentVariants.forEach((v, idx) => {
+        if (v.size === 'N/A') setValue(`variants.${idx}.size`, '');
+      });
+    }
+  }, [isMaterialOrMachinery, setValue]);
 
   const inputBase = "w-full px-4 py-3 border rounded-xl text-sm font-medium text-gray-800 placeholder-gray-300 focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all duration-200 bg-white hover:border-gray-400";
   const inputError = "border-red-300 focus:ring-red-500/40 focus:border-red-400 bg-red-50/30";
@@ -151,6 +204,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               >
                 <option value="TERMINADOS">📦 Productos Terminados</option>
                 <option value="PROCESO">⏳ Productos en Proceso</option>
+                <option value="SEGUNDA">♻️ Productos de Segunda</option>
                 <option value="MATERIALES">🧱 Materiales</option>
                 <option value="MAQUINARIA">⚙️ Maquinaria</option>
                 <option value="OTROS">📋 Otros</option>
@@ -238,59 +292,60 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
 
             {/* Precio de Venta */}
-            <div>
-              <label className={labelClass}>
-                <DollarSign className="w-3.5 h-3.5" />
-                Precio de Venta <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  {...register('sellingPrice', { valueAsNumber: true })}
-                  className={`${inputBase} pl-10 ${errors.sellingPrice ? inputError : inputNormal}`}
-                  placeholder="0.00"
-                  min="0"
-                />
-              </div>
-              {errors.sellingPrice && (
-                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {errors.sellingPrice.message}
-                </p>
-              )}
-            </div>
-
-            {/* Margen de Ganancia */}
-            {watchPurchasePrice > 0 && watchSellingPrice > 0 && (
-              <div className="md:col-span-2">
-                <div className={`flex items-center justify-between p-4 rounded-xl border ${margin > 0
-                    ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200'
-                    : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
-                  }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${margin > 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
-                      <TrendingUp className={`w-4 h-4 ${margin > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Margen de ganancia</p>
-                      <p className={`text-lg font-black ${margin > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                        S/ {(watchSellingPrice - watchPurchasePrice).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className={`text-right px-4 py-2 rounded-xl ${margin > 0 ? 'bg-emerald-100/80' : 'bg-red-100/80'
-                    }`}>
-                    <p className={`text-xl font-black ${margin > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {margin.toFixed(1)}%
-                    </p>
-                  </div>
+            {!isMaterialOrMachinery && (
+              <div>
+                <label className={labelClass}>
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Precio de Venta <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('sellingPrice', { valueAsNumber: true })}
+                    className={`${inputBase} pl-10 ${errors.sellingPrice ? inputError : inputNormal}`}
+                    placeholder="0.00"
+                    min="0"
+                  />
                 </div>
+                {errors.sellingPrice && (
+                  <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.sellingPrice.message}
+                  </p>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Margen de Ganancia - Solo si no es material/maquinaria */}
+      {!isMaterialOrMachinery && watchPurchasePrice > 0 && watchSellingPrice > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 -mt-3">
+          <div className={`flex items-center justify-between p-4 rounded-xl border ${margin > 0
+            ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200'
+            : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+            }`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${margin > 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                <TrendingUp className={`w-4 h-4 ${margin > 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Margen de ganancia estimado</p>
+                <p className={`text-lg font-black ${margin > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  S/ {(watchSellingPrice - watchPurchasePrice).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className={`text-right px-4 py-2 rounded-xl ${margin > 0 ? 'bg-emerald-100/80' : 'bg-red-100/80'}`}>
+              <p className={`text-xl font-black ${margin > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {margin.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Variantes ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -307,7 +362,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => append({ size: '', color: '', initialStock: 0 })}
+              onClick={() => append({ size: isMaterialOrMachinery ? 'N/A' : '', color: '', initialStock: 0 })}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-bold rounded-xl hover:from-violet-600 hover:to-purple-700 transition-all shadow-md shadow-violet-500/25 hover:shadow-lg hover:shadow-violet-500/30 hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
@@ -360,24 +415,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
 
                 {/* Talla */}
-                <div>
-                  <label className={labelClass}>
-                    <Ruler className="w-3.5 h-3.5" />
-                    Talla <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    {...register(`variants.${index}.size`)}
-                    className={`${inputBase} ${errors.variants?.[index]?.size ? inputError : inputNormal}`}
-                    placeholder="S, M, L, XL, 28..."
-                  />
-                  {errors.variants?.[index]?.size && (
-                    <p className="mt-1 text-[10px] text-red-500 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {errors.variants[index]?.size?.message}
-                    </p>
-                  )}
-                </div>
+                {!isMaterialOrMachinery && (
+                  <div>
+                    <label className={labelClass}>
+                      <Ruler className="w-3.5 h-3.5" />
+                      Talla <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      {...register(`variants.${index}.size`)}
+                      className={`${inputBase} ${errors.variants?.[index]?.size ? inputError : inputNormal}`}
+                      placeholder="S, M, L, XL, 28..."
+                    />
+                    {errors.variants?.[index]?.size && (
+                      <p className="mt-1 text-[10px] text-red-500 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.variants[index]?.size?.message}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Color */}
                 <div>
@@ -457,4 +514,4 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       </div>
     </form>
   );
-}
+};

@@ -13,12 +13,29 @@ model User {
   email         String    @unique
   name          String
   password      String
-  role          String    @default("USER")
+  roles         Role[]    @relation("UserRoles")
+  isActive      Boolean   @default(true) @map("is_active")
   movements     Movement[]
+  purchases     Purchase[]
+  qualityControls QualityControl[] @relation("QualityConfirmedBy")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
+  processAudits ProcessAudit[]
+  sales         Sale[]    @relation("UserSales")
+  samplesCreated ProductSample[] @relation("SampleCreator")
+  samplesReviewed ProductSample[] @relation("SampleReviewer")
+
   @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserRoles")
+
+  @@map("roles")
 }
 
 model Product {
@@ -30,9 +47,12 @@ model Product {
   description      String?       @db.Text
   purchasePrice    Float         @map("purchase_price")
   sellingPrice     Float         @map("selling_price")
-  minStock         Int           @default(5) @map("min_stock")
+  minStock         Float         @default(5) @map("min_stock")
   isActive         Boolean       @default(true) @map("is_active")
   variants         ProductVariant[]
+  purchaseItems    PurchaseItem[]
+  processAudits    ProcessAudit[]
+  sampleUsage      SampleMaterial[]
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -45,9 +65,11 @@ model ProductVariant {
   product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   size             String
   color            String
-  stock            Int           @default(0)
+  stock            Float         @default(0)
   variantSku       String        @unique @map("variant_sku")
   movements        Movement[]
+  purchaseItems    PurchaseItem[]
+  saleItems        SaleItem[]
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
@@ -59,11 +81,11 @@ model ProductVariant {
 model Movement {
   id               String        @id @default(cuid())
   type             String        // "ENTRY" o "EXIT"
-  quantity         Int
+  quantity         Float
   reason           String
   reference        String?
-  previousStock    Int           @map("previous_stock")
-  newStock         Int           @map("new_stock")
+  previousStock    Float         @map("previous_stock")
+  newStock         Float         @map("new_stock")
   variantId        String        @map("variant_id")
   variant          ProductVariant @relation(fields: [variantId], references: [id])
   userId           String        @map("user_id")
@@ -74,3 +96,241 @@ model Movement {
   @@index([createdAt])
   @@map("movements")
 }
+
+model Purchase {
+  id            String         @id @default(cuid())
+  type          String         @default("PURCHASE") // PURCHASE or SERVICE
+  invoiceNumber String?        @map("invoice_number")
+  op            String?        // Orden de Producción
+  totalAmount   Float          @default(0) @map("total_amount")
+  status        String         @default("EN_CALIDAD") // EN_CALIDAD, RECIBIDO, RECHAZADO
+  items         PurchaseItem[]
+  userId        String         @map("user_id")
+  user          User           @relation(fields: [userId], references: [id])
+  supplierId    String?        @map("supplier_id")
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  notes         String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id            String   @id @default(cuid())
+  purchaseId    String   @map("purchase_id")
+  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  
+  // Opcionales por si ya existe en inventario
+  productId     String?  @map("product_id")
+  product       Product? @relation(fields: [productId], references: [id])
+  variantId     String?  @map("variant_id")
+  variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  
+  // Datos descriptivos (obligatorios para nuevas compras)
+  name          String
+  description   String?
+  category      String   // Materiales, Maquinaria, Avios, Productos Químicos
+  unit          String?  // Metros, Unidades, Litros, etc.
+  
+  quantity      Float
+  price         Float    // Precio de compra unitario
+  status        String   @default("EN_CALIDAD") // EN_CALIDAD, RECEIVED, REJECTED
+  
+  qualityControl QualityControl?
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("purchase_items")
+}
+
+model QualityControl {
+  id              String       @id @default(cuid())
+  purchaseItemId  String       @unique @map("purchase_item_id")
+  purchaseItem    PurchaseItem @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
+  
+  status          String       // RECEIVED, REJECTED, PARTIAL?
+  observations    String?      @db.Text
+  rejectionReason String?      @map("rejection_reason") @db.Text
+  
+  confirmedById   String?      @map("confirmed_by_id")
+  confirmedBy     User?        @relation("QualityConfirmedBy", fields: [confirmedById], references: [id])
+  
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@map("quality_controls")
+}
+
+model Supplier {
+  id            String    @id @default(cuid())
+  documentType  String    @default("RUC") @map("document_type") // RUC, DNI
+  documentNumber String   @unique @map("document_number")
+  name          String    // Razón Social o Nombres
+  contactName   String?   @map("contact_name")
+  email         String?
+  phone         String?
+  address       String?   @db.Text
+  category      String?   // Materiales, Servicios, Maquinarias, etc
+  isActive      Boolean   @default(true) @map("is_active")
+  notes         String?   @db.Text
+  purchases     Purchase[]
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("suppliers")
+}
+
+model ProcessAudit {
+  id              String         @id @default(cuid())
+  productId       String         @map("product_id")
+  product         Product        @relation(fields: [productId], references: [id])
+  op              String         // Lote de producción u OP
+  process         String         // Corte, Confección, Lavado, Acabados
+  inspectorId     String         @map("inspector_id")
+  inspector       User           @relation(fields: [inspectorId], references: [id])
+  auditDate       DateTime       @default(now()) @map("audit_date")
+  result          String         // CONFORME, OBSERVACION, NO_CONFORME
+  
+  quantityGood    Float          @default(0) @map("quantity_good")
+  quantityProcess Float          @default(0) @map("quantity_process")
+  quantitySecond  Float          @default(0) @map("quantity_second")
+  totalQuantity   Float          @default(0) @map("total_quantity")
+
+  observations    String?        @db.Text
+  evidences       String[]       // Array of file paths/URLs
+  checklist       Json?          // Checklist values depending on the process
+  
+  approvalStatus  String         @default("PENDIENTE") @map("approval_status") // PENDIENTE, APROBADO, RECHAZADO
+  approvedAt      DateTime?      @map("approved_at")
+  
+  findings        AuditFinding[]
+
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("process_audits")
+}
+
+model AuditFinding {
+  id              String         @id @default(cuid())
+  auditId         String         @map("audit_id")
+  audit           ProcessAudit   @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  description     String         @db.Text
+  severity        String         // BAJO, MEDIO, ALTO, CRITICO
+  responsibleArea String         @map("responsible_area") // Corte, Confección, etc.
+  date            DateTime       @default(now())
+  
+  correctiveActions CorrectiveAction[]
+
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("audit_findings")
+}
+
+model CorrectiveAction {
+  id              String         @id @default(cuid())
+  findingId       String         @map("finding_id")
+  finding         AuditFinding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  action          String         @db.Text
+  responsibleId   String?        @map("responsible_id") // Can be linked to User or just string
+  responsibleName String?        @map("responsible_name")
+  deadline        DateTime?
+  status          String         @default("PENDIENTE") // PENDIENTE, EN_PROCESO, SOLUCIONADO
+  
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("corrective_actions")
+}
+
+
+model Client {
+  id              String   @id @default(cuid())
+  documentType    String   @default("DNI") @map("document_type") // DNI, RUC
+  documentNumber  String   @unique @map("document_number")
+  name            String
+  email           String?
+  phone           String?
+  address         String?  @db.Text
+  sales           Sale[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("clients")
+}
+
+model Sale {
+  id              String     @id @default(cuid())
+  invoiceNumber   String?    @unique @map("invoice_number")
+  clientId        String?    @map("client_id")
+  client          Client?    @relation(fields: [clientId], references: [id])
+  totalAmount     Float      @map("total_amount")
+  paymentMethod   String     @map("payment_method") // EFECTIVO, TARJETA, TRANSFERENCIA
+  status          String     @default("COMPLETADO") // COMPLETADO, ANULADO
+  items           SaleItem[]
+  sellerId        String     @map("seller_id")
+  seller          User       @relation("UserSales", fields: [sellerId], references: [id])
+  notes           String?    @db.Text
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id              String         @id @default(cuid())
+  saleId          String         @map("sale_id")
+  sale            Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  variantId       String         @map("variant_id")
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+  quantity        Float
+  unitPrice       Float          @map("unit_price") // Selling price at the time of sale
+  totalPrice      Float          @map("total_price")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  @@map("sale_items")
+}
+
+model ProductSample {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?          @db.Text
+  characteristics String?          @db.Text
+  images          String[]         // Evidencias / Fotos de la muestra
+  status          String           @default("PENDIENTE") // PENDIENTE, OBSERVADO, APROBADO
+  observations    String?          @db.Text // Observaciones de comercial
+  recommendations String?          @db.Text // Recomendaciones de comercial
+  
+  odpId           String           @map("odp_id")
+  odp             User             @relation("SampleCreator", fields: [odpId], references: [id])
+  
+  commercialId    String?          @map("commercial_id") // El comercial que revisa
+  commercial      User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
+  
+  materials       SampleMaterial[]
+  
+  approvedAt      DateTime?        @map("approved_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@map("product_samples")
+}
+
+model SampleMaterial {
+  id              String        @id @default(cuid())
+  sampleId        String        @map("sample_id")
+  sample          ProductSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  
+  productId       String        @map("product_id")
+  product         Product       @relation(fields: [productId], references: [id])
+  
+  quantityPerUnit Float         @map("quantity_per_unit")
+  unitPriceAtTime Float         @map("unit_price_at_time") // Precio del inventario al momento de definir
+
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@map("sample_materials")
+}
+

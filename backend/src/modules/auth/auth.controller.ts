@@ -1,8 +1,10 @@
 // backend/src/modules/auth/auth.controller.ts
-import { Controller, Post, Body, Get, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -34,7 +36,7 @@ export class AuthController {
       const result = await this.authService.login(loginDto);
       return {
         success: true,
-        message: 'Login exitoso',
+        message: result.roles.length > 0 ? 'Por favor seleccione un rol' : 'Login exitoso',
         data: result
       };
     } catch (error) {
@@ -42,6 +44,25 @@ export class AuthController {
         success: false,
         message: error.message || 'Credenciales inválidas',
         statusCode: HttpStatus.UNAUTHORIZED
+      };
+    }
+  }
+
+  @Post('select-role')
+  @HttpCode(HttpStatus.OK)
+  async selectRole(@Body() body: { userId: string; roleName: string }) {
+    try {
+      const result = await this.authService.selectRole(body.userId, body.roleName);
+      return {
+        success: true,
+        message: 'Acceso concedido',
+        data: result
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || 'Error al seleccionar rol',
+        statusCode: HttpStatus.BAD_REQUEST
       };
     }
   }
@@ -77,7 +98,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Request() req) {
     try {
-      const newToken = await this.authService.refreshToken(req.user.id);
+      const newToken = await this.authService.refreshToken(req.user.id, req.user.role);
       return {
         success: true,
         data: { token: newToken }
@@ -184,6 +205,81 @@ export class AuthController {
       return {
         success: false,
         message: error.message || 'Error al restablecer contraseña'
+      };
+    }
+  }
+
+  @Get('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getAllUsers() {
+    try {
+      const result = await this.authService.getAllUsers();
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Get('roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getAllRoles() {
+    try {
+      const result = await this.authService.getAllRoles();
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Post('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async createUser(@Body() body: any) {
+    try {
+      const result = await this.authService.createUserByAdmin(body);
+      return { success: true, message: 'Usuario creado exitosamente', data: result };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Post('users/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async updateUser(@Param('id') id: string, @Body() body: any) {
+    try {
+      const result = await this.authService.updateUserByAdmin(id, body);
+      return { success: true, message: 'Usuario actualizado exitosamente', data: result };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Post('users/:id/toggle-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async toggleStatus(@Param('id') id: string) {
+    try {
+      const result = await this.authService.toggleUserStatus(id);
+      return { success: true, message: 'Estado actualizado', data: result };
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
+  }
+
+  @Post('users/:id/delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async deleteUser(@Param('id') id: string) {
+    try {
+      await this.authService.deleteUser(id);
+      return { success: true, message: 'Usuario eliminado exitosamente' };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || 'Error al eliminar usuario'
       };
     }
   }

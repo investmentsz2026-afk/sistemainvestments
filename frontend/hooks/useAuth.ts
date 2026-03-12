@@ -35,21 +35,31 @@ export function useAuth() {
 
   const loginMutation = useMutation(
     async (credentials: LoginCredentials) => {
-      // backend wraps result in { success, message, data }
       const resp = await api.post('/auth/login', credentials);
-      return resp.data.data as AuthResponse; // unwrap payload
+      return resp.data.data;
     },
     {
-      onSuccess: (data) => {
-        console.log('Login successful:', data);
-        localStorage.setItem('token', data.token);
-        refetch();
-        // Forzar redirección
-        window.location.href = '/';
-      },
       onError: (error: any) => {
         console.error('Login error:', error);
         alert(error.response?.data?.message || 'Error al iniciar sesión');
+      },
+    }
+  );
+
+  const selectRoleMutation = useMutation(
+    async ({ userId, roleName }: { userId: string; roleName: string }) => {
+      const resp = await api.post('/auth/select-role', { userId, roleName });
+      return resp.data.data;
+    },
+    {
+      onSuccess: (data) => {
+        localStorage.setItem('token', data.token);
+        refetch();
+        window.location.href = '/';
+      },
+      onError: (error: any) => {
+        console.error('Role selection error:', error);
+        alert(error.response?.data?.message || 'Error al seleccionar rol');
       },
     }
   );
@@ -89,8 +99,10 @@ export function useAuth() {
   return {
     user,
     isLoading: loginMutation.isLoading || registerMutation.isLoading || userLoading,
-    login: loginMutation.mutate,
+    login: loginMutation.mutateAsync, // Switch to mutateAsync for better control in component
     register: registerMutation.mutate,
+    selectRole: selectRoleMutation.mutate,
+    isSelectingRole: selectRoleMutation.isLoading,
     logout,
     isAuthenticated,
   };

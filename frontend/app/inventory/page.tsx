@@ -172,6 +172,7 @@ export default function InventoryPage() {
     { id: 'TODOS', label: 'Todos', icon: Package },
     { id: 'TERMINADOS', label: 'Terminados', icon: CheckCircle },
     { id: 'PROCESO', label: 'En Proceso', icon: Clock },
+    { id: 'SEGUNDA', label: 'De Segunda', icon: RefreshCw },
     { id: 'MATERIALES', label: 'Materiales', icon: FileText },
     { id: 'MAQUINARIA', label: 'Maquinaria', icon: Truck },
     { id: 'OTROS', label: 'Otros', icon: MoreVertical },
@@ -835,204 +836,209 @@ export default function InventoryPage() {
               </Link>
             )}
           </div>
-        )}
-      </div>
+        )
+        }
+      </div >
 
       {/* Modal para movimientos */}
-      {showMovementModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {movementType === 'ENTRY' ? 'Registrar Entrada' : 'Registrar Salida'}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowMovementModal(false);
-                  setSelectedProduct(null);
-                  setSelectedVariant(null);
-                }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <p className="font-medium text-gray-900">{selectedProduct.name}</p>
-
-              {/* Selector de variante */}
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar variante</label>
-                <select
-                  value={selectedVariant?.id || ''}
-                  onChange={(e) => {
-                    const v = selectedProduct.variants.find((x: any) => x.id === e.target.value);
-                    setSelectedVariant(v || null);
+      {
+        showMovementModal && selectedProduct && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {movementType === 'ENTRY' ? 'Registrar Entrada' : 'Registrar Salida'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowMovementModal(false);
+                    setSelectedProduct(null);
+                    setSelectedVariant(null);
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
                 >
-                  <option value="">-- Seleccionar variante --</option>
-                  {selectedProduct.variants.map((v: any) => (
-                    <option key={v.id} value={v.id}>
-                      {v.size} / {v.color} (Stock: {v.stock})
-                    </option>
-                  ))}
-                </select>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <p className="text-sm text-gray-600 mt-3">
-                Stock actual: <span className="font-medium">{selectedVariant ? selectedVariant.stock : '—'}</span>
-              </p>
-            </div>
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <p className="font-medium text-gray-900">{selectedProduct.name}</p>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={movementType === 'EXIT' ? selectedVariant?.stock : undefined}
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Motivo
-                </label>
-                <select
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Seleccionar motivo</option>
-                  {movementType === 'ENTRY' ? (
-                    <>
-                      <option value="Compra">Compra a proveedor</option>
-                      <option value="Devolución">Devolución de cliente</option>
-                      <option value="Ajuste">Ajuste de inventario</option>
-                      <option value="Transferencia">Transferencia</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="Venta">Venta</option>
-                      <option value="Merma">Merma</option>
-                      <option value="Ajuste">Ajuste de inventario</option>
-                      <option value="Transferencia">Transferencia</option>
-                    </>
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Referencia (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder={movementType === 'ENTRY' ? 'N° factura, orden de compra...' : 'N° venta, ticket...'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowMovementModal(false);
-                  setSelectedProduct(null);
-                  setSelectedVariant(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleMovement}
-                disabled={!quantity || !reason}
-                className={`flex-1 px-4 py-2 rounded-lg text-white transition ${movementType === 'ENTRY'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-red-600 hover:bg-red-700'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Modal de Exportación */}
-      {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-xl">
-                  <Download className="w-5 h-5 text-blue-600" />
+                {/* Selector de variante */}
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar variante</label>
+                  <select
+                    value={selectedVariant?.id || ''}
+                    onChange={(e) => {
+                      const v = selectedProduct.variants.find((x: any) => x.id === e.target.value);
+                      setSelectedVariant(v || null);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">-- Seleccionar variante --</option>
+                    {selectedProduct.variants.map((v: any) => (
+                      <option key={v.id} value={v.id}>
+                        {v.size} / {v.color} (Stock: {v.stock})
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                <p className="text-sm text-gray-600 mt-3">
+                  Stock actual: <span className="font-medium">{selectedVariant ? selectedVariant.stock : '—'}</span>
+                </p>
+              </div>
+
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Exportar Inventario</h3>
-                  <p className="text-xs text-gray-400">Selecciona el formato de exportación</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={movementType === 'EXIT' ? selectedVariant?.stock : undefined}
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Motivo
+                  </label>
+                  <select
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Seleccionar motivo</option>
+                    {movementType === 'ENTRY' ? (
+                      <>
+                        <option value="Compra">Compra a proveedor</option>
+                        <option value="Devolución">Devolución de cliente</option>
+                        <option value="Ajuste">Ajuste de inventario</option>
+                        <option value="Transferencia">Transferencia</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Venta">Venta</option>
+                        <option value="Merma">Merma</option>
+                        <option value="Ajuste">Ajuste de inventario</option>
+                        <option value="Transferencia">Transferencia</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Referencia (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder={movementType === 'ENTRY' ? 'N° factura, orden de compra...' : 'N° venta, ticket...'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
                 </div>
               </div>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="p-6">
-              <div className="grid grid-cols-1 gap-4">
-                {/* Opción Excel */}
+              <div className="flex gap-3 mt-6">
                 <button
-                  onClick={exportToExcel}
-                  className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all duration-300 text-left"
-                >
-                  <div className="p-3 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
-                    <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Microsoft Excel (.xlsx)</h4>
-                    <p className="text-xs text-gray-500">Hoja de cálculo con todos los datos detallados</p>
-                  </div>
-                </button>
-
-                {/* Opción PDF */}
-                <button
-                  onClick={exportToPDF}
-                  className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-red-500 hover:bg-red-50/50 transition-all duration-300 text-left"
-                >
-                  <div className="p-3 bg-red-100 rounded-xl group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">Documento PDF (.pdf)</h4>
-                    <p className="text-xs text-gray-500">Reporte visual listo para imprimir o enviar</p>
-                  </div>
-                </button>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+                  onClick={() => {
+                    setShowMovementModal(false);
+                    setSelectedProduct(null);
+                    setSelectedVariant(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                 >
                   Cancelar
                 </button>
+                <button
+                  onClick={handleMovement}
+                  disabled={!quantity || !reason}
+                  className={`flex-1 px-4 py-2 rounded-lg text-white transition ${movementType === 'ENTRY'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Confirmar
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </Layout>
+        )
+      }
+      {/* Modal de Exportación */}
+      {
+        showExportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200">
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-xl">
+                    <Download className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Exportar Inventario</h3>
+                    <p className="text-xs text-gray-400">Selecciona el formato de exportación</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Opción Excel */}
+                  <button
+                    onClick={exportToExcel}
+                    className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all duration-300 text-left"
+                  >
+                    <div className="p-3 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
+                      <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Microsoft Excel (.xlsx)</h4>
+                      <p className="text-xs text-gray-500">Hoja de cálculo con todos los datos detallados</p>
+                    </div>
+                  </button>
+
+                  {/* Opción PDF */}
+                  <button
+                    onClick={exportToPDF}
+                    className="group flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-100 hover:border-red-500 hover:bg-red-50/50 transition-all duration-300 text-left"
+                  >
+                    <div className="p-3 bg-red-100 rounded-xl group-hover:scale-110 transition-transform">
+                      <FileText className="w-6 h-6 text-red-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Documento PDF (.pdf)</h4>
+                      <p className="text-xs text-gray-500">Reporte visual listo para imprimir o enviar</p>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </Layout >
   );
 }

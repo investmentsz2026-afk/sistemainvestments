@@ -6,7 +6,13 @@ import { ProductsModule } from './modules/products/products.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { MovementsModule } from './modules/movements/movements.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { DatabaseModule } from './database/database.module';
+import { QualityModule } from './modules/quality/quality.module';
+import { ProcessAuditsModule } from './modules/process-audits/process-audits.module';
+import { CommercialModule } from './modules/commercial/commercial.module';
+import { SamplesModule } from './modules/samples/samples.module';
 
 @Module({
   imports: [
@@ -19,6 +25,12 @@ import { DatabaseModule } from './database/database.module';
     InventoryModule,
     MovementsModule,
     ReportsModule,
+    PurchasesModule,
+    SuppliersModule,
+    QualityModule,
+    ProcessAuditsModule,
+    CommercialModule,
+    SamplesModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

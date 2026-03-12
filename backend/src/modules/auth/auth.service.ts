@@ -28,18 +28,21 @@ export class AuthService {
         email: registerDto.email,
         name: registerDto.name,
         password: hashedPassword,
-        role: 'USER',
+        roles: {
+          connect: { name: 'ADMIN' } // Default to user or as needed
+        }
       },
+      include: { roles: true }
     });
 
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.generateToken(user.id, user.email, 'ADMIN');
 
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: 'ADMIN',
       },
       token,
     };
@@ -48,10 +51,11 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
+      include: { roles: true }
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Credenciales inválidas o cuenta inactiva');
     }
 
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
@@ -60,29 +64,57 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const token = this.generateToken(user.id, user.email, user.role);
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      roles: user.roles.map(r => r.name),
+      tempToken: this.jwtService.sign({ sub: user.id, type: 'TEMP_ROLE_SELECTION' }, { expiresIn: '5m' })
+    };
+  }
+
+  async selectRole(userId: string, roleName: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { roles: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const hasRole = user.roles.some(r => r.name === roleName);
+    if (!hasRole) {
+      throw new BadRequestException('El usuario no tiene este rol asignado');
+    }
+
+    const token = this.generateToken(user.id, user.email, roleName);
 
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: roleName,
       },
       token,
     };
   }
 
-  async refreshToken(userId: string) {
+  async refreshToken(userId: string, currentRole?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { roles: true }
     });
 
     if (!user) {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    return this.generateToken(user.id, user.email, user.role);
+    const roleToUse = currentRole || (user.roles.length > 0 ? user.roles[0].name : 'USER');
+    return this.generateToken(user.id, user.email, roleToUse);
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -137,7 +169,6 @@ export class AuthService {
       id: updatedUser.id,
       email: updatedUser.email,
       name: updatedUser.name,
-      role: updatedUser.role,
     };
   }
 
@@ -164,22 +195,111 @@ export class AuthService {
     return true;
   }
 
+  async getAllUsers() {
+    return this.prisma.user.findMany({
+      include: { roles: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getAllRoles() {
+    return this.prisma.role.findMany();
+  }
+
+  async createUserByAdmin(data: any) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('El email ya está registrado');
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    return this.prisma.user.create({
+      data: {
+        email: data.email,
+        name: data.name,
+        password: hashedPassword,
+        roles: {
+          connect: data.roles.map(roleName => ({ name: roleName }))
+        }
+      },
+      include: { roles: true }
+    });
+  }
+
+  async updateUserByAdmin(id: string, data: any) {
+    const { roles, password, ...rest } = data;
+    const updateData: any = { ...rest };
+
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    if (roles) {
+      updateData.roles = {
+        set: [], // Clear previous roles
+        connect: roles.map(roleName => ({ name: roleName }))
+      };
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: { roles: true }
+    });
+  }
+
+  async toggleUserStatus(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: !user.isActive },
+    });
+  }
+
   async resetPassword(token: string, newPassword: string) {
     try {
-      // Verificar el token
       const payload = this.jwtService.verify(token);
-
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-
       await this.prisma.user.update({
         where: { id: payload.sub },
         data: { password: hashedPassword },
       });
-
       return true;
     } catch (error) {
       throw new BadRequestException('Token inválido o expirado');
     }
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            movements: true,
+            purchases: true
+          }
+        }
+      }
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    // Si el usuario tiene actividad, NO podemos eliminarlo por integridad referencial
+    // y perderíamos el historial de quién hizo qué.
+    if ((user as any)._count.movements > 0 || (user as any)._count.purchases > 0) {
+      throw new BadRequestException('No se puede eliminar porque tiene movimientos o compras asociadas. Se recomienda desactivar la cuenta en su lugar.');
+    }
+
+    return this.prisma.user.delete({
+      where: { id }
+    });
   }
 
   private generateToken(userId: string, email: string, role: string): string {
