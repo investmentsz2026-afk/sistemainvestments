@@ -188,22 +188,33 @@ export default function ScanPage() {
         // Convertir base64 a blob
         const blob = await (await fetch(imageSrc)).blob();
         
-        // Decodificar código de barras
-        const result = await codeReader.current.decodeFromImage(blob);
-        
-        if (result && result.getText()) {
-          const barcode = result.getText();
-          setDetectedBarcode(barcode);
-          processBarcode(barcode);
-          
-          // Vibrar si es posible (solo dispositivos móviles)
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
+        const imageUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.src = imageUrl;
+
+        img.onload = async () => {
+          if (!codeReader.current) return;
+          try {
+            const result = await codeReader.current.decodeFromImage(img);
+            
+            if (result && result.getText()) {
+              const barcode = result.getText();
+              setDetectedBarcode(barcode);
+              processBarcode(barcode);
+              
+              // Vibrar si es posible (solo dispositivos móviles)
+              if (navigator.vibrate) {
+                navigator.vibrate(200);
+              }
+            }
+          } catch (error) {
+            // Ignorar error de decodificación
+          } finally {
+            URL.revokeObjectURL(imageUrl); // Prevenir fugas de memoria
           }
-        }
+        };
       } catch (error) {
-        // Error esperado cuando no se detecta código
-        // No mostrar toast para no saturar
+        // Error capturando la imagen
       }
     }, 500); // Escanear cada 500ms
   };
@@ -214,9 +225,8 @@ export default function ScanPage() {
       if (stream) {
         const track = stream.getVideoTracks()[0];
         try {
-          // @ts-ignore - Torch capability
           await track.applyConstraints({
-            advanced: [{ torch: !torchOn }]
+            advanced: [{ torch: !torchOn } as any]
           });
           setTorchOn(!torchOn);
         } catch (error) {

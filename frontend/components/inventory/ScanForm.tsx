@@ -10,7 +10,7 @@ export const ScanForm: React.FC = () => {
   const [reason, setReason] = useState('Venta');
   const [isScanning, setIsScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { scanProduct, isScanning: isLoading } = useInventory();
+  const { registerMovement, isRegistering: isLoading } = useInventory();
 
   useEffect(() => {
     // Enfocar el input cuando se activa el modo escaneo
@@ -27,8 +27,9 @@ export const ScanForm: React.FC = () => {
       return;
     }
 
-    scanProduct({
-      variantSku: barcode,
+    registerMovement({
+      variantId: barcode, // Asumiendo que procesará el SKU/Barcode en el backend o necesita adaptación
+      type: 'EXIT',
       quantity,
       reason,
     });
