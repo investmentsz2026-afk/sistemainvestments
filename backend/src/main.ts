@@ -27,8 +27,10 @@ async function bootstrap() {
     // Servir archivos estáticos
     app.useStaticAssets(join(__dirname, '..', 'public'));
 
-    // Prefijo global
-    app.setGlobalPrefix('api');
+    // Prefijo global (excluyendo la raíz para que Railway encuentre el health check)
+    app.setGlobalPrefix('api', {
+      exclude: ['/'],
+    });
 
     // Puerto dinámico para Railway
     const port = process.env.PORT || 3000;
