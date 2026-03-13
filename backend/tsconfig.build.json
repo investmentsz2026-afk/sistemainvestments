@@ -1,11 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "dist",       // Donde se genera el build
-    "rootDir": "src",       // Desde dónde se compila
+    "outDir": "dist",
+    "rootDir": "src",
     "removeComments": true,
-    "declaration": false    // No necesitamos .d.ts en producción
+    "declaration": false,
+    "incremental": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
 }
