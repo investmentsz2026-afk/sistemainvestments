@@ -13,7 +13,6 @@ import { ProcessAuditsModule } from './modules/process-audits/process-audits.mod
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -34,6 +33,6 @@ import { AppService } from './app.service';
     SamplesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [],
 })
 export class AppModule { }

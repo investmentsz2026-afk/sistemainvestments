@@ -1,12 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
+  // Endpoint raíz para verificar que el backend está corriendo
   @Get()
-  healthCheck() {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+  root() {
+    return { status: 'ok', message: 'Backend running' };
   }
 }
