@@ -9,9 +9,12 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    // CORS seguro
+    // CORS seguro: permite localhost y tu frontend en producción
     app.enableCors({
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: [
+        'http://localhost:3000', // para desarrollo local
+        'https://frontend-production-120326.up.railway.app', // frontend en Railway
+      ],
       credentials: true,
     });
 
@@ -24,20 +27,19 @@ async function bootstrap() {
       }),
     );
 
-    // Servir archivos estáticos
+    // Servir archivos estáticos desde la carpeta 'public'
     app.useStaticAssets(join(__dirname, '..', 'public'));
 
-    // Prefijo global (excluyendo la raíz para que Railway encuentre el health check)
+    // Prefijo global para todas las rutas excepto la raíz
     app.setGlobalPrefix('api', {
       exclude: ['/'],
     });
 
     // Puerto dinámico para Railway
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
     await app.listen(port, '0.0.0.0');
 
-    const url = await app.getUrl();
-    logger.log(`✅ Application running on: ${url}`);
+    logger.log(`✅ Application running on port ${port}`);
   } catch (err) {
     logger.error('❌ Failed to start application', err);
     process.exit(1);

@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash('123456', 10);
+  const passwordHash = await bcrypt.hash('admin2026', 10);
 
   // Crear roles definidos por el usuario
   const roles = [
@@ -27,7 +27,7 @@ async function main() {
 
   // Upsert admin user assigning all roles (requested by user)
   await prisma.user.upsert({
-    where: { email: 'admin@proyectolima.com' },
+    where: { email: 'admin@gmail.com' },
     update: {
       name: 'Administrador',
       password: passwordHash,
@@ -37,7 +37,7 @@ async function main() {
       }
     },
     create: {
-      email: 'admin@proyectolima.com',
+      email: 'admin@gmail.com',
       name: 'Administrador',
       password: passwordHash,
       roles: {
@@ -47,8 +47,8 @@ async function main() {
   });
 
   console.log('✅ Roles y Admin creados exitosamente');
-  console.log('📧 Email: admin@proyectolima.com');
-  console.log('🔑 Contraseña: 123456');
+  console.log('📧 Email: admin@gmail.com');
+  console.log('🔑 Contraseña: admin2026');
 }
 
 main()
