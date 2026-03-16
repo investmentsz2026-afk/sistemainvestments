@@ -26,7 +26,7 @@ import {
 import Link from 'next/link';
 import { motion, Variants } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ODPDashboard } from '../components/dashboard/ODPDashboard';
+import { UDPDashboard } from '../components/dashboard/UDPDashboard';
 import { CommercialDashboard } from '../components/dashboard/CommercialDashboard';
 
 export default function DashboardPage() {
@@ -135,10 +135,10 @@ export default function DashboardPage() {
     }
   };
 
-  if (user?.role === 'ODP') {
+  if (user?.role === 'UDP') {
     return (
       <Layout>
-        <ODPDashboard />
+        <UDPDashboard />
       </Layout>
     );
   }

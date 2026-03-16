@@ -117,7 +117,7 @@ export default function QualityPage() {
 
             const doc = new jsPDF('landscape', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
-            const title = 'HISTORIAL DE CONTROL DE CALIDAD (ODP)';
+            const title = 'HISTORIAL DE CONTROL DE CALIDAD (UDP)';
 
             // Header
             doc.setFillColor(37, 99, 235); // Blue 600
@@ -229,7 +229,7 @@ export default function QualityPage() {
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3 uppercase tracking-tight">
                         <ShieldCheck className="w-10 h-10 text-blue-600" />
-                        Módulo de Calidad <span className="text-blue-600">(ODP)</span>
+                        Módulo de Calidad <span className="text-blue-600">(UDP)</span>
                     </h1>
                     <p className="text-gray-500 mt-1 font-medium italic">Confirma la recepción de compras y evalúa su estado.</p>
                 </div>

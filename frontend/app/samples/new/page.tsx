@@ -5,14 +5,18 @@ import { Layout } from '../../../components/common/Layout';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../lib/axios';
 import {
+    Beaker,
+    Search,
+    Trash2,
+    DollarSign,
+    Box,
     Plus,
     Camera,
     X,
     ArrowLeft,
     Send,
     FileText,
-    Settings,
-    Beaker
+    Settings
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -31,6 +35,12 @@ export default function NewSamplePage() {
         images: [] as string[]
     });
 
+    const [materials, setMaterials] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [customMatName, setCustomMatName] = useState('');
+
     const [imageUrl, setImageUrl] = useState('');
 
     const addImage = () => {
@@ -45,16 +55,81 @@ export default function NewSamplePage() {
         toast.error('Imagen eliminada');
     };
 
+    const handleSearchMaterials = async (q: string) => {
+        setSearchQuery(q);
+        if (q.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        setIsSearching(true);
+        try {
+            const resp = await api.get(`/products/search?q=${q}`);
+            setSearchResults(resp.data);
+        } catch (error) {
+            console.error('Error searching products:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const addMaterial = (prod: any) => {
+        if (materials.some(m => m.productId === prod.id)) {
+            toast.error('Este material ya está en la lista');
+            return;
+        }
+        setMaterials([...materials, {
+            productId: prod.id,
+            name: prod.name,
+            quantity: 1,
+            unitPriceAtTime: prod.purchasePrice || 0,
+            customMaterial: null
+        }]);
+        setSearchQuery('');
+        setSearchResults([]);
+        toast.success(`${prod.name} añadido`);
+    };
+
+    const addCustomMaterial = () => {
+        if (!customMatName) return;
+        setMaterials([...materials, {
+            productId: null,
+            name: customMatName,
+            customMaterial: customMatName,
+            quantity: 1,
+            unitPriceAtTime: 0
+        }]);
+        setCustomMatName('');
+        toast.success('Material personalizado añadido');
+    };
+
+    const removeMaterial = (index: number) => {
+        setMaterials(materials.filter((_, i) => i !== index));
+    };
+
+    const updateMaterialQty = (index: number, qty: number) => {
+        const newMats = [...materials];
+        newMats[index].quantity = qty;
+        setMaterials(newMats);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await api.post('/samples', formData);
-            toast.success('Muestra enviada a Comercial con éxito');
+            await api.post('/samples', {
+                ...formData,
+                materials: materials.map(m => ({
+                    productId: m.productId,
+                    customMaterial: m.customMaterial,
+                    quantity: m.quantity,
+                    unitPriceAtTime: m.unitPriceAtTime
+                }))
+            });
+            toast.success(materials.length > 0 ? 'Solicitud enviada a Administrador' : 'Muestra creada con éxito');
             router.push('/samples');
         } catch (error) {
             console.error('Error creating sample:', error);
-            toast.error('Error al enviar la muestra');
+            toast.error('Error al enviar la solicitud');
         } finally {
             setIsLoading(false);
         }
@@ -125,6 +200,126 @@ export default function NewSamplePage() {
                             </div>
                         </div>
 
+                        {/* MATERIALS REQUIREMENTS */}
+                        <div className="space-y-6 pt-10 border-t border-gray-100">
+                            <div>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight uppercase">Requerimientos de Materiales</h3>
+                                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Busca en inventario o agrega insumos adicionales</p>
+                            </div>
+
+                            <div className="relative">
+                                <div className="relative">
+                                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                    <input 
+                                        type="text"
+                                        placeholder="Buscar materiales en inventario (nombre o SKU)..."
+                                        className="w-full bg-gray-50 border-none rounded-2xl pl-16 pr-6 py-5 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                        value={searchQuery}
+                                        onChange={e => handleSearchMaterials(e.target.value)}
+                                    />
+                                </div>
+
+                                {searchResults.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto p-2 space-y-1">
+                                        {searchResults.map(prod => (
+                                            <button
+                                                key={prod.id}
+                                                type="button"
+                                                onClick={() => addMaterial(prod)}
+                                                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition text-left group"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 font-black text-xs">
+                                                        <Box className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-gray-900 text-sm uppercase">{prod.name}</p>
+                                                        <p className="text-[10px] font-bold text-gray-400 font-mono tracking-tighter uppercase">{prod.sku} • S/ {prod.purchasePrice}</p>
+                                                    </div>
+                                                </div>
+                                                <Plus className="w-5 h-5 text-gray-300 group-hover:text-indigo-600 transition" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* CUSTOM MATERIAL OPTION */}
+                            <div className="flex gap-4">
+                                <input 
+                                    type="text"
+                                    placeholder="Otro material no encontrado en inventario..."
+                                    className="flex-1 bg-gray-50 border-none rounded-xl px-6 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                    value={customMatName}
+                                    onChange={e => setCustomMatName(e.target.value)}
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={addCustomMaterial}
+                                    className="px-6 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition"
+                                >
+                                    Agregar Manual
+                                </button>
+                            </div>
+
+                            {/* MATERIALS LIST */}
+                            <div className="space-y-3">
+                                {materials.map((m, i) => (
+                                    <div key={i} className="flex items-center justify-between bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${m.productId ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                {m.productId ? <Box className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-gray-900 text-sm uppercase">{m.name}</p>
+                                                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
+                                                    {m.productId ? 'De Inventario' : 'Manual / Externo'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-6">
+                                            <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
+                                                <span className="text-[10px] font-black text-gray-400 uppercase mr-3">Cant</span>
+                                                <input 
+                                                    type="number"
+                                                    min="1"
+                                                    value={m.quantity}
+                                                    onChange={e => updateMaterialQty(i, parseFloat(e.target.value) || 1)}
+                                                    className="w-12 bg-transparent font-black text-center outline-none"
+                                                />
+                                            </div>
+                                            <div className="text-right min-w-[80px]">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Precio Unit.</p>
+                                                <p className="font-black text-emerald-600">S/ {m.unitPriceAtTime || 0}</p>
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => removeMaterial(i)}
+                                                className="p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                {materials.length > 0 && (
+                                    <div className="flex justify-end p-6 bg-gray-900 rounded-[2rem] text-white mt-6 shadow-xl shadow-gray-200">
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Costo Estimado de Insumos</p>
+                                            <div className="flex items-center justify-end gap-3">
+                                                <DollarSign className="w-6 h-6 text-emerald-400" />
+                                                <span className="text-3xl font-black">
+                                                    S/ {materials.reduce((acc, m) => acc + (m.quantity * m.unitPriceAtTime), 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* IMAGES */}
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fotos y Evidencias</label>
@@ -178,7 +373,7 @@ export default function NewSamplePage() {
                                     <>Enviando...</>
                                 ) : (
                                     <>
-                                        <Send className="w-8 h-8" /> Enviar a Comercial
+                                        <Send className="w-8 h-8" /> {materials.length > 0 ? 'Enviar a Administrador' : 'Enviar a Comercial'}
                                     </>
                                 )}
                             </button>

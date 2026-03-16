@@ -25,6 +25,7 @@ export default function SamplesPage() {
     const [samples, setSamples] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSamples();
@@ -44,14 +45,17 @@ export default function SamplesPage() {
     const stats = {
         total: samples.length,
         approved: samples.filter((s: any) => s.status === 'APROBADO').length,
+        completed: samples.filter((s: any) => s.status === 'COMPLETADO_INVENTARIO').length,
         pending: samples.filter((s: any) => s.status === 'PENDIENTE').length,
         observed: samples.filter((s: any) => s.status === 'OBSERVADO').length,
     };
 
-    const filteredSamples = samples.filter((s: any) => 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.odp?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSamples = samples.filter((s: any) => {
+        const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.udp?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter ? s.status === statusFilter : true;
+        return matchesSearch && matchesStatus;
+    });
 
     const cardClass = "bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20";
 
@@ -69,7 +73,7 @@ export default function SamplesPage() {
                             <p className="text-gray-500 font-medium text-lg mt-1">Gestión profesional de prototipos y muestras.</p>
                         </div>
                     </div>
-                    {user?.role === 'ODP' && (
+                    {user?.role === 'UDP' && (
                         <Link 
                             href="/samples/new"
                             className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-black transition active:scale-95"
@@ -80,17 +84,22 @@ export default function SamplesPage() {
                 </div>
 
                 {/* STATS */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
                     {[
-                        { label: 'Total Prototipos', value: stats.total, color: 'indigo' },
-                        { label: 'Aprobados', value: stats.approved, color: 'emerald' },
-                        { label: 'Pendientes', value: stats.pending, color: 'amber' },
-                        { label: 'Observados', value: stats.observed, color: 'rose' },
+                        { label: 'Total Prototipos', value: stats.total, color: 'indigo', status: null },
+                        { label: 'Aprobados', value: stats.approved, color: 'emerald', status: 'APROBADO' },
+                        { label: 'Inventariados', value: stats.completed, color: 'blue', status: 'COMPLETADO_INVENTARIO' },
+                        { label: 'Pendientes', value: stats.pending, color: 'amber', status: 'PENDIENTE' },
+                        { label: 'Observados', value: stats.observed, color: 'rose', status: 'OBSERVADO' },
                     ].map((stat, i) => (
-                        <div key={i} className={`${cardClass} flex flex-col items-center text-center p-6`}>
+                        <button 
+                            key={i} 
+                            onClick={() => setStatusFilter(stat.status)}
+                            className={`${cardClass} flex flex-col items-center text-center p-6 px-2 transition-all hover:scale-105 active:scale-95 ${statusFilter === stat.status ? 'ring-2 ring-indigo-500 bg-indigo-50/10' : ''}`}
+                        >
                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                             <h3 className={`text-4xl font-black text-${stat.color}-600`}>{stat.value}</h3>
-                        </div>
+                             <h3 className={`text-3xl font-black text-${stat.color}-600`}>{stat.value}</h3>
+                        </button>
                     ))}
                 </div>
 
@@ -106,6 +115,14 @@ export default function SamplesPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    {statusFilter && (
+                        <button 
+                            onClick={() => setStatusFilter(null)}
+                            className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition"
+                        >
+                            Ver Todos
+                        </button>
+                    )}
                 </div>
 
                 {/* LIST */}
@@ -133,11 +150,19 @@ export default function SamplesPage() {
                                             <span className="text-[10px] font-black uppercase mt-2">Sin Evidencia Visual</span>
                                         </div>
                                     )}
-                                    <div className={`absolute top-4 right-4 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg ${
-                                        sample.status === 'APROBADO' ? 'bg-emerald-500 text-white' :
-                                        sample.status === 'OBSERVADO' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white'
-                                    }`}>
-                                        {sample.status}
+                                    <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                                        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg ${
+                                            sample.status === 'APROBADO' ? 'bg-emerald-500 text-white' :
+                                            sample.status === 'COMPLETADO_INVENTARIO' ? 'bg-blue-600 text-white' :
+                                            sample.status === 'OBSERVADO' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white'
+                                        }`}>
+                                            {sample.status === 'COMPLETADO_INVENTARIO' ? 'INVENTARIADO' : sample.status}
+                                        </div>
+                                        {sample.materialReceiptStatus && (
+                                            <div className="px-3 py-1 bg-white/90 backdrop-blur-md text-[8px] font-black text-indigo-600 rounded-lg shadow-md uppercase tracking-tighter">
+                                                📦 {sample.materialReceiptStatus.replace('_', ' ')}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -150,7 +175,7 @@ export default function SamplesPage() {
                                             <ClipboardList className="w-4 h-4 text-indigo-300" />
                                             <span>Creado por:</span>
                                         </div>
-                                        <span className="text-gray-900 uppercase font-black">{sample.odp?.name}</span>
+                                        <span className="text-gray-900 uppercase font-black">{sample.udp?.name}</span>
                                     </div>
                                     <div className="flex items-center justify-between text-xs font-bold">
                                         <div className="flex items-center gap-2 text-gray-500">

@@ -9,7 +9,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 
-export const ODPDashboard = () => {
+export const UDPDashboard = () => {
     const { user } = useAuth();
     const [pendingCount, setPendingCount] = useState<number | string>('-');
     const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +21,7 @@ export const ODPDashboard = () => {
                 const items = Array.isArray(resp.data) ? resp.data : (resp.data.data || []);
                 setPendingCount(items.length);
             } catch (error) {
-                console.error('Error fetching ODP stats:', error);
+                console.error('Error fetching UDP stats:', error);
             } finally {
                 setIsLoading(false);
             }
@@ -36,7 +36,7 @@ export const ODPDashboard = () => {
 
     return (
         <div className="space-y-8">
-            {/* Header específico de ODP */}
+            {/* Header específico de UDP */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -44,7 +44,7 @@ export const ODPDashboard = () => {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">
-                            Panel de ODP, <span className="text-indigo-600">{user?.name}</span> 👋
+                            Panel de UDP, <span className="text-indigo-600">{user?.name}</span> 👋
                         </h1>
                         <p className="text-gray-500 mt-1">
                             Monitoreo en tiempo real de Calidad y Auditorías de Producción.
@@ -176,13 +176,12 @@ export const ODPDashboard = () => {
                 </motion.div>
             </div>
 
-            {/* Acciones Rápidas */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
             >
-                <h2 className="text-lg font-bold text-gray-900 mb-4">🚀 Accesos Directos ODP</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">🚀 Accesos Directos UDP</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Link href="/quality" className="group flex items-center gap-4 bg-white p-5 rounded-2xl border border-gray-100 hover:shadow-lg hover:shadow-blue-100/50 hover:border-blue-200 transition-all">
                         <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">

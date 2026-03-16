@@ -183,14 +183,17 @@ model Supplier {
 
 model ProcessAudit {
   id              String         @id @default(cuid())
-  productId       String         @map("product_id")
-  product         Product        @relation(fields: [productId], references: [id])
+  productId       String?        @map("product_id")
+  product         Product?       @relation(fields: [productId], references: [id])
+  sampleId        String?        @map("sample_id")
+  sample          ProductSample? @relation(fields: [sampleId], references: [id])
   op              String         // Lote de producción u OP
   process         String         // Corte, Confección, Lavado, Acabados
+  externalCompany String?        @map("external_company") // Empresa externa que realiza el proceso
   inspectorId     String         @map("inspector_id")
   inspector       User           @relation(fields: [inspectorId], references: [id])
   auditDate       DateTime       @default(now()) @map("audit_date")
-  result          String         // CONFORME, OBSERVACION, NO_CONFORME
+  result          String         @default("PENDIENTE") // PENDIENTE, CONFORME, OBSERVACION, NO_CONFORME
   
   quantityGood    Float          @default(0) @map("quantity_good")
   quantityProcess Float          @default(0) @map("quantity_process")
@@ -201,15 +204,42 @@ model ProcessAudit {
   evidences       String[]       // Array of file paths/URLs
   checklist       Json?          // Checklist values depending on the process
   
+  status          String         @default("EN_PROCESO") // EN_PROCESO, FINALIZADO
   approvalStatus  String         @default("PENDIENTE") @map("approval_status") // PENDIENTE, APROBADO, RECHAZADO
   approvedAt      DateTime?      @map("approved_at")
   
   findings        AuditFinding[]
 
+  // Admin and Logistics tracking
+  adminStatus     String         @default("PENDIENTE") @map("admin_status") // PENDIENTE, APROBADO, RECHAZADO
+  adminNotes      String?        @map("admin_notes") @db.Text
+  adminUserId     String?        @map("admin_user_id")
+  
+  logisticsStatus String         @default("PENDIENTE") @map("logistics_status") // PENDIENTE, RECIBIDO
+  receivedAt      DateTime?      @map("received_at")
+
+  processHistory  Json?          @map("process_history") // Array of history steps
+
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("process_audits")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  message     String
+  type        String   // e.g., "AUDIT_FINALIZED", "AUDIT_APPROVED"
+  referenceId String?  @map("reference_id") // ID de la auditoría o muestra
+  
+  targetRole  String?  @map("target_role") // Para filtrar por rol (ADMIN, LOGISTICA, etc)
+  userId      String?  @map("user_id")    // Para filtrar por un usuario específico
+  
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
 }
 
 model AuditFinding {
@@ -303,15 +333,28 @@ model ProductSample {
   observations    String?          @db.Text // Observaciones de comercial
   recommendations String?          @db.Text // Recomendaciones de comercial
   
-  odpId           String           @map("odp_id")
-  odp             User             @relation("SampleCreator", fields: [odpId], references: [id])
+  op              String?          // Orden de Producción asignada por comercial
+  productionQuantity Float?        @map("production_quantity") // Cantidad total
+  productionColor    String?       @map("production_color")
+  productionSizeData Json?         @map("production_size_data") // e.g. { "S": 10, "M": 20 }
+  
+  udpId           String           @map("udp_id")
+  udp             User             @relation("SampleCreator", fields: [udpId], references: [id])
   
   commercialId    String?          @map("commercial_id") // El comercial que revisa
   commercial      User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
   
   materials       SampleMaterial[]
+  processAudits   ProcessAudit[]
   
   approvedAt      DateTime?        @map("approved_at")
+  
+  // New Material Workflow fields
+  materialReceiptStatus String?      @default("PENDIENTE_ADMIN") @map("material_receipt_status") // PENDIENTE_ADMIN, APROBADO_ADMIN, ENTREGADO_LOGISTICA, RECIBIDO_UDP
+  adminMaterialNotes    String?      @map("admin_material_notes") @db.Text
+  logisticsMaterialDate DateTime?    @map("logistics_material_date")
+  udpMaterialReceivedAt DateTime?    @map("udp_material_received_at")
+
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -323,10 +366,12 @@ model SampleMaterial {
   sampleId        String        @map("sample_id")
   sample          ProductSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
   
-  productId       String        @map("product_id")
-  product         Product       @relation(fields: [productId], references: [id])
+  productId       String?       @map("product_id")
+  product         Product?      @relation(fields: [productId], references: [id])
   
-  quantityPerUnit Float         @map("quantity_per_unit")
+  customMaterial  String?       @map("custom_material") // En caso no exista en inventario
+  
+  quantity        Float         @default(1)
   unitPriceAtTime Float         @map("unit_price_at_time") // Precio del inventario al momento de definir
 
   createdAt       DateTime      @default(now()) @map("created_at")

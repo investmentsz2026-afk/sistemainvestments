@@ -14,7 +14,7 @@ async function main() {
     { name: 'COMERCIAL', description: 'Módulo de ventas y comercial' },
     { name: 'CONTABILIDAD', description: 'Módulo contable' },
     { name: 'LOGISTICA', description: 'Módulo de compras e inventario' },
-    { name: 'ODP', description: 'Módulo de calidad y auditoría' },
+    { name: 'UDP', description: 'Módulo de calidad y auditoría' },
   ];
 
   for (const role of roles) {

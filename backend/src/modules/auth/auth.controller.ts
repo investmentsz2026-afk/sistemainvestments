@@ -1,7 +1,7 @@
 // backend/src/modules/auth/auth.controller.ts
 import { Controller, Post, Body, Get, UseGuards, Request, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { LoginDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -10,6 +10,7 @@ import { Roles } from './decorators/roles.decorator';
 export class AuthController {
   constructor(private authService: AuthService) { }
 
+  /* 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerDto: RegisterDto) {
@@ -28,6 +29,8 @@ export class AuthController {
       };
     }
   }
+  */
+
 
   @Post('login')
   @HttpCode(HttpStatus.OK)

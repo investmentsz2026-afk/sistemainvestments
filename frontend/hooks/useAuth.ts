@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import api from '../lib/axios';
-import { AuthResponse, LoginCredentials, RegisterCredentials } from '../types';
+import { AuthResponse, LoginCredentials } from '../types';
+import toast from 'react-hot-toast';
 
 export function useAuth() {
   const router = useRouter();
@@ -41,7 +42,6 @@ export function useAuth() {
     {
       onError: (error: any) => {
         console.error('Login error:', error);
-        alert(error.response?.data?.message || 'Error al iniciar sesión');
       },
     }
   );
@@ -55,32 +55,16 @@ export function useAuth() {
       onSuccess: (data) => {
         localStorage.setItem('token', data.token);
         refetch();
+        toast.success('Sesión iniciada correctamente');
         window.location.href = '/';
       },
       onError: (error: any) => {
         console.error('Role selection error:', error);
-        alert(error.response?.data?.message || 'Error al seleccionar rol');
+        toast.error(error.response?.data?.message || 'Error al seleccionar rol');
       },
     }
   );
 
-  const registerMutation = useMutation(
-    async (credentials: RegisterCredentials) => {
-      const resp = await api.post('/auth/register', credentials);
-      return resp.data.data as AuthResponse;
-    },
-    {
-      onSuccess: (data) => {
-        localStorage.setItem('token', data.token);
-        refetch();
-        window.location.href = '/';
-      },
-      onError: (error: any) => {
-        console.error('Register error:', error);
-        alert(error.response?.data?.message || 'Error al registrarse');
-      },
-    }
-  );
 
   const queryClient = useQueryClient();
 
@@ -98,9 +82,8 @@ export function useAuth() {
 
   return {
     user,
-    isLoading: loginMutation.isLoading || registerMutation.isLoading || userLoading,
+    isLoading: loginMutation.isLoading || userLoading,
     login: loginMutation.mutateAsync, // Switch to mutateAsync for better control in component
-    register: registerMutation.mutate,
     selectRole: selectRoleMutation.mutate,
     isSelectingRole: selectRoleMutation.isLoading,
     logout,

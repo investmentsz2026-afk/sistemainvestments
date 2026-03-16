@@ -27,6 +27,11 @@ export class ProductsController {
     return this.productsService.findAll();
   }
 
+  @Get('search')
+  search(@Query('q') query: string) {
+    return this.productsService.searchProducts(query);
+  }
+
   @Get('low-stock')
   getLowStock() {
     return this.productsService.getLowStockProducts();

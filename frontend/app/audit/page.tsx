@@ -64,9 +64,10 @@ export default function AuditPage() {
         return audits.filter(a => {
             const matchesSearch = 
                 a.op.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                a.product?.name.toLowerCase().includes(searchTerm.toLowerCase());
+                (a.product?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (a.sample?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
             const matchesProcess = processFilter === 'ALL' || a.process === processFilter;
-            const matchesStatus = statusFilter === 'ALL' || a.result === statusFilter;
+            const matchesStatus = statusFilter === 'ALL' || a.result === statusFilter || a.status === statusFilter;
             return matchesSearch && matchesProcess && matchesStatus;
         });
     }, [audits, searchTerm, processFilter, statusFilter]);
@@ -99,7 +100,7 @@ export default function AuditPage() {
         <Layout>
             <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Auditoría de Procesos (ODP)</h1>
+                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Auditoría de Procesos (UDP)</h1>
                     <p className="text-gray-500 mt-1 flex items-center gap-2">
                         <ClipboardCheck className="w-4 h-4 text-indigo-500" />
                         Aseguramiento de calidad en línea de producción
@@ -155,6 +156,8 @@ export default function AuditPage() {
                         <option value="CONFORME">Conforme</option>
                         <option value="OBSERVACION">Observación</option>
                         <option value="NO_CONFORME">No Conforme</option>
+                        <option value="EN_PROCESO">En Proceso</option>
+                        <option value="FINALIZADO">Finalizado</option>
                     </select>
                 </div>
             </div>
@@ -188,7 +191,7 @@ export default function AuditPage() {
                                     <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Producto</th>
                                     <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Fecha / Auditor</th>
                                     <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400 text-center">Resultado</th>
-                                    <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">Estado Comercial</th>
+                                    <th className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400 text-center">Estado</th>
                                     <th className="px-8 py-5 text-right"></th>
                                 </tr>
                             </thead>
@@ -217,8 +220,13 @@ export default function AuditPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <p className="font-bold text-gray-900 text-sm">{audit.product?.name || 'Producto Desconocido'}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-0.5">{audit.product?.sku}</p>
+                                                <p className="font-bold text-gray-900 text-sm">
+                                                    {audit.product?.name || audit.sample?.name || 'Item Desconocido'}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-0.5">
+                                                    {audit.product?.sku || (audit.sample ? `SAMP-${audit.sample.id.slice(-4).toUpperCase()}` : '---')}
+                                                    {audit.sample && <span className="ml-2 text-amber-500 bg-amber-50 px-1 rounded">MUESTRA</span>}
+                                                </p>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-1.5 text-sm text-gray-700 font-semibold">
@@ -233,8 +241,12 @@ export default function AuditPage() {
                                             <td className="px-8 py-6 text-center">
                                                 {getStatusBadge(audit.result)}
                                             </td>
-                                            <td className="px-8 py-6">
-                                                {getApprovalStatusBadge(audit.approvalStatus)}
+                                            <td className="px-8 py-6 text-center">
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider ${
+                                                    audit.status === 'FINALIZADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                    {audit.logisticsStatus === 'RECIBIDO' ? '✅ COMPLETADO' : audit.status === 'FINALIZADO' ? '✅ FINALIZADO' : '🔄 EN PROCESO'}
+                                                </span>
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex justify-end bg-gray-100/50 w-fit ml-auto p-2 rounded-xl group-hover:bg-indigo-600 transition-colors group-hover:text-white text-gray-400 border border-transparent group-hover:shadow-lg group-hover:shadow-indigo-200">

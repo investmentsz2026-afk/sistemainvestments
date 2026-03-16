@@ -12,6 +12,16 @@ export class ProcessAuditsController {
         return this.service.createAudit(req.user.id, body);
     }
 
+    @Get('auditable-items')
+    async getAuditableItems() {
+        return this.service.getAuditableItems();
+    }
+
+    @Get('finalized-audits')
+    async getFinalizedAudits() {
+        return this.service.getFinalizedAudits();
+    }
+
     @Get()
     async findAll(@Query() query: any) {
         return this.service.findAll(query);
@@ -22,9 +32,29 @@ export class ProcessAuditsController {
         return this.service.findOne(id);
     }
 
+    @Patch(':id/progress')
+    async updateProgress(@Param('id') id: string, @Body() body: any) {
+        return this.service.updateProgress(id, body);
+    }
+
+    @Patch(':id/finalize')
+    async finalizeAudit(@Param('id') id: string, @Body() body: any) {
+        return this.service.finalizeAudit(id, body);
+    }
+
     @Patch(':id/approval')
     async updateApproval(@Param('id') id: string, @Body('status') status: string) {
         return this.service.updateApprovalStatus(id, status);
+    }
+
+    @Patch(':id/admin-review')
+    async adminReview(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+        return this.service.adminReview(id, req.user.id, body);
+    }
+
+    @Patch(':id/logistics-receive')
+    async logisticsReceive(@Param('id') id: string) {
+        return this.service.logisticsConfirm(id);
     }
 
     @Patch('corrective-action/:id/status')

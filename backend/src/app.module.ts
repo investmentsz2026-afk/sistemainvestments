@@ -12,6 +12,7 @@ import { QualityModule } from './modules/quality/quality.module';
 import { ProcessAuditsModule } from './modules/process-audits/process-audits.module';
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { SamplesModule } from './modules/samples/samples.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { AppController } from './app.controller';
     ProcessAuditsModule,
     CommercialModule,
     SamplesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [],

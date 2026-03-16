@@ -13,6 +13,7 @@ async function bootstrap() {
     app.enableCors({
       origin: [
         'http://localhost:3000', // para desarrollo local
+        'http://127.0.0.1:3000', // alternativa local
         'https://frontend-production-120326.up.railway.app', // frontend en Railway
       ],
       credentials: true,
@@ -36,7 +37,7 @@ async function bootstrap() {
     });
 
     // Puerto dinámico para Railway
-    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
     await app.listen(port, '0.0.0.0');
 
     logger.log(`✅ Application running on port ${port}`);

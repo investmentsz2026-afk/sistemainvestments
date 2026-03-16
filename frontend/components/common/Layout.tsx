@@ -1,10 +1,11 @@
 // frontend/components/common/Layout.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
+import api from '../../lib/axios';
 import {
   Package,
   ShoppingCart,
@@ -41,6 +42,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN' || user?.role === 'LOGISTICA' || user?.role === 'UDP' || user?.role === 'COMERCIAL') {
+      fetchUnreadCount();
+      const interval = setInterval(fetchUnreadCount, 60000); // Check every minute
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const resp = await api.get('/notifications/unread-count');
+      setUnreadNotifications(resp.data.count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   const handleLogoutClick = () => {
     setShowTopUserMenu(false);
@@ -69,10 +88,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Compras', href: '/purchases', icon: CreditCard },
       { name: 'Despacho', href: '/dispatch', icon: Truck }
     ] : []),
-    ...(user?.role === 'ADMIN' || user?.role === 'ODP' || user?.role === 'COMERCIAL' ? [
+    ...(user?.role === 'ADMIN' || user?.role === 'UDP' || user?.role === 'COMERCIAL' ? [
       { name: 'Muestras', href: '/samples', icon: Beaker }
     ] : []),
-    ...(user?.role === 'ADMIN' || user?.role === 'ODP' ? [
+    ...(user?.role === 'ADMIN' || user?.role === 'UDP' ? [
       { name: 'Calidad', href: '/quality', icon: ShieldCheck },
       { name: 'Auditoría', href: '/audit', icon: FileSearch }
     ] : []),
@@ -111,9 +130,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Right side icons */}
             <div className="flex items-center gap-4">
               {/* Notifications */}
-              <button className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100">
+              <Link 
+                href={(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' || user?.role === 'UDP' || user?.role === 'COMERCIAL') ? '/notifications' : '#'}
+                className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 relative"
+              >
                 <Bell className="w-5 h-5" />
-              </button>
+                {unreadNotifications > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </Link>
 
               {/* User menu */}
               <div className="relative">
