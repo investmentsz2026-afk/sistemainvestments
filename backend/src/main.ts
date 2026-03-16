@@ -6,45 +6,37 @@ import { join } from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  try {
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    // CORS seguro: permite localhost y tu frontend en producción
-    app.enableCors({
-      origin: [
-        'http://localhost:3000', // para desarrollo local
-        'http://127.0.0.1:3000', // alternativa local
-        'https://frontend-production-120326.up.railway.app', // frontend en Railway
-      ],
-      credentials: true,
-    });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    // Validaciones globales
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+  // ✅ CORS GLOBAL (modo seguro producción + debugging)
+  app.enableCors({
+    origin: true, // permite cualquier dominio temporalmente
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Authorization',
+  });
 
-    // Servir archivos estáticos desde la carpeta 'public'
-    app.useStaticAssets(join(__dirname, '..', 'public'));
+  // ✅ Validaciones globales
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
-    // Prefijo global para todas las rutas excepto la raíz
-    app.setGlobalPrefix('api', {
-      exclude: ['/'],
-    });
+  // ✅ Archivos estáticos
+  app.useStaticAssets(join(__dirname, '..', 'public'));
 
-    // Puerto dinámico para Railway
-    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
-    await app.listen(port, '0.0.0.0');
+  // ✅ Prefijo global API
+  app.setGlobalPrefix('api');
 
-    logger.log(`✅ Application running on port ${port}`);
-  } catch (err) {
-    logger.error('❌ Failed to start application', err);
-    process.exit(1);
-  }
+  // ✅ Puerto Railway
+  const port = process.env.PORT || 3001;
+  await app.listen(port, '0.0.0.0');
+
+  logger.log(`🚀 Backend running on port ${port}`);
 }
 
 bootstrap();
