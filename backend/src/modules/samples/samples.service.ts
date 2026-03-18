@@ -11,12 +11,13 @@ export class SamplesService {
   ) { }
 
   async create(udpId: string, data: any) {
-    const { name, description, characteristics, images, materials } = data;
+    const { name, code, description, characteristics, images, materials } = data;
     
     return await this.prisma.$transaction(async (tx) => {
       const sample = await (tx as any).productSample.create({
         data: {
           name,
+          code,
           description,
           characteristics,
           images: images || [],
@@ -41,7 +42,7 @@ export class SamplesService {
         // Notify Admin
         await this.notifications.create({
           title: 'Nueva Solicitud de Materiales para Muestra',
-          message: `El usuario UDP ha solicitado materiales para la muestra: ${name}`,
+          message: `UDP ha solicitado materiales para la muestra: ${name} ${code ? `(Código: ${code})` : ''}`,
           type: 'SAMPLE_MATERIAL_REQUEST',
           referenceId: sample.id,
           targetRole: 'ADMIN',
@@ -66,8 +67,13 @@ export class SamplesService {
         udp: { select: { name: true } },
         commercial: { select: { name: true } },
         materials: {
-          include: { product: true }
-        }
+          include: { 
+            product: {
+              include: { variants: true }
+            }
+          }
+        },
+        processAudits: true
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -80,8 +86,13 @@ export class SamplesService {
         udp: { select: { name: true } },
         commercial: { select: { name: true } },
         materials: {
-          include: { product: true }
-        }
+          include: { 
+            product: {
+              include: { variants: true }
+            }
+          }
+        },
+        processAudits: true
       },
     });
     if (!sample) throw new NotFoundException('Muestra no encontrada');
@@ -130,6 +141,19 @@ export class SamplesService {
         }
       }
 
+      if (status === 'APROBADO') {
+        const adminRole = await tx.role.findUnique({ where: { name: 'ADMIN' } });
+        await tx.notification.create({
+          data: {
+            title: 'Muestra Aprobada (Nueva OP)',
+            message: `Comercial ha aprobado la muestra ${existingSample.name} y creado la OP: ${op}. Pendiente de revisión para enviar a UDP (Auditoría).`,
+            type: 'SAMPLE_APPROVED',
+            referenceId: id,
+            targetRole: 'ADMIN',
+          }
+        });
+      }
+
       return updatedSample;
     });
   }
@@ -146,13 +170,71 @@ export class SamplesService {
 
     await this.notifications.create({
       title: 'Materiales Aprobados por Admin',
-      message: `Admin ha aprobado los materiales para la muestra ${sample.name}. Logística puede proceder con la entrega.`,
+      message: `Admin ha aprobado los materiales para la muestra ${sample.name} ${sample.code ? `(Código: ${sample.code})` : ''}. Logística puede proceder con la entrega.`,
       type: 'SAMPLE_MATERIAL_APPROVED',
       referenceId: id,
       targetRole: 'LOGISTICA',
     });
 
     return updated;
+  }
+
+  async adminApproveOP(id: string, notes?: string) {
+    const sample = await this.findOne(id);
+    const updated = await (this.prisma as any).productSample.update({
+      where: { id },
+      data: {
+        adminOpApprovalStatus: 'APROBADO',
+        // Optional: Could store admin notes here if we had a field
+      }
+    });
+
+    await this.notifications.create({
+      title: 'OP Aprobada por Administrador',
+      message: `El administrador ha aprobado la muestra ${sample.name} y su OP ${sample.op}. Ya está disponible para Auditoría de Procesos.`,
+      type: 'OP_APPROVED',
+      referenceId: id,
+      targetRole: 'UDP', // or whatever role audits
+    });
+
+    return updated;
+  }
+
+  async dischargeInventory(id: string, discharges: { materialId: string, variantId: string, quantity: number }[], userId: string) {
+    const sample = await this.findOne(id);
+    
+    return await this.prisma.$transaction(async (tx) => {
+      for (const item of discharges) {
+        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+        if (!variant) throw new BadRequestException(`Variante ${item.variantId} no encontrada`);
+        if (variant.stock < item.quantity) {
+          throw new BadRequestException(`Stock insuficiente para ${variant.variantSku}`);
+        }
+
+        const newStock = variant.stock - item.quantity;
+
+        // movement
+        await tx.movement.create({
+          data: {
+            type: 'EXIT',
+            quantity: item.quantity,
+            reason: `Descarga para Muestra ${sample.name} (${sample.code || id})`,
+            previousStock: variant.stock,
+            newStock: newStock,
+            variantId: item.variantId,
+            userId: userId,
+            reference: sample.code || sample.id
+          }
+        });
+
+        // update stock
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: newStock }
+        });
+      }
+      return { success: true };
+    });
   }
 
   async logisticsDeliverMaterials(id: string) {
@@ -167,7 +249,7 @@ export class SamplesService {
 
     await this.notifications.create({
       title: 'Materiales Entregados por Logística',
-      message: `Logística ha entregado los materiales para la muestra ${sample.name}. UDP debe confirmar recepción.`,
+      message: `Logística ha entregado los materiales para la muestra ${sample.name} ${sample.code ? `(Código: ${sample.code})` : ''}. UDP debe confirmar recepción.`,
       type: 'SAMPLE_MATERIAL_DELIVERED',
       referenceId: id,
       userId: (sample as any).udpId, // Solo el creador de la muestra
@@ -206,6 +288,13 @@ export class SamplesService {
     });
 
     return updated;
+  }
+
+  async saveUdpRequirements(id: string, udpRequirements: any) {
+    return await (this.prisma as any).productSample.update({
+      where: { id },
+      data: { udpRequirements }
+    });
   }
 
   async update(id: string, udpId: string, data: any) {

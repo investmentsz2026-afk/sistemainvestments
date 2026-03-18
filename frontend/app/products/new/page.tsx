@@ -34,6 +34,7 @@ export default function NewProductPage() {
   const [finalizedAudits, setFinalizedAudits] = useState<any[]>([]);
   const [loadingAudits, setLoadingAudits] = useState(false);
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
+  const [savedAuditItems, setSavedAuditItems] = useState<string[]>([]); // auditId-type-size
 
   const fetchPurchases = async () => {    try {
       setLoadingPurchases(true);
@@ -70,6 +71,7 @@ export default function NewProductPage() {
     let invType = 'TERMINADOS';
     if (item.category === 'Materiales') invType = 'MATERIALES';
     else if (item.category === 'Maquinaria') invType = 'MAQUINARIA';
+    else if (item.category === 'Avios') invType = 'AVIOS';
     else if (item.category === 'Servicio') invType = 'OTROS';
 
     const importedData = {
@@ -92,44 +94,67 @@ export default function NewProductPage() {
     const variants: any[] = [];
     let nameSuffix = '';
     let invType = 'TERMINADOS';
+    const auditSizes = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
+    const sizeToUse = (audit as any)._selectedSize || (auditSizes[0]?.size);
 
     if (type === '1RA') {
-      nameSuffix = '';
+      nameSuffix = sizeToUse ? ` (Talla ${sizeToUse})` : '';
       invType = 'TERMINADOS';
       if (audit.productionSizeData) {
-        if (Array.isArray(audit.productionSizeData)) {
-          audit.productionSizeData.forEach((item: any) => {
-            if (item.quantity > 0) {
-              variants.push({ size: item.size, color: item.color || 'ÚNICO', initialStock: item.quantity });
-            }
-          });
-        } else {
-          const color = audit.productionColor || 'ÚNICO';
-          Object.entries(audit.productionSizeData).forEach(([size, qty]: [string, any]) => {
-            if (qty > 0) variants.push({ size, color, initialStock: qty });
-          });
-        }
+        const sizeData = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
+        sizeData.forEach((item: any) => {
+          if (item.quantity > 0 && (!sizeToUse || item.size === sizeToUse)) {
+            variants.push({ size: item.size, color: item.color || 'ÚNICO', initialStock: item.quantity });
+          }
+        });
       }
-      if (variants.length === 0 && audit.quantityGood > 0) {
+      if (variants.length === 0 && audit.quantityGood > 0 && !sizeToUse) {
         variants.push({ size: 'ESTÁNDAR', color: audit.productionColor || '1RA CALIDAD', initialStock: audit.quantityGood });
       }
     } else if (type === '2DA') {
-      nameSuffix = ' - 2DA CALIDAD';
+      nameSuffix = ' - 2DA CALIDAD' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
       invType = 'SEGUNDA';
-      if (audit.quantitySecond > 0) {
-        variants.push({ size: 'ESTÁNDAR', color: '2DA CALIDAD', initialStock: audit.quantitySecond });
+      // Try to find quantity for specific size in productionSizeData if available (planned)
+      let qty = audit.quantitySecond;
+      if (sizeToUse && Array.isArray(audit.productionSizeData)) {
+        const sz = audit.productionSizeData.find((s: any) => s.size === sizeToUse);
+        if (sz) qty = sz.quantity || 0; // Better than nothing, often 2da is small fraction but user can adjust
       }
+      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: '2DA CALIDAD', initialStock: qty > 0 ? qty : 0 });
     } else if (type === 'PROCESO') {
-      nameSuffix = ' - EN PROCESO';
+      nameSuffix = ' - EN PROCESO' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
       invType = 'PROCESO';
-      if (audit.quantityProcess > 0) {
-        variants.push({ size: 'ESTÁNDAR', color: 'EN PROCESO', initialStock: audit.quantityProcess });
+      let qty = audit.quantityProcess;
+      if (sizeToUse && Array.isArray(audit.productionSizeData)) {
+        const sz = audit.productionSizeData.find((s: any) => s.size === sizeToUse);
+        if (sz) qty = sz.quantity;
       }
+      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: 'EN PROCESO', initialStock: qty > 0 ? qty : 0 });
     }
 
     if (variants.length === 0) {
-      toast.error('No hay cantidades registradas para esta categoría.');
+      toast.error('No se encontraron cantidades para esta selección');
       return;
+    }
+
+    // Set prices based on specific size if possible, or first available
+    let pPrice = 0.1;
+    let sPrice = 0.1;
+
+    if (sizeToUse) {
+      // Cost from UDP requirements
+      if (audit.udpRequirements?.sizes) {
+        const sizeReq = audit.udpRequirements.sizes.find((s: any) => s.size === sizeToUse);
+        if (sizeReq) {
+          pPrice = sizeReq.items.reduce((acc: number, item: any) => acc + ((item.price || 0) * (item.consumption || 0)), 0);
+        }
+      }
+
+      // Selling price from Commercial review
+      const sizeSaleData = auditSizes.find((s: any) => s.size === sizeToUse);
+      if (sizeSaleData) {
+        sPrice = type === '1RA' ? (sizeSaleData.salePrice || 0) : (sizeSaleData.secondSalePrice || 0);
+      }
     }
 
     const importedData = {
@@ -137,9 +162,9 @@ export default function NewProductPage() {
       category: 'Prendas',
       inventoryType: invType,
       sku: audit.op + (type === '1RA' ? '' : `-${type}`),
-      description: `Importado de Auditoría ${audit.process} • OP: ${audit.op}. Categoría: ${type}.`,
-      purchasePrice: 0.1, // Default min price
-      sellingPrice: type === '1RA' ? 0.1 : 0,
+      description: `Importado de Auditoría ${audit.process} • OP: ${audit.op}. Categoría: ${type}${sizeToUse ? ` • Ref. Talla: ${sizeToUse}` : ''}.`,
+      purchasePrice: pPrice || 0.1,
+      sellingPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
       minStock: 5,
       variants: variants
     };
@@ -183,6 +208,10 @@ export default function NewProductPage() {
       toast.success('Producto guardado correctamente');
       
       if (selectedAudit) {
+        const type = data.inventoryType === 'TERMINADOS' ? '1RA' : data.inventoryType === 'SEGUNDA' ? '2DA' : 'PROCESO';
+        const size = data.variants?.[0]?.size || 'ESTÁNDAR';
+        setSavedAuditItems(prev => [...prev, `${selectedAudit.id}-${type}-${size}`]);
+        
         // If we are importing from an audit, return to the modal and reset form for next category
         setInitialData(null);
         setFormKey(prev => prev + 1);
@@ -250,7 +279,7 @@ export default function NewProductPage() {
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold hover:bg-emerald-100 transition shadow-sm active:scale-95"
             >
               <ClipboardCheck className="w-4 h-4" />
-              Importar de Muestra
+              Importar de OP
             </button>
             <button
               onClick={() => setShowImportModal(true)}
@@ -399,17 +428,17 @@ export default function NewProductPage() {
               className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowAuditModal(false)} />
 
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+              className="relative bg-white w-full max-w-4xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-[90vh]">
 
               {/* HEADER */}
               <div className="p-6 border-b border-gray-100 bg-emerald-50/30 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-100 rounded-xl text-emerald-600">
+                  <div className="p-2.5 bg-emerald-100 rounded-xl text-emerald-600 shadow-sm">
                     <ClipboardCheck className="w-5 h-5 font-bold" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Importar de Muestra Auditada</h2>
-                    <p className="text-xs text-emerald-600 font-medium">Muestras con auditoría finalizada — listas para inventario</p>
+                    <h2 className="text-xl font-bold text-gray-900 uppercase tracking-tight">Importar de Orden de Producción (OP)</h2>
+                    <p className="text-xs text-emerald-600 font-bold uppercase tracking-widest opacity-70">Lotes auditados listos para inventario</p>
                   </div>
                 </div>
                 <button onClick={() => setShowAuditModal(false)} className="p-2 hover:bg-white rounded-full transition shadow-sm border border-gray-100"><X className="w-5 h-5 text-gray-400" /></button>
@@ -530,7 +559,7 @@ export default function NewProductPage() {
               className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setShowAuditDetailModal(false)} />
 
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+              className="relative bg-white w-full max-w-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto max-h-[95vh]">
               
               <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div className="flex items-center gap-4">
@@ -545,7 +574,7 @@ export default function NewProductPage() {
                 <button onClick={() => setShowAuditDetailModal(false)} className="p-3 hover:bg-white rounded-2xl transition shadow-sm border border-gray-100"><X className="w-6 h-6 text-gray-400" /></button>
               </div>
 
-              <div className="p-8 space-y-8 text-center">
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 text-center scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {/* QUANTITY CARDS */}
                 <div className="grid grid-cols-3 gap-6">
                   <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 flex flex-col items-center">
@@ -567,83 +596,98 @@ export default function NewProductPage() {
 
                 {/* ACTION BUTTONS */}
                 <div className="space-y-3">
-                  <button 
-                    onClick={() => handleImportAudit(selectedAudit, '1RA')}
-                    disabled={importedCategories[selectedAudit.id]?.includes('1RA')}
-                    className={`w-full flex items-center justify-between p-6 bg-white border-2 rounded-3xl transition group ${
-                      importedCategories[selectedAudit.id]?.includes('1RA') 
-                        ? 'border-gray-200 opacity-60 cursor-not-allowed' 
-                        : 'border-emerald-500 hover:bg-emerald-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 text-left">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${
-                        importedCategories[selectedAudit.id]?.includes('1RA') ? 'bg-gray-400' : 'bg-emerald-500'
-                      }`}><Package className="w-5 h-5" /></div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                  <div className="bg-white border-2 border-emerald-500 rounded-3xl overflow-hidden">
+                    <div className="p-6 bg-emerald-50/30 flex items-center justify-between border-b border-emerald-100">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-emerald-500 shadow-lg shadow-emerald-200"><Package className="w-5 h-5" /></div>
+                        <div>
                           <h4 className="font-black text-gray-900 text-sm">Subir Productos Terminados (1ra)</h4>
-                          {importedCategories[selectedAudit.id]?.includes('1RA') && (
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-lg uppercase">Ya agregado</span>
-                          )}
+                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
                         </div>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Cargar desglose por tallas al inventario</p>
                       </div>
                     </div>
-                    {importedCategories[selectedAudit.id]?.includes('1RA') ? <CheckCircle2 className="w-6 h-6 text-gray-400" /> : <Plus className="w-6 h-6 text-emerald-500 group-hover:scale-125 transition" />}
-                  </button>
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
+                        const isSaved = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
+                        return (
+                          <button
+                            key={sz.size}
+                            disabled={isSaved}
+                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, '1RA')}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md'
+                            }`}
+                          >
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-emerald-500">Talla</span>
+                            <span className="text-sm font-black text-gray-900 uppercase">{sz.size}</span>
+                            <span className="text-[9px] font-bold text-emerald-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.salePrice || '?' }`}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                  <button 
-                    onClick={() => handleImportAudit(selectedAudit, '2DA')}
-                    disabled={importedCategories[selectedAudit.id]?.includes('2DA')}
-                    className={`w-full flex items-center justify-between p-6 bg-white border-2 rounded-3xl transition group ${
-                      importedCategories[selectedAudit.id]?.includes('2DA') 
-                        ? 'border-gray-200 opacity-60 cursor-not-allowed' 
-                        : 'border-rose-500 hover:bg-rose-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 text-left">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${
-                        importedCategories[selectedAudit.id]?.includes('2DA') ? 'bg-gray-400' : 'bg-rose-500'
-                      }`}><Tag className="w-5 h-5" /></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-black text-gray-900 text-sm">Subir Productos de Segunda (2da)</h4>
-                          {importedCategories[selectedAudit.id]?.includes('2DA') && (
-                            <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black rounded-lg uppercase">Ya agregado</span>
-                          )}
+                  <div className="bg-white border-2 border-rose-500 rounded-3xl overflow-hidden">
+                    <div className="p-6 bg-rose-50/30 flex items-center justify-between border-b border-rose-100">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-rose-500 shadow-lg shadow-rose-200"><AlertCircle className="w-5 h-5" /></div>
+                        <div>
+                          <h4 className="font-black text-gray-900 text-sm">Subir Productos de Segunda</h4>
+                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
                         </div>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Cargar stock de segunda calidad</p>
                       </div>
                     </div>
-                    {importedCategories[selectedAudit.id]?.includes('2DA') ? <CheckCircle2 className="w-6 h-6 text-gray-400" /> : <Plus className="w-6 h-6 text-rose-500 group-hover:scale-125 transition" />}
-                  </button>
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
+                        const isSaved = savedAuditItems.includes(`${selectedAudit.id}-2DA-${sz.size}`);
+                        return (
+                          <button
+                            key={sz.size}
+                            disabled={isSaved}
+                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, '2DA')}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-rose-500 hover:bg-rose-50 hover:shadow-md'
+                            }`}
+                          >
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-rose-500">Talla</span>
+                            <span className="text-sm font-black text-gray-900 uppercase">{sz.size}</span>
+                            <span className="text-[9px] font-bold text-rose-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.secondSalePrice || '?' }`}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                  <button 
-                    onClick={() => handleImportAudit(selectedAudit, 'PROCESO')}
-                    disabled={importedCategories[selectedAudit.id]?.includes('PROCESO')}
-                    className={`w-full flex items-center justify-between p-6 bg-white border-2 rounded-3xl transition group ${
-                      importedCategories[selectedAudit.id]?.includes('PROCESO') 
-                        ? 'border-gray-200 opacity-60 cursor-not-allowed' 
-                        : 'border-amber-500 hover:bg-amber-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 text-left">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white ${
-                        importedCategories[selectedAudit.id]?.includes('PROCESO') ? 'bg-gray-400' : 'bg-amber-500'
-                      }`}><Clock className="w-5 h-5" /></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-black text-gray-900 text-sm">Subir Productos en Proceso</h4>
-                          {importedCategories[selectedAudit.id]?.includes('PROCESO') && (
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-lg uppercase">Ya agregado</span>
-                          )}
+                  <div className="bg-white border-2 border-amber-500 rounded-3xl overflow-hidden">
+                    <div className="p-6 bg-amber-50/30 flex items-center justify-between border-b border-amber-100">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-amber-500 shadow-lg shadow-amber-200"><Clock className="w-5 h-5" /></div>
+                        <div>
+                          <h4 className="font-black text-gray-900 text-sm italic uppercase">Subir Productos en Proceso</h4>
+                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de costos</p>
                         </div>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Cargar stock en proceso de fabricación</p>
                       </div>
                     </div>
-                    {importedCategories[selectedAudit.id]?.includes('PROCESO') ? <CheckCircle2 className="w-6 h-6 text-gray-400" /> : <Plus className="w-6 h-6 text-amber-500 group-hover:scale-125 transition" />}
-                  </button>
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
+                        const isSaved = savedAuditItems.includes(`${selectedAudit.id}-PROCESO-${sz.size}`);
+                        return (
+                          <button
+                            key={sz.size}
+                            disabled={isSaved}
+                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, 'PROCESO')}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-amber-500 hover:bg-amber-50 hover:shadow-md'
+                            }`}
+                          >
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-amber-500 font-mono italic">Talla</span>
+                            <span className="text-sm font-black text-gray-900 uppercase italic">{sz.size}</span>
+                            <span className="text-[9px] font-bold text-amber-600 mt-1">{isSaved ? 'AGREGADO' : ''}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-8 border-t border-gray-100">

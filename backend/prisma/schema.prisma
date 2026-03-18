@@ -347,6 +347,8 @@ model ProductSample {
   materials       SampleMaterial[]
   processAudits   ProcessAudit[]
   
+  code            String?          @unique
+  udpRequirements Json?          @map("udp_requirements")
   approvedAt      DateTime?        @map("approved_at")
   
   // New Material Workflow fields
@@ -354,7 +356,10 @@ model ProductSample {
   adminMaterialNotes    String?      @map("admin_material_notes") @db.Text
   logisticsMaterialDate DateTime?    @map("logistics_material_date")
   udpMaterialReceivedAt DateTime?    @map("udp_material_received_at")
-
+  
+  // OP Admin Approval
+  adminOpApprovalStatus String       @default("PENDIENTE") @map("admin_op_approval_status") // PENDIENTE, APROBADO, RECHAZADO
+  
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 

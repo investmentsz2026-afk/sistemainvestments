@@ -167,7 +167,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             <div className="p-2 bg-green-100 rounded-lg">
               <DollarSign className="w-5 h-5 text-green-600" />
             </div>
-            <span className="text-sm text-gray-500">Precio Compra</span>
+            <span className="text-sm text-gray-500">
+              {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'Precio de Compra'}
+            </span>
           </div>
           <p className="text-2xl font-bold text-gray-900">${product.purchasePrice}</p>
         </div>
@@ -318,7 +320,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   'Talla': v.size,
                   'Color': v.color,
                   'Stock': v.stock,
-                  'Precio Compra': product.purchasePrice,
+                  [['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'Precio Compra']: product.purchasePrice,
                   'Precio Venta': product.sellingPrice
                 }));
                 const csv = data.map(row => Object.values(row).join(',')).join('\n');

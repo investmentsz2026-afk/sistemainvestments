@@ -30,6 +30,7 @@ export default function NewSamplePage() {
     // Form State
     const [formData, setFormData] = useState({
         name: '',
+        code: '',
         description: '',
         characteristics: '',
         images: [] as string[]
@@ -112,6 +113,13 @@ export default function NewSamplePage() {
         setMaterials(newMats);
     };
 
+    const generateCode = () => {
+        const random = Math.floor(1000 + Math.random() * 9000);
+        const prefix = formData.name ? formData.name.substring(0, 3).toUpperCase() : 'SMP';
+        setFormData({ ...formData, code: `${prefix}-${random}` });
+        toast.success('Código generado');
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -168,6 +176,30 @@ export default function NewSamplePage() {
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
+                            </div>
+                        </div>
+
+                        {/* CODE */}
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Código de Muestra</label>
+                            <div className="flex gap-4">
+                                <div className="relative flex-1">
+                                    <FileText className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                    <input 
+                                        type="text" required
+                                        placeholder="Ej: SMP-2024-001"
+                                        className="w-full bg-gray-50 border-none rounded-[1.5rem] pl-16 pr-6 py-6 font-black text-lg text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                        value={formData.code}
+                                        onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                                    />
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={generateCode}
+                                    className="px-8 py-6 bg-indigo-50 text-indigo-600 rounded-[1.5rem] font-black hover:bg-indigo-100 transition shadow-sm border border-indigo-100"
+                                >
+                                    Generar Código
+                                </button>
                             </div>
                         </div>
 

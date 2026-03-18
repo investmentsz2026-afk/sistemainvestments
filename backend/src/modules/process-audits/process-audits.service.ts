@@ -279,7 +279,10 @@ export class ProcessAuditsService {
 
     async getAuditableItems() {
         const samples = await (this.prisma as any).productSample.findMany({
-            where: { status: 'APROBADO' },
+            where: { 
+                status: 'APROBADO',
+                adminOpApprovalStatus: 'APROBADO'
+            },
             select: { 
                 id: true, 
                 name: true, 
@@ -336,6 +339,7 @@ export class ProcessAuditsService {
             totalQuantity: a.totalQuantity,
             productionColor: a.sample?.productionColor,
             productionSizeData: a.sample?.productionSizeData,
+            udpRequirements: a.sample?.udpRequirements,
         }));
     }
 }

@@ -151,12 +151,16 @@ export default function SamplesPage() {
                                         </div>
                                     )}
                                     <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-                                        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg ${
+                                        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200/50 ${
                                             sample.status === 'APROBADO' ? 'bg-emerald-500 text-white' :
                                             sample.status === 'COMPLETADO_INVENTARIO' ? 'bg-blue-600 text-white' :
                                             sample.status === 'OBSERVADO' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white'
                                         }`}>
-                                            {sample.status === 'COMPLETADO_INVENTARIO' ? 'INVENTARIADO' : sample.status}
+                                            {sample.status === 'COMPLETADO_INVENTARIO' ? 'INVENTARIADO' : 
+                                             (sample.status === 'APROBADO' && sample.processAudits?.some((a: any) => a.adminStatus === 'APROBADO')) ? 'LISTO PARA INVENTARIO' :
+                                             (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'PENDIENTE') ? 'APROBADO - PEND. ADMIN' : 
+                                             (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'APROBADO') ? 'LISTO PARA AUDITORÍA' : 
+                                             sample.status}
                                         </div>
                                         {sample.materialReceiptStatus && (
                                             <div className="px-3 py-1 bg-white/90 backdrop-blur-md text-[8px] font-black text-indigo-600 rounded-lg shadow-md uppercase tracking-tighter">

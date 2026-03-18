@@ -37,6 +37,16 @@ export class SamplesController {
     return this.samplesService.adminApproveMaterials(id, body.notes);
   }
 
+  @Patch(':id/admin-approve-op')
+  adminApproveOP(@Param('id') id: string, @Body() body: any) {
+    return this.samplesService.adminApproveOP(id, body.notes);
+  }
+
+  @Post(':id/discharge-inventory')
+  dischargeInventory(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.samplesService.dischargeInventory(id, body.discharges, req.user.id);
+  }
+
   @Patch(':id/logistics-deliver-materials')
   logisticsDeliverMaterials(@Param('id') id: string) {
     return this.samplesService.logisticsDeliverMaterials(id);
@@ -50,5 +60,10 @@ export class SamplesController {
   @Patch(':id/udp-complete-development')
   udpCompleteDevelopment(@Param('id') id: string) {
     return this.samplesService.udpCompleteDevelopment(id);
+  }
+
+  @Patch(':id/udp-requirements')
+  saveUdpRequirements(@Param('id') id: string, @Body() body: any) {
+    return this.samplesService.saveUdpRequirements(id, body.requirements);
   }
 }

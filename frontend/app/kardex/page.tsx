@@ -35,7 +35,8 @@ import {
   BookOpen,
   CheckCircle,
   Truck,
-  MoreVertical
+  MoreVertical,
+  Boxes
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -342,6 +343,7 @@ export default function KardexPage() {
     { id: 'PROCESO', label: 'En Proceso', icon: Clock },
     { id: 'MATERIALES', label: 'Materiales', icon: FileText },
     { id: 'MAQUINARIA', label: 'Maquinaria', icon: Truck },
+    { id: 'AVIOS', label: 'Avíos', icon: Boxes },
     { id: 'OTROS', label: 'Otros', icon: MoreVertical },
   ];
 

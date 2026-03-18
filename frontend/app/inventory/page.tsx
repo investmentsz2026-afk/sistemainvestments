@@ -33,7 +33,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Boxes
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -175,6 +176,7 @@ export default function InventoryPage() {
     { id: 'SEGUNDA', label: 'De Segunda', icon: RefreshCw },
     { id: 'MATERIALES', label: 'Materiales', icon: FileText },
     { id: 'MAQUINARIA', label: 'Maquinaria', icon: Truck },
+    { id: 'AVIOS', label: 'Avíos', icon: Boxes },
     { id: 'OTROS', label: 'Otros', icon: MoreVertical },
   ];
 
@@ -212,8 +214,8 @@ export default function InventoryPage() {
         'Color': variant.color,
         'Stock': variant.stock,
         'Stock Mín.': product.minStock,
-        'P. Compra': product.purchasePrice,
         'P. Venta': product.sellingPrice,
+        [['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'P. Compra']: product.purchasePrice,
         'Valor Total': (variant.stock * product.purchasePrice)
       }))
     );
@@ -241,7 +243,7 @@ export default function InventoryPage() {
     doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 14, 25);
     doc.text(`Total productos: ${totalProducts} | Stock total: ${totalStock} | Valor: S/ ${totalValue.toLocaleString()}`, 14, 30);
 
-    const headers = [['Producto', 'SKU', 'Categoría', 'Tipo', 'Talla', 'Color', 'Stock', 'P. Compra', 'P. Venta', 'Valor']];
+    const headers = [['Producto', 'SKU', 'Categoría', 'Tipo', 'Talla', 'Color', 'Stock', 'Costo/Compra', 'P. Venta', 'Valor']];
     const body = sortedProducts.flatMap(product =>
       product.variants.map(variant => [
         product.name,

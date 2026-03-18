@@ -304,9 +304,9 @@ export default function UsersPage() {
                     <motion.div
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+                        className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl max-h-[90vh] flex flex-col"
                     >
-                        <div className="p-8">
+                        <div className="p-8 overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-bold text-gray-900">
                                     {isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
@@ -357,8 +357,8 @@ export default function UsersPage() {
 
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-3">Roles Asignados</label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {roles.map(r => (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {roles.filter(r => r.name !== 'ODP').map(r => (
                                             <label key={r.id} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition ${formData.roles.includes(r.name)
                                                 ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600'
                                                 : 'border-gray-100 bg-gray-50'
@@ -374,7 +374,7 @@ export default function UsersPage() {
                                                         setFormData({ ...formData, roles: newRoles });
                                                     }}
                                                 />
-                                                <Shield className={`w-4 h-4 ${formData.roles.includes(r.name) ? 'text-indigo-600' : 'text-gray-400'}`} />
+                                                <Shield className={`w-4 h-4 flex-shrink-0 ${formData.roles.includes(r.name) ? 'text-indigo-600' : 'text-gray-400'}`} />
                                                 <span className={`text-sm font-medium ${formData.roles.includes(r.name) ? 'text-indigo-900' : 'text-gray-600'}`}>
                                                     {r.name}
                                                 </span>
@@ -383,7 +383,7 @@ export default function UsersPage() {
                                     </div>
                                 </div>
 
-                                <div className="pt-4">
+                                <div className="pt-4 sticky bottom-0 bg-white z-10">
                                     <button
                                         type="submit"
                                         className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition active:scale-95"

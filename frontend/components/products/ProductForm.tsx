@@ -20,7 +20,7 @@ const productSchema = z.object({
     initialStock: z.number().min(0, 'El stock inicial debe ser mayor o igual a 0').default(0),
   })).min(1, 'Debe agregar al menos una variante'),
 }).superRefine((data, ctx) => {
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA'].includes(data.inventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
 
   // Validar precio de venta solo si NO es material/maquinaria
   if (!isMaterialOrMachinery && data.sellingPrice <= 0) {
@@ -98,7 +98,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchSellingPrice = watch('sellingPrice');
   const watchInventoryType = watch('inventoryType');
 
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA'].includes(watchInventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(watchInventoryType);
 
   const margin = watchPurchasePrice > 0 && watchSellingPrice > 0
     ? ((watchSellingPrice - watchPurchasePrice) / watchPurchasePrice * 100)
@@ -207,6 +207,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <option value="SEGUNDA">♻️ Productos de Segunda</option>
                 <option value="MATERIALES">🧱 Materiales</option>
                 <option value="MAQUINARIA">⚙️ Maquinaria</option>
+                <option value="AVIOS">🧷 Avíos</option>
                 <option value="OTROS">📋 Otros</option>
               </select>
               {errors.inventoryType && (
@@ -271,7 +272,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <div>
               <label className={labelClass}>
                 <DollarSign className="w-3.5 h-3.5" />
-                Precio de Compra <span className="text-red-400">*</span>
+                {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(watchInventoryType) ? 'Costo de Producción' : 'Precio de Compra'} <span className="text-red-400">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>

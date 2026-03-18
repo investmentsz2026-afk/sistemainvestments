@@ -203,8 +203,7 @@ export default function NewAuditPage() {
                                                                 >
                                                                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                                                                     <span className="font-mono text-xs font-black text-gray-400 group-hover:text-indigo-500">{p.sku}</span>
-                                                                    <span className="font-bold text-gray-700 text-sm truncate">{p.name}</span>
-                                                                    {p.op && <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-black ml-auto">OP: {p.op}</span>}
+                                                                    <span className="font-bold text-gray-700 text-sm truncate">{p.name} {p.op ? `(OP ${p.op})` : ''}</span>
                                                                 </button>
                                                             ))
                                                         )}

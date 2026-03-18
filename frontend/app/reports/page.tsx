@@ -164,7 +164,7 @@ export default function ReportsPage() {
         let data: any[] = [], headers: any[] = [], title = '';
         if (reportType === 'inventory') {
             title = 'REPORTE DE INVENTARIO ACTUAL';
-            headers = [['Fecha Reg.', 'SKU', 'Producto', 'Variante', 'Stock', 'P. Compra', 'P. Venta', 'Valor Total']];
+            headers = [['Fecha Reg.', 'SKU', 'Producto', 'Variante', 'Stock', 'Costo/Compra', 'P. Venta', 'Valor Total']];
             data = filteredStock.map((s: any) => [format(new Date(s.createdAt), 'dd/MM/yyyy'), s.variantSku, s.productName, `${s.size}/${s.color}`, s.stock, s.purchasePrice, s.sellingPrice, s.totalValue]);
         } else if (reportType === 'movements') {
             title = 'REPORTE DE MOVIMIENTOS';
@@ -172,7 +172,7 @@ export default function ReportsPage() {
             data = filteredMovements.map((m: any) => [format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm'), m.type === 'ENTRY' ? 'ENTRADA' : 'SALIDA', m.variant.product.name, `${m.variant.size}-${m.variant.color}`, m.quantity, m.reason, m.previousStock, m.newStock]);
         } else {
             title = 'REPORTE DE VALORIZACIÓN';
-            headers = [['Producto', 'Variante', 'Stock', 'Valor Compra', 'Valor Venta']];
+            headers = [['Producto', 'Variante', 'Stock', 'Valor Costo/Compra', 'Valor Venta']];
             data = filteredValuation.map((v: any) => [v.product, v.variant, v.quantity, v.purchaseValue, v.salesValue]);
         }
         if (fmt === 'excel') {
@@ -441,7 +441,7 @@ export default function ReportsPage() {
                                             <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest">Producto</th>
                                             <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest">Variante</th>
                                             <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest text-right">Stock</th>
-                                            <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest text-right">Compra</th>
+                                            <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest text-right">Costo / Compra</th>
                                             <th className="px-6 py-4 text-[10px] font-extrabold text-indigo-900/70 uppercase tracking-widest text-right">Venta</th>
                                         </>
                                     )}
