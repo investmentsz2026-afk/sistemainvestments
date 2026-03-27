@@ -78,6 +78,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         initialData={{
           name: product.name,
           category: product.category,
+          sku: product.sku,
+          op: product.op || '',
           inventoryType: product.inventoryType,
           description: product.description || '',
           purchasePrice: product.purchasePrice,
@@ -87,7 +89,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             id: v.id,
             size: v.size,
             color: v.color,
-            initialStock: v.stock
+            initialStock: v.stock,
+            variantSku: v.variantSku
           }))
         }}
         isLoading={isUpdating}

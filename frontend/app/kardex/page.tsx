@@ -203,6 +203,7 @@ export default function KardexPage() {
     return (
       m.variant.product.name.toLowerCase().includes(s) ||
       m.variant.product.sku.toLowerCase().includes(s) ||
+      (m.variant.product.op || '').toLowerCase().includes(s) ||
       m.variant.variantSku.toLowerCase().includes(s) ||
       m.variant.size.toLowerCase().includes(s) ||
       m.variant.color.toLowerCase().includes(s) ||
@@ -224,6 +225,7 @@ export default function KardexPage() {
       'Fecha': format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm'),
       'Tipo': m.type === 'ENTRY' ? 'Entrada' : 'Salida',
       'Producto': m.variant.product.name,
+      'OP': m.variant.product.op || '--',
       'SKU': m.variant.variantSku,
       'Talla': m.variant.size,
       'Color': m.variant.color,
@@ -263,6 +265,7 @@ export default function KardexPage() {
         'Fecha',
         'Tipo',
         'Producto',
+        'OP',
         'Talla/Color',
         'Cantidad',
         'Stock Anterior',
@@ -274,6 +277,7 @@ export default function KardexPage() {
         format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm'),
         m.type === 'ENTRY' ? 'Entrada' : 'Salida',
         m.variant.product.name,
+        m.variant.product.op || '--',
         `${m.variant.size} / ${m.variant.color}`,
         m.quantity.toString(),
         m.previousStock.toString(),
@@ -638,7 +642,7 @@ export default function KardexPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <Package className="w-4 h-4" />
-                      Producto
+                      Producto / OP
                     </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -703,7 +707,14 @@ export default function KardexPage() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{movement.variant.product.name}</p>
-                      <p className="text-xs text-gray-500">SKU: {movement.variant.product.sku}</p>
+                      <p className="text-xs text-gray-500">
+                        SKU: {movement.variant.product.sku}
+                        {movement.variant.product.op && (
+                          <span className="ml-2 text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                            OP: {movement.variant.product.op}
+                          </span>
+                        )}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="bg-gray-100 px-2 py-1 rounded text-xs inline-block">

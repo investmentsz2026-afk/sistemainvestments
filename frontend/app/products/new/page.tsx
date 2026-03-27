@@ -162,6 +162,7 @@ export default function NewProductPage() {
       category: 'Prendas',
       inventoryType: invType,
       sku: audit.op + (type === '1RA' ? '' : `-${type}`),
+      op: audit.op,
       description: `Importado de Auditoría ${audit.process} • OP: ${audit.op}. Categoría: ${type}${sizeToUse ? ` • Ref. Talla: ${sizeToUse}` : ''}.`,
       purchasePrice: pPrice || 0.1,
       sellingPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),

@@ -111,7 +111,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-gray-600">SKU: {product.sku} | Categoría: {product.category}</p>
+            <p className="text-gray-600">
+              SKU: {product.sku} | 
+              Categoría: {product.category}
+              {product.op && (
+                <> | <span className="text-indigo-600 font-bold">OP: {product.op}</span></>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -286,6 +292,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 {format(new Date(product.updatedAt), 'dd/MM/yyyy HH:mm')}
               </dd>
             </div>
+            <div className="flex justify-between text-indigo-600">
+              <dt className="font-bold">Orden de Producción (OP)</dt>
+              <dd className="font-black uppercase">{product.op || '--'}</dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-gray-600">Stock mínimo</dt>
               <dd className="font-medium text-gray-900">{product.minStock} unidades</dd>
@@ -316,6 +326,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               onClick={() => {
                 const data = product.variants.map((v: any) => ({
                   'Producto': product.name,
+                  'OP': product.op || '--',
                   'SKU': v.variantSku,
                   'Talla': v.size,
                   'Color': v.color,

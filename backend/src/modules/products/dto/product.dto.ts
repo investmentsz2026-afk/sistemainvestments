@@ -13,6 +13,10 @@ export class CreateVariantDto {
   @IsOptional()
   @Min(0)
   initialStock?: number;
+
+  @IsString()
+  @IsOptional()
+  variantSku?: string;
 }
 
 export class CreateProductDto {
@@ -24,11 +28,19 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
   inventoryType?: string;
 
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  op?: string;
 
   @IsNumber()
   @Min(0)
@@ -60,11 +72,19 @@ export class UpdateProductDto {
 
   @IsString()
   @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
   inventoryType?: string;
 
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  op?: string;
 
   @IsNumber()
   @IsOptional()
@@ -111,4 +131,8 @@ export class UpdateVariantDto {
   @IsOptional()
   @Min(0)
   initialStock?: number;
+
+  @IsString()
+  @IsOptional()
+  variantSku?: string;
 }

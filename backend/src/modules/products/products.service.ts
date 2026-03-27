@@ -21,13 +21,16 @@ export class ProductsService {
       counter = lastCounter + 1;
     }
 
-    // Generar SKU principal del producto
-    const sku = generateSKU(
-      createProductDto.category,
-      '00', // SKU base sin talla específica
-      '000', // SKU base sin color específico
-      counter
-    );
+    // Generar SKU principal del producto si no se proporciona uno manual
+    let sku = createProductDto.sku;
+    if (!sku) {
+      sku = generateSKU(
+        createProductDto.category,
+        '00', // SKU base sin talla específica
+        '000', // SKU base sin color específico
+        counter
+      );
+    }
 
     // Crear producto
     const product = await this.prisma.product.create({
@@ -37,6 +40,7 @@ export class ProductsService {
         category: createProductDto.category,
         inventoryType: createProductDto.inventoryType || 'TERMINADOS',
         description: createProductDto.description,
+        op: createProductDto.op,
         purchasePrice: createProductDto.purchasePrice,
         sellingPrice: createProductDto.sellingPrice,
         minStock: createProductDto.minStock || 5,
@@ -75,12 +79,15 @@ export class ProductsService {
       throw new BadRequestException('Variant already exists');
     }
 
-    // Generar SKU único para la variante
-    const variantSku = generateVariantSKU(
-      product.sku,
-      createVariantDto.size,
-      createVariantDto.color
-    );
+    // Generar SKU único para la variante si no se proporciona uno manual
+    let variantSku = createVariantDto.variantSku;
+    if (!variantSku) {
+      variantSku = generateVariantSKU(
+        product.sku,
+        createVariantDto.size,
+        createVariantDto.color
+      );
+    }
 
     return this.prisma.productVariant.create({
       data: {
@@ -150,6 +157,21 @@ export class ProductsService {
       },
     });
 
+    // Si el SKU cambió, actualizar todos los variantSku de sus variantes
+    if (productData.sku && productData.sku !== product.sku) {
+      for (const variant of updatedProduct.variants) {
+        const variantSku = generateVariantSKU(
+          productData.sku,
+          variant.size,
+          variant.color
+        );
+        await this.prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { variantSku },
+        });
+      }
+    }
+
     // Manejar variantes si se proporcionan
     if (variants && Array.isArray(variants)) {
       const variantIdsToKeep: string[] = [];
@@ -164,6 +186,7 @@ export class ProductsService {
               size: variant.size,
               color: variant.color,
               stock: stockValue !== undefined ? stockValue : undefined,
+              variantSku: variant.variantSku || undefined,
             },
           });
           variantIdsToKeep.push(variant.id);

@@ -207,6 +207,7 @@ export default function InventoryPage() {
     const data = sortedProducts.flatMap(product =>
       product.variants.map(variant => ({
         'Producto': product.name,
+        'OP': product.op || '--',
         'SKU': variant.variantSku,
         'Categoría': product.category,
         'Tipo': product.inventoryType,
@@ -223,7 +224,7 @@ export default function InventoryPage() {
     const ws = XLSX.utils.json_to_sheet(data);
     // Column widths
     ws['!cols'] = [
-      { wch: 25 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+      { wch: 25 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
       { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 8 },
       { wch: 12 }, { wch: 12 }, { wch: 14 }
     ];
@@ -243,10 +244,11 @@ export default function InventoryPage() {
     doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 14, 25);
     doc.text(`Total productos: ${totalProducts} | Stock total: ${totalStock} | Valor: S/ ${totalValue.toLocaleString()}`, 14, 30);
 
-    const headers = [['Producto', 'SKU', 'Categoría', 'Tipo', 'Talla', 'Color', 'Stock', 'Costo/Compra', 'P. Venta', 'Valor']];
+    const headers = [['Producto', 'OP', 'SKU', 'Categoría', 'Tipo', 'Talla', 'Color', 'Stock', 'Costo/Compra', 'P. Venta', 'Valor']];
     const body = sortedProducts.flatMap(product =>
       product.variants.map(variant => [
         product.name,
+        product.op || '--',
         variant.variantSku,
         product.category,
         product.inventoryType,
@@ -612,6 +614,9 @@ export default function InventoryPage() {
                       Producto
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      OP
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       SKU
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -668,6 +673,11 @@ export default function InventoryPage() {
                               </span>
                             </div>
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <code className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                            {product.op || '--'}
+                          </code>
                         </td>
                         <td className="px-6 py-4">
                           <code className="text-xs bg-gray-100 px-2 py-1 rounded">

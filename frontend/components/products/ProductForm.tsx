@@ -3,13 +3,17 @@ import React from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ProductBarcode } from './Barcode';
+import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight, Barcode, ClipboardCheck } from 'lucide-react';
 
 const productSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   category: z.string().min(1, 'La categoría es requerida'),
   inventoryType: z.string().min(1, 'El tipo de inventario es requerido'),
   description: z.string().optional(),
+  sku: z.string().optional(),
+  op: z.string().optional(),
   purchasePrice: z.number().min(0.01, 'El precio de compra debe ser mayor a 0'),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0'),
   minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0').default(5),
@@ -18,6 +22,7 @@ const productSchema = z.object({
     size: z.string().optional(),
     color: z.string().min(1, 'El color es requerido'),
     initialStock: z.number().min(0, 'El stock inicial debe ser mayor o igual a 0').default(0),
+    variantSku: z.string().optional(),
   })).min(1, 'Debe agregar al menos una variante'),
 }).superRefine((data, ctx) => {
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
@@ -75,6 +80,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       category: '',
       inventoryType: 'TERMINADOS',
       description: '',
+      sku: '',
+      op: '',
       purchasePrice: 0,
       sellingPrice: 0,
       minStock: 5,
@@ -97,6 +104,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchPurchasePrice = watch('purchasePrice');
   const watchSellingPrice = watch('sellingPrice');
   const watchInventoryType = watch('inventoryType');
+  const watchSku = watch('sku');
 
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(watchInventoryType);
 
@@ -248,6 +256,50 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 placeholder="Descripción detallada del producto (opcional)"
               />
             </div>
+
+            {/* SKU */}
+            <div>
+              <label className={labelClass}>
+                <Tag className="w-3.5 h-3.5" />
+                SKU (Manual / Auto)
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  {...register('sku')}
+                  className={`${inputBase} ${inputNormal} font-mono`}
+                  placeholder="Ej: ABC-123 (Opcional)"
+                />
+                {watchSku && watchSku.length > 2 && (
+                  <div className="flex flex-col items-center p-2 bg-white rounded-xl border border-gray-100 shadow-sm max-w-[150px]">
+                    <ProductBarcode value={watchSku} displayValue={false} height={25} width={1} />
+                    <span className="text-[8px] font-black text-gray-400 mt-1 uppercase truncate w-full text-center">{watchSku}</span>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1 font-bold uppercase tracking-widest">
+                <Info className="w-3 h-3" /> Dejar vacío para generarlo automáticamente
+              </p>
+            </div>
+
+            {/* Orden de Producción (OP) - Condicional */}
+            {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(watchInventoryType) && (
+              <div>
+                <label className={labelClass}>
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Orden de Producción (OP)
+                </label>
+                <input
+                  type="text"
+                  {...register('op')}
+                  className={`${inputBase} ${inputNormal} font-mono uppercase`}
+                  placeholder="Ej: OP-2024-001"
+                />
+                <p className="mt-1.5 text-[10px] text-indigo-500 flex items-center gap-1 font-bold uppercase tracking-widest">
+                  <Info className="w-3 h-3" /> Referencia obligatoria para trazabilidad de lote
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -470,6 +522,33 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     placeholder="0"
                     min="0"
                   />
+                </div>
+
+                {/* SKU de variante */}
+                <div className="md:col-span-3 pb-2 pt-2 border-t border-dashed border-gray-100 mt-2">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    <div className="flex-1">
+                      <label className={labelClass}>
+                        <Tag className="w-3.5 h-3.5" />
+                        SKU Específico de Variante
+                      </label>
+                      <input
+                        type="text"
+                        {...register(`variants.${index}.variantSku`)}
+                        className={`${inputBase} ${inputNormal} font-mono text-xs`}
+                        placeholder="Ej: ABC-123-S (Dejar vacío para auto)"
+                      />
+                    </div>
+                    {(() => {
+                      const vSku = watch(`variants.${index}.variantSku`);
+                      return vSku && vSku.length > 2 ? (
+                        <div className="flex flex-col items-center p-2 bg-white rounded-xl border border-gray-100 shadow-sm min-w-[120px]">
+                          <ProductBarcode value={vSku} displayValue={false} height={20} width={0.9} />
+                          <span className="text-[7px] font-black text-gray-400 mt-0.5 uppercase tracking-tighter">{vSku}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 </div>
               </div>
             </div>

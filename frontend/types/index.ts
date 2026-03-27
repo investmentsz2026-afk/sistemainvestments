@@ -13,6 +13,7 @@ export interface Product {
   category: string;
   inventoryType: string;
   description?: string;
+  op?: string;
   purchasePrice: number;
   sellingPrice: number;
   minStock: number;

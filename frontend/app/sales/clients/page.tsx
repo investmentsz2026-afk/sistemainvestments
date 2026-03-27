@@ -14,8 +14,14 @@ import {
     MoreVertical,
     ChevronRight,
     ArrowLeft,
-    X
+    X,
+    FileSpreadsheet,
+    Users,
+    Upload,
+    FileText,
+    Check
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,6 +31,10 @@ export default function ClientsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showSelectionModal, setShowSelectionModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importData, setImportData] = useState<any[]>([]);
+    const [isImporting, setIsImporting] = useState(false);
 
     // New client form state
     const [newClient, setNewClient] = useState({
@@ -64,6 +74,49 @@ export default function ClientsPage() {
         }
     };
 
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const bstr = event.target?.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws);
+            setImportData(data);
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const processBulkImport = async () => {
+        setIsImporting(true);
+        try {
+            // Se asume un endpoint que acepte un array o iterar
+            // Por ahora iteramos para asegurar compatibilidad
+            for (const item of importData) {
+                await api.post('/sales/clients', {
+                    documentType: item.tipo_doc || item.documentType || 'DNI',
+                    documentNumber: String(item.numero || item.documentNumber || ''),
+                    name: item.nombre || item.name || '',
+                    email: item.correo || item.email || '',
+                    phone: String(item.telefono || item.phone || ''),
+                    address: item.direccion || item.address || ''
+                });
+            }
+            setShowImportModal(false);
+            setImportData([]);
+            fetchClients();
+            alert('Importación masiva completada con éxito');
+        } catch (error) {
+            console.error('Error in bulk import:', error);
+            alert('Error parcial en la importación');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const filteredClients = clients.filter(c => 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         c.documentNumber.includes(searchTerm)
@@ -89,7 +142,7 @@ export default function ClientsPage() {
                         </div>
                     </div>
                     <button 
-                        onClick={() => setShowAddModal(true)}
+                        onClick={() => setShowSelectionModal(true)}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-indigo-700 transition active:scale-95"
                     >
                         <Plus className="w-5 h-5" /> Nuevo Cliente
@@ -175,10 +228,73 @@ export default function ClientsPage() {
                 </div>
             </div>
 
-            {/* ADD CLIENT MODAL */}
+            {/* SELECTION MODAL */}
+            <AnimatePresence>
+                {showSelectionModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+                            onClick={() => setShowSelectionModal(false)}
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-2xl overflow-hidden"
+                        >
+                            <div className="text-center mb-10">
+                                <h2 className="text-3xl font-black text-gray-900 uppercase">¿Cómo deseas agregar?</h2>
+                                <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mt-2 px-10">Selecciona el método que mejor se adapte a tu necesidad</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <button 
+                                    onClick={() => { setShowSelectionModal(false); setShowAddModal(true); }}
+                                    className="p-8 bg-gray-50 rounded-[2.5rem] border-2 border-transparent hover:border-indigo-600 hover:bg-indigo-50 transition-all text-left flex flex-col group h-full"
+                                >
+                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-6 group-hover:scale-110 transition-transform">
+                                        <Users className="w-7 h-7 text-indigo-600" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-gray-900 uppercase mb-2">Individual</h3>
+                                    <p className="text-sm text-gray-400 font-medium font-bold leading-relaxed">Registra un cliente paso a paso llenando el formulario estándar.</p>
+                                    <div className="mt-auto pt-6 flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest">
+                                        Continuar <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={() => { setShowSelectionModal(false); setShowImportModal(true); }}
+                                    className="p-8 bg-gray-50 rounded-[2.5rem] border-2 border-transparent hover:border-indigo-600 hover:bg-indigo-50 transition-all text-left flex flex-col group h-full"
+                                >
+                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-6 group-hover:scale-110 transition-transform">
+                                        <FileSpreadsheet className="w-7 h-7 text-indigo-600" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-gray-900 uppercase mb-2">Importe Masivo</h3>
+                                    <p className="text-sm text-gray-400 font-medium font-bold leading-relaxed">Carga múltiples clientes desde un archivo Excel o PDF.</p>
+                                    <div className="mt-auto pt-6 flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest">
+                                        Continuar <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={() => setShowSelectionModal(false)}
+                                className="mt-10 w-full p-4 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:text-gray-900 transition"
+                            >
+                                <X className="w-4 h-4 mx-auto mb-1" /> Cerrar
+                            </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ADD CLIENT MODAL (RESPONSIVE) */}
             <AnimatePresence>
                 {showAddModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -190,25 +306,25 @@ export default function ClientsPage() {
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="relative w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl overflow-hidden"
+                            className="relative w-full max-w-2xl bg-white rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden max-h-[95vh] flex flex-col"
                         >
-                            <div className="bg-gray-900 p-10 text-white relative">
+                            <div className="bg-gray-900 p-6 md:p-10 text-white relative shrink-0">
                                 <button 
                                     onClick={() => setShowAddModal(false)}
-                                    className="absolute top-10 right-10 p-2 text-white/40 hover:text-white transition"
+                                    className="absolute top-6 md:top-10 right-6 md:right-10 p-2 text-white/40 hover:text-white transition"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
-                                <h2 className="text-3xl font-black uppercase tracking-tight">Nuevo Cliente</h2>
-                                <p className="text-white/40 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Inscripción en el sistema</p>
+                                <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Nuevo Cliente</h2>
+                                <p className="text-white/40 font-bold uppercase text-[10px] tracking-[0.2em] mt-2">Inscripción Individual</p>
                             </div>
 
-                            <form onSubmit={handleAddClient} className="p-10 space-y-6">
-                                <div className="grid grid-cols-2 gap-6">
+                            <form onSubmit={handleAddClient} className="p-6 md:p-10 space-y-6 overflow-y-auto">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo Doc.</label>
                                         <select 
-                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                             value={newClient.documentType}
                                             onChange={(e) => setNewClient({ ...newClient, documentType: e.target.value })}
                                         >
@@ -220,7 +336,7 @@ export default function ClientsPage() {
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número</label>
                                         <input 
                                             type="text" required
-                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                             value={newClient.documentNumber}
                                             onChange={(e) => setNewClient({ ...newClient, documentNumber: e.target.value })}
                                         />
@@ -231,18 +347,18 @@ export default function ClientsPage() {
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo / Razón Social</label>
                                     <input 
                                         type="text" required
-                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                         value={newClient.name}
                                         onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
                                         <input 
                                             type="email"
-                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                             value={newClient.email}
                                             onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
                                         />
@@ -251,7 +367,7 @@ export default function ClientsPage() {
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
                                         <input 
                                             type="text"
-                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                             value={newClient.phone}
                                             onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
                                         />
@@ -262,21 +378,124 @@ export default function ClientsPage() {
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de Entrega / Fiscal</label>
                                     <input 
                                         type="text"
-                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition"
+                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                         value={newClient.address}
                                         onChange={(e) => setNewClient({ ...newClient, address: e.target.value })}
                                     />
                                 </div>
 
-                                <div className="pt-6">
+                                <div className="pt-6 sticky bottom-0 bg-white pb-6">
                                     <button 
                                         type="submit"
-                                        className="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition active:scale-95"
+                                        className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-lg shadow-2xl shadow-indigo-100 ring-4 ring-indigo-50 hover:bg-indigo-700 transition active:scale-95"
                                     >
                                         Registrar Cliente
                                     </button>
                                 </div>
                             </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* BULK IMPORT MODAL */}
+            <AnimatePresence>
+                {showImportModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-md"
+                            onClick={() => setShowImportModal(false)}
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative w-full max-w-3xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                        >
+                            <div className="bg-gradient-to-br from-indigo-900 to-indigo-700 p-10 text-white shrink-0 relative">
+                                <button onClick={() => setShowImportModal(false)} className="absolute top-10 right-10 p-2 text-white/40 hover:text-white transition">
+                                    <X className="w-6 h-6" />
+                                </button>
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
+                                        <Upload className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black uppercase">Importe Masivo</h2>
+                                </div>
+                                <p className="text-white/60 font-medium">Carga tus bases de datos desde archivos Excel o PDF.</p>
+                            </div>
+
+                            <div className="p-10 flex-1 overflow-y-auto">
+                                {importData.length === 0 ? (
+                                    <div className="text-center py-20 border-4 border-dashed border-gray-100 rounded-[3rem]">
+                                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <FileText className="w-10 h-10 text-gray-300" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-gray-900 uppercase mb-2">Sube tu archivo</h3>
+                                        <p className="text-sm text-gray-400 font-bold mb-8 px-20">Aceptamos formatos .xlsx, .xls y archivos tabulares.</p>
+                                        <input 
+                                            type="file" 
+                                            id="fileInput" 
+                                            className="hidden" 
+                                            accept=".xlsx,.xls,.csv"
+                                            onChange={handleFileUpload}
+                                        />
+                                        <label 
+                                            htmlFor="fileInput" 
+                                            className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest cursor-pointer shadow-xl hover:bg-indigo-700 transition active:scale-95 inline-block"
+                                        >
+                                            Seleccionar Archivo
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                                            <div className="flex items-center gap-3">
+                                                <Check className="w-5 h-5 text-emerald-600" />
+                                                <span className="text-emerald-900 font-black text-sm uppercase tracking-widest">Se cargaron {importData.length} registros</span>
+                                            </div>
+                                            <button onClick={() => setImportData([])} className="text-emerald-600 font-bold text-xs uppercase hover:underline">Cambiar archivo</button>
+                                        </div>
+
+                                        <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nombre</th>
+                                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Documento</th>
+                                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {importData.slice(0, 5).map((item, idx) => (
+                                                        <tr key={idx} className="bg-white">
+                                                            <td className="px-6 py-4 text-sm font-bold text-gray-900">{item.nombre || item.name}</td>
+                                                            <td className="px-6 py-4 text-xs font-mono text-gray-500">{item.numero || item.documentNumber}</td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-black uppercase">Listo</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {importData.length > 5 && (
+                                                <div className="p-4 bg-gray-50 text-center text-xs text-gray-400 font-bold italic uppercase tracking-widest">Y {importData.length - 5} más...</div>
+                                            )}
+                                        </div>
+
+                                        <button 
+                                            onClick={processBulkImport}
+                                            disabled={isImporting}
+                                            className="w-full py-6 bg-emerald-600 text-white rounded-[2.5rem] font-black text-xl shadow-2xl shadow-emerald-200 hover:bg-emerald-700 transition active:scale-95 disabled:opacity-50"
+                                        >
+                                            {isImporting ? 'Procesando...' : 'Iniciar Importación'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
                     </div>
                 )}

@@ -48,6 +48,7 @@ model Product {
   purchasePrice    Float         @map("purchase_price")
   sellingPrice     Float         @map("selling_price")
   minStock         Float         @default(5) @map("min_stock")
+  op               String?
   isActive         Boolean       @default(true) @map("is_active")
   variants         ProductVariant[]
   purchaseItems    PurchaseItem[]
