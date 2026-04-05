@@ -13,6 +13,7 @@ import { ProcessAuditsModule } from './modules/process-audits/process-audits.mod
 import { CommercialModule } from './modules/commercial/commercial.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -33,6 +34,7 @@ import { AppController } from './app.controller';
     CommercialModule,
     SamplesModule,
     NotificationsModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -26,13 +26,14 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
+  ResponsiveContainer
 } from 'recharts';
 
-export function CommercialDashboard() {
+interface CommercialDashboardProps {
+  user: any;
+}
+
+export function CommercialDashboard({ user }: CommercialDashboardProps) {
   const [stats, setStats] = useState({
     totalSales: 0,
     salesCount: 0,
@@ -49,7 +50,7 @@ export function CommercialDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // For now using mock or basic API calls
+      // Backend automatically filters results based on vendor role (LIMA/ORIENTE)
       const [salesResp, auditsResp, clientsResp] = await Promise.all([
         api.get('/sales'),
         api.get('/process-audits?approvalStatus=PENDIENTE'),
@@ -58,9 +59,9 @@ export function CommercialDashboard() {
 
       const sales = salesResp.data || [];
       const audits = auditsResp.data || [];
-      const clients = clientsResp.data || [];
+      const clients = Array.isArray(clientsResp.data.data) ? clientsResp.data.data : (clientsResp.data || []);
 
-      const total = sales.reduce((acc, s) => acc + s.totalAmount, 0);
+      const total = sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       
       setStats({
         totalSales: total,
@@ -71,17 +72,21 @@ export function CommercialDashboard() {
 
       setPendingAudits(audits.slice(0, 5));
       
-      // Group sales by day for chart
-      const chartData = [
-        { name: 'Lun', total: 4500 },
-        { name: 'Mar', total: 5200 },
-        { name: 'Mie', total: 4800 },
-        { name: 'Jue', total: 6100 },
-        { name: 'Vie', total: 5900 },
-        { name: 'Sab', total: 7200 },
-        { name: 'Dom', total: 3100 },
-      ];
-      setSalesData(chartData);
+      // Calculate real grouping by day for the chart
+      const days = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+      const currentWeekSales = new Array(7).fill(0).map((_, i) => ({
+          name: days[i],
+          total: 0
+      }));
+
+      sales.forEach((s: any) => {
+          const date = new Date(s.createdAt);
+          const dayIndex = date.getDay();
+          currentWeekSales[dayIndex].total += s.totalAmount;
+      });
+
+      // Rotating to start from Monday if desired, but this is fine for now
+      setSalesData(currentWeekSales);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -90,15 +95,34 @@ export function CommercialDashboard() {
     }
   };
 
-  const cardClass = "bg-white rounded-[2rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20";
+  const cardClass = "bg-white rounded-[2rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 hover:shadow-2xl hover:shadow-indigo-50 transition-all";
+
+  const getDashboardTitle = () => {
+      if (user?.role === 'VENDEDOR_LIMA') return 'Panel Lima';
+      if (user?.role === 'VENDEDOR_ORIENTE') return 'Panel Oriente';
+      return 'Panel Comercial';
+  };
+
+  const getDashboardDescription = () => {
+      if (user?.role === 'VENDEDOR_LIMA') return 'Resultados y gestión de ventas zona Lima.';
+      if (user?.role === 'VENDEDOR_ORIENTE') return 'Resultados y gestión de ventas zona Oriente.';
+      return 'Monitorea tus ventas y aprobaciones pendientes.';
+  };
 
   return (
     <div className="space-y-8 pb-20">
       {/* WELCOME SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Panel Comercial</h1>
-          <p className="text-gray-500 font-medium text-lg mt-1">Monitorea tus ventas y aprobaciones pendientes.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+              {getDashboardTitle()}
+              {user?.zone && (
+                  <span className="text-xs px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 tracking-widest font-black uppercase">
+                      {user.zone}
+                  </span>
+              )}
+          </h1>
+          <p className="text-gray-500 font-medium text-lg mt-1">{getDashboardDescription()}</p>
         </div>
         <div className="flex items-center gap-3">
            <Link href="/sales/new" className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-bold shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition active:scale-95">
@@ -191,9 +215,9 @@ export function CommercialDashboard() {
                       <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{audit.process}</span>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-500">{new Date(audit.auditDate).toLocaleDateString()}</span>
+                    <span className="text-[10px] font-bold text-gray-500">{new Date(audit.auditDate || audit.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{audit.product?.name}</h4>
+                  <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{audit.product?.name || audit.sample?.name}</h4>
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-[11px] font-mono font-bold text-gray-400 uppercase">OP: {audit.op}</span>
                     <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transform group-hover:translate-x-1 transition-all" />

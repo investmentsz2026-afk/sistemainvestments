@@ -15,6 +15,7 @@ model User {
   password      String
   roles         Role[]    @relation("UserRoles")
   isActive      Boolean   @default(true) @map("is_active")
+  zone          String?   // LIMA, ORIENTE, etc.
   movements     Movement[]
   purchases     Purchase[]
   qualityControls QualityControl[] @relation("QualityConfirmedBy")
@@ -23,8 +24,10 @@ model User {
 
   processAudits ProcessAudit[]
   sales         Sale[]    @relation("UserSales")
+  orders        Order[]   @relation("UserOrders")
   samplesCreated ProductSample[] @relation("SampleCreator")
   samplesReviewed ProductSample[] @relation("SampleReviewer")
+  createdClients Client[] @relation("ClientCreator")
 
   @@map("users")
 }
@@ -285,11 +288,74 @@ model Client {
   email           String?
   phone           String?
   address         String?  @db.Text
+  zone            String?  // LIMA, ORIENTE, etc.
+  createdById     String?  @map("created_by_id")
+  createdBy       User?    @relation("ClientCreator", fields: [createdById], references: [id])
   sales           Sale[]
+  orders          Order[]
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("clients")
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String?     @unique @map("order_number")
+  clientId        String?     @map("client_id")
+  client          Client?     @relation(fields: [clientId], references: [id])
+  
+  // Header info from user image
+  condition       String?     // FACTURA/CREDITO 45 DIAS
+  agency          String?     // Agencia de transporte / Destino
+  observations    String?     @db.Text
+  
+  totalAmount     Float       @default(0) @map("total_amount")
+  totalQuantity   Int         @default(0) @map("total_quantity")
+  
+  // Status workflow
+  status          String      @default("PENDIENTE") // PENDIENTE, EN_LOGISTICA, DESPACHADO, ENTREGADO
+  
+  items           OrderItem[]
+  
+  sellerId        String      @map("seller_id")
+  seller          User        @relation("UserOrders", fields: [sellerId], references: [id])
+  
+  zone            String?     // LIMA, ORIENTE
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  modelName       String   @map("model_name")
+  color           String
+  
+  // Matrix quantities (Excel style)
+  s28             Int      @default(0)
+  m30             Int      @default(0)
+  l32             Int      @default(0)
+  xl34            Int      @default(0)
+  xxl36           Int      @default(0)
+  size38          Int      @default(0)
+  size40          Int      @default(0)
+  size42          Int      @default(0)
+  size44          Int      @default(0)
+  size46          Int      @default(0)
+  
+  quantity        Int      @default(0)
+  unitPrice       Float    @map("unit_price")
+  totalPrice      Float    @map("total_price")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("order_items")
 }
 
 model Sale {

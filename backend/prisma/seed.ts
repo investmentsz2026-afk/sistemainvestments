@@ -15,6 +15,8 @@ async function main() {
     { name: 'CONTABILIDAD', description: 'Módulo contable' },
     { name: 'LOGISTICA', description: 'Módulo de compras e inventario' },
     { name: 'UDP', description: 'Módulo de calidad y auditoría' },
+    { name: 'VENDEDOR_LIMA', description: 'Vendedor exclusivo zona Lima' },
+    { name: 'VENDEDOR_ORIENTE', description: 'Vendedor exclusivo zona Oriente' },
   ];
 
   for (const role of roles) {

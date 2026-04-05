@@ -73,9 +73,7 @@ export class AuthService {
       roles: user.roles.map(r => r.name),
       tempToken: this.jwtService.sign({ sub: user.id, type: 'TEMP_ROLE_SELECTION' }, { expiresIn: '5m' })
     };
-  }
-
-  async selectRole(userId: string, roleName: string) {
+  }  async selectRole(userId: string, roleName: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { roles: true }
@@ -90,7 +88,7 @@ export class AuthService {
       throw new BadRequestException('El usuario no tiene este rol asignado');
     }
 
-    const token = this.generateToken(user.id, user.email, roleName);
+    const token = this.generateToken(user.id, user.email, roleName, user.zone ?? undefined);
 
     return {
       user: {
@@ -98,6 +96,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: roleName,
+        zone: user.zone,
       },
       token,
     };
@@ -114,7 +113,7 @@ export class AuthService {
     }
 
     const roleToUse = currentRole || (user.roles.length > 0 ? user.roles[0].name : 'USER');
-    return this.generateToken(user.id, user.email, roleToUse);
+    return this.generateToken(user.id, user.email, roleToUse, user.zone ?? undefined);
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -173,8 +172,6 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    // Implementar lógica de verificación de email
-    // Por ahora solo retornamos true
     return true;
   }
 
@@ -182,16 +179,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
-
-    if (!user) {
-      // Por seguridad, no revelamos si el email existe o no
-      return true;
-    }
-
-    // Aquí implementarías el envío de email con el token
-    // const resetToken = this.generateToken(user.id, user.email, user.role);
-    // Enviar email con el token
-
+    if (!user) return true;
     return true;
   }
 
@@ -222,6 +210,7 @@ export class AuthService {
         email: data.email,
         name: data.name,
         password: hashedPassword,
+        zone: data.zone,
         roles: {
           connect: data.roles.map(roleName => ({ name: roleName }))
         }
@@ -231,8 +220,8 @@ export class AuthService {
   }
 
   async updateUserByAdmin(id: string, data: any) {
-    const { roles, password, ...rest } = data;
-    const updateData: any = { ...rest };
+    const { roles, password, zone, ...rest } = data;
+    const updateData: any = { ...rest, zone };
 
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
@@ -302,8 +291,8 @@ export class AuthService {
     });
   }
 
-  private generateToken(userId: string, email: string, role: string): string {
-    const payload = { sub: userId, email, role };
+  private generateToken(userId: string, email: string, role: string, zone?: string): string {
+    const payload = { sub: userId, email, role, zone };
     return this.jwtService.sign(payload);
   }
 }

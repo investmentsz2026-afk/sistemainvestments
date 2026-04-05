@@ -143,10 +143,10 @@ export default function DashboardPage() {
     );
   }
 
-  if (user?.role === 'COMERCIAL') {
+  if (user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE') {
     return (
       <Layout>
-        <CommercialDashboard />
+        <CommercialDashboard user={user} />
       </Layout>
     );
   }

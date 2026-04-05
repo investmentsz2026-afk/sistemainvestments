@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   FileSearch,
   Users,
-  Beaker
+  Beaker,
+  ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -95,7 +96,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Calidad', href: '/quality', icon: ShieldCheck },
       { name: 'Auditoría', href: '/audit', icon: FileSearch }
     ] : []),
-    ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' ? [
+    ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE' ? [
+      { name: 'Pedidos', href: '/orders', icon: ShoppingBag },
       { name: 'Ventas', href: '/sales', icon: ShoppingCart },
       { name: 'Clientes', href: '/sales/clients', icon: Users }
     ] : []),

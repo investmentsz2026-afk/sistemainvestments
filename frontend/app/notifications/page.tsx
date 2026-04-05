@@ -62,6 +62,10 @@ export default function NotificationsPage() {
                 router.push(`/audit/${notification.referenceId}`);
             } else if (notification.type.startsWith('SAMPLE_')) {
                 router.push(`/samples/${notification.referenceId}`);
+            } else if (notification.type === 'NEW_ORDER_REGISTERED' || notification.type === 'ORDER_EDITED_BY_SELLER') {
+                router.push('/orders');
+            } else if (notification.type === 'ORDER_SENT_TO_LOGISTICS') {
+                router.push('/dispatch');
             }
         }
     };
