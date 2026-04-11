@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-    X, 
-    Printer, 
-    User, 
-    Calendar, 
-    CreditCard, 
-    MapPin, 
-    Package, 
-    Building2, 
+import {
+    X,
+    Printer,
+    User,
+    Calendar,
+    CreditCard,
+    MapPin,
+    Package,
+    Building2,
     Hash,
     Loader2,
     FileText
@@ -168,7 +168,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                     >
                         {/* HEADER */}
                         <div className="bg-gray-900 px-10 py-8 text-white relative">
-                            <button 
+                            <button
                                 onClick={onClose}
                                 className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition"
                             >
@@ -277,10 +277,10 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                     {/* PRODUCTS TABLE */}
                                     <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
                                         <div className="px-8 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                                             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Resumen de Productos</h3>
-                                             <span className="text-[11px] font-black text-indigo-600 bg-white px-3 py-1 rounded-lg border border-indigo-50 shadow-sm">
+                                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Resumen de Productos</h3>
+                                            <span className="text-[11px] font-black text-indigo-600 bg-white px-3 py-1 rounded-lg border border-indigo-50 shadow-sm">
                                                 {sale.items?.length} Ítems registrados
-                                             </span>
+                                            </span>
                                         </div>
                                         <table className="w-full">
                                             <thead>
@@ -330,13 +330,13 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                         {sale && (
                             <div className="bg-gray-50 p-10 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
                                 <div className="flex gap-4">
-                                    <button 
+                                    <button
                                         onClick={handlePrint}
                                         className="flex items-center gap-3 px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-gray-200 hover:bg-black transition active:scale-95"
                                     >
                                         <Printer className="w-4 h-4" /> Reimprimir Comprobante
                                     </button>
-                                     <button 
+                                    <button
                                         onClick={handleDownloadPDF}
                                         className="flex items-center gap-3 px-8 py-4 bg-white border border-gray-200 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-gray-50 transition active:scale-95"
                                     >
