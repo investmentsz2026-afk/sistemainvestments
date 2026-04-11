@@ -20,6 +20,20 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import SaleDetailsModal from '../../components/sales/SaleDetailsModal';
+import SalePaymentsModal from '../../components/sales/SalePaymentsModal';
+import { Eye, Wallet, FileSpreadsheet, FileText } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
 
 export default function SalesPage() {
     const { user } = useAuth();
@@ -31,6 +45,21 @@ export default function SalesPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [zoneFilter, setZoneFilter] = useState('ALL');
+
+    // Modal state
+    const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+
+    const openDetails = (id: string) => {
+        setSelectedSaleId(id);
+        setIsModalOpen(true);
+    };
+
+    const openPayments = (id: string) => {
+        setSelectedSaleId(id);
+        setIsPaymentsModalOpen(true);
+    };
 
     useEffect(() => {
         fetchSales();
@@ -56,7 +85,8 @@ export default function SalesPage() {
         const saleDate = new Date(s.createdAt).toISOString().split('T')[0];
         const matchesStart = !startDate || saleDate >= startDate;
         const matchesEnd = !endDate || saleDate <= endDate;
-        const matchesZone = zoneFilter === 'ALL' || s.seller?.zone === zoneFilter;
+        const activeZone = s.seller?.zone || 'OFICINA';
+        const matchesZone = zoneFilter === 'ALL' || activeZone === zoneFilter;
 
         return matchesSearch && matchesStatus && matchesStart && matchesEnd && matchesZone;
     });
@@ -75,6 +105,83 @@ export default function SalesPage() {
     const annualRevenue = sales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
+
+    const getExportData = () => {
+        const data: any[] = [];
+        filteredSales.forEach(sale => {
+            const date = formatDate(sale.createdAt);
+            const clientName = sale.client?.name || 'Cliente Varios';
+            
+            if (sale.items && sale.items.length > 0) {
+                sale.items.forEach((item: any) => {
+                    data.push({
+                        'Factura/Boleta': sale.invoiceNumber || 'S/N',
+                        'Fecha': date,
+                        'Cliente': clientName,
+                        'Vendedor': sale.seller?.name || 'N/A',
+                        'Zona Vendedor': sale.seller?.zone || 'OFICINA',
+                        'Modelo': item.variant?.product?.name || 'N/A',
+                        'Color': item.variant?.color || 'N/A',
+                        'Talla': item.variant?.size || 'N/A',
+                        'Cant.': item.quantity,
+                        'Precio U.': item.unitPrice,
+                        'Subtotal': item.totalPrice,
+                        'Total Factura': sale.totalAmount,
+                        'Estado Factura': sale.status,
+                        'Estado Pago': sale.paymentStatus || 'PENDIENTE'
+                    });
+                });
+            } else {
+                data.push({
+                    'Factura/Boleta': sale.invoiceNumber || 'S/N',
+                    'Fecha': date,
+                    'Cliente': clientName,
+                    'Vendedor': sale.seller?.name || 'N/A',
+                    'Zona Vendedor': sale.seller?.zone || 'OFICINA',
+                    'Modelo': 'N/A',
+                    'Color': 'N/A',
+                    'Talla': 'N/A',
+                    'Cant.': 0,
+                    'Precio U.': 0,
+                    'Subtotal': 0,
+                    'Total Factura': sale.totalAmount,
+                    'Estado Factura': sale.status,
+                    'Estado Pago': sale.paymentStatus || 'PENDIENTE'
+                });
+            }
+        });
+        return data;
+    };
+
+    const exportToExcel = () => {
+        const data = getExportData();
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+        XLSX.writeFile(wb, `Reporte_Ventas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
+    const exportToPDF = () => {
+        const data = getExportData();
+        if (data.length === 0) return;
+        const doc = new jsPDF('landscape');
+        
+        doc.setFontSize(14);
+        doc.text('Reporte de Ventas Detallado - Investments Z&G', 14, 20);
+        
+        const tableColumn = Object.keys(data[0]);
+        const tableRows = data.map(item => Object.values(item));
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows as any[],
+            startY: 30,
+            styles: { fontSize: 7, cellPadding: 1 },
+            headStyles: { fillColor: [79, 70, 229] } // root indigo-600
+        });
+        
+        doc.save(`Reporte_Ventas_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
 
     const cardClass = "bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20";
 
@@ -105,7 +212,7 @@ export default function SalesPage() {
                         </div>
                         <div>
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos Totales</p>
-                            <h3 className="text-3xl font-black text-gray-900">${totalRevenue.toLocaleString()}</h3>
+                            <h3 className="text-3xl font-black text-gray-900">S/ {totalRevenue.toLocaleString()}</h3>
                         </div>
                     </div>
                     <div className={`${cardClass} p-8 flex items-center gap-6`}>
@@ -124,7 +231,7 @@ export default function SalesPage() {
                         <div>
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Ticket Promedio</p>
                             <h3 className="text-3xl font-black text-gray-900">
-                                ${filteredSales.length > 0 ? (totalRevenue / filteredSales.length).toFixed(2) : '0'}
+                                S/ {filteredSales.length > 0 ? (totalRevenue / filteredSales.length).toFixed(2) : '0'}
                             </h3>
                         </div>
                     </div>
@@ -217,22 +324,34 @@ export default function SalesPage() {
                                         onChange={(e) => setEndDate(e.target.value)}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Zona</label>
-                                    <select 
-                                        className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-600"
-                                        value={zoneFilter}
-                                        onChange={(e) => setZoneFilter(e.target.value)}
-                                    >
-                                        <option value="ALL">TODAS LAS ZONAS</option>
-                                        <option value="LIMA">LIMA</option>
-                                        <option value="ORIENTE">ORIENTE</option>
-                                        <option value="OFICINA">OFICINA</option>
-                                    </select>
-                                </div>
+                                {user?.role === 'COMERCIAL' && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Zona</label>
+                                        <select 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-600"
+                                            value={zoneFilter}
+                                            onChange={(e) => setZoneFilter(e.target.value)}
+                                        >
+                                            <option value="ALL">TODAS LAS ZONAS</option>
+                                            <option value="LIMA">LIMA</option>
+                                            <option value="ORIENTE">ORIENTE</option>
+                                            <option value="OFICINA">OFICINA</option>
+                                        </select>
+                                    </div>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
+                </div>
+
+                {/* EXPORT BUTTONS */}
+                <div className="flex justify-end gap-3 mb-2">
+                     <button onClick={exportToExcel} className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl font-black text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm text-sm">
+                        <FileSpreadsheet className="w-4 h-4" /> Exportar Excel
+                     </button>
+                     <button onClick={exportToPDF} className="flex items-center gap-2 px-6 py-2.5 bg-red-50 border border-red-100 rounded-xl font-black text-red-600 hover:bg-red-100 transition-all shadow-sm text-sm">
+                        <FileText className="w-4 h-4" /> Exportar PDF
+                     </button>
                 </div>
 
                 {/* SALES LIST */}
@@ -246,7 +365,8 @@ export default function SalesPage() {
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Estado</th>
+                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
+                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
                                     <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
@@ -281,11 +401,11 @@ export default function SalesPage() {
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-2 text-sm font-bold text-gray-500">
                                                     <Calendar className="w-4 h-4" />
-                                                    {new Date(sale.createdAt).toLocaleDateString()}
+                                                    {formatDate(sale.createdAt)}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <span className="text-lg font-black text-gray-900">${sale.totalAmount.toLocaleString()}</span>
+                                                <span className="text-lg font-black text-gray-900">S/ {sale.totalAmount.toLocaleString()}</span>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
@@ -300,10 +420,31 @@ export default function SalesPage() {
                                                     {sale.status}
                                                 </span>
                                             </td>
+                                            <td className="px-8 py-6">
+                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                                    sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-500 text-white' : 
+                                                    sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
+                                                }`}>
+                                                    {sale.paymentStatus || 'PENDIENTE'}
+                                                </span>
+                                            </td>
                                             <td className="px-8 py-6 text-right">
-                                                <button className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-indigo-600 hover:border-indigo-100 shadow-sm transition group-hover:scale-110">
-                                                    <ChevronRight className="w-5 h-5" />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button 
+                                                        onClick={() => openPayments(sale.id)}
+                                                        className="p-2 border border-emerald-100 rounded-xl text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-200 shadow-sm transition group-hover:scale-110 flex items-center gap-2 px-4 whitespace-nowrap"
+                                                    >
+                                                        <Wallet className="w-4 h-4" />
+                                                        <span className="text-xs font-black uppercase">Pagos</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => openDetails(sale.id)}
+                                                        className="p-2 border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-50 hover:border-indigo-100 shadow-sm transition group-hover:scale-110 flex items-center gap-2 px-4"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                        <span className="text-xs font-black uppercase">Ver</span>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -313,12 +454,30 @@ export default function SalesPage() {
                     </div>
                 </div>
 
-                <div className="flex justify-center pt-8">
-                     <button className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 shadow-sm transition">
-                        <Download className="w-5 h-5" /> Exportar Reporte de Ventas
-                     </button>
-                </div>
             </div>
+
+            {selectedSaleId && (
+                <SaleDetailsModal 
+                    saleId={selectedSaleId}
+                    isOpen={isModalOpen}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setSelectedSaleId(null);
+                    }}
+                />
+            )}
+
+            {selectedSaleId && (
+                <SalePaymentsModal 
+                    saleId={selectedSaleId}
+                    isOpen={isPaymentsModalOpen}
+                    onClose={() => {
+                        setIsPaymentsModalOpen(false);
+                        setSelectedSaleId(null);
+                    }}
+                    onUpdate={fetchSales}
+                />
+            )}
         </Layout>
     );
 }

@@ -270,12 +270,12 @@ export default function DashboardPage() {
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 mb-1">${totalValue.toLocaleString()}</h3>
+            <h3 className="text-3xl font-bold text-gray-900 mb-1">S/ {totalValue.toLocaleString()}</h3>
             <p className="text-gray-600 text-sm font-medium">Valor del inventario</p>
             <div className="mt-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Venta potencial:</span>
-                <span className="font-semibold text-green-600">${potentialRevenue.toLocaleString()}</span>
+                <span className="font-semibold text-green-600">S/ {potentialRevenue.toLocaleString()}</span>
               </div>
             </div>
           </div>

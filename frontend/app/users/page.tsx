@@ -133,22 +133,30 @@ export default function UsersPage() {
         );
     };
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
+        setIsSubmitting(true);
         try {
             if (isEditing) {
                 const updateData: any = { ...formData };
                 if (!updateData.password) delete updateData.password;
                 await api.post(`/auth/users/${formData.id}`, updateData);
-                showAlert('Actualizado', 'Usuario actualizado correctamente');
+                showAlert('Actualizado', 'Usuario actualizado correctamente', 'success');
             } else {
                 await api.post('/auth/users', formData);
-                showAlert('Creado', 'Usuario registrado correctamente');
+                showAlert('Creado', 'Usuario registrado correctamente', 'success');
             }
             setShowAddModal(false);
             fetchUsers();
         } catch (error: any) {
             showAlert('Error', error.response?.data?.message || 'Ocurrió un error', 'danger');
+        } finally {
+            setIsSubmitting(true); // Keep as true for a split second to prevent double click
+            setTimeout(() => setIsSubmitting(false), 500);
         }
     };
 
@@ -409,9 +417,17 @@ export default function UsersPage() {
                                     <div className="pt-6">
                                         <button
                                             type="submit"
-                                            className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-2xl hover:bg-indigo-700 transition active:scale-95 shadow-indigo-200 uppercase tracking-widest"
+                                            disabled={isSubmitting}
+                                            className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-2xl hover:bg-indigo-700 transition active:scale-95 shadow-indigo-200 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                                         >
-                                            {isEditing ? 'Guardar Cambios' : 'Registrar Miembro'}
+                                            {isSubmitting ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    <span>Procesando...</span>
+                                                </>
+                                            ) : (
+                                                <span>{isEditing ? 'Guardar Cambios' : 'Registrar Miembro'}</span>
+                                            )}
                                         </button>
                                     </div>
                                 </form>

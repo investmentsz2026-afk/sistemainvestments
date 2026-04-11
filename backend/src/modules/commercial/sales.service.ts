@@ -7,7 +7,7 @@ export class SalesService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService
-  ) {}
+  ) { }
 
   async createSale(userId: string, data: any) {
     const { clientId, items, paymentMethod, notes, invoiceNumber } = data;
@@ -89,7 +89,7 @@ export class SalesService {
   }
 
   async findAll(user: any, query: any) {
-    const { startDate, endDate, clientId, sellerId, status } = query;
+    const { startDate, endDate, clientId, sellerId, status, zone } = query;
     const where: any = {};
 
     if (clientId) where.clientId = clientId;
@@ -97,8 +97,13 @@ export class SalesService {
     if (status) where.status = status;
 
     // Filter by zone if the user is a zone-specific vendor
-    if (user.role === 'VENDEDOR_LIMA') where.client = { ...where.client, zone: 'LIMA' };
-    if (user.role === 'VENDEDOR_ORIENTE') where.client = { ...where.client, zone: 'ORIENTE' };
+    if (user.role === 'VENDEDOR_LIMA') {
+      where.seller = { zone: 'LIMA' };
+    } else if (user.role === 'VENDEDOR_ORIENTE') {
+      where.seller = { zone: 'ORIENTE' };
+    } else if (zone && zone !== 'ALL') {
+      where.seller = { zone: zone };
+    }
 
     if (startDate && endDate) {
       where.createdAt = {
@@ -112,6 +117,7 @@ export class SalesService {
       include: {
         client: true,
         seller: { select: { name: true, zone: true } },
+        payments: true,
         items: {
           include: {
             variant: {
@@ -129,7 +135,8 @@ export class SalesService {
       where: { id },
       include: {
         client: true,
-        seller: { select: { name: true } },
+        seller: { select: { name: true, zone: true } },
+        payments: true,
         items: {
           include: {
             variant: {
@@ -144,14 +151,85 @@ export class SalesService {
     return sale;
   }
 
+  async addPayment(saleId: string, data: any) {
+    const { amount, method, notes, evidenceUrl } = data;
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { payments: true }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Create payment
+      const payment = await tx.salePayment.create({
+        data: {
+          saleId,
+          amount: parseFloat(amount),
+          method: method || 'EFECTIVO',
+          notes,
+          evidenceUrl,
+        }
+      });
+
+      // Calculate total paid including the new payment
+      const existingTotal = sale.payments.reduce((acc, p) => acc + p.amount, 0);
+      const newTotalPaid = existingTotal + parseFloat(amount);
+
+      let paymentStatus = 'PARCIAL';
+      if (newTotalPaid >= sale.totalAmount) {
+        paymentStatus = 'CANCELADO';
+      }
+
+      await tx.sale.update({
+        where: { id: saleId },
+        data: { paymentStatus }
+      });
+
+      return payment;
+    });
+  }
+
+  async finalizePayment(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { payments: true }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    const totalPaid = sale.payments.reduce((acc, p) => acc + p.amount, 0);
+    const pendingAmount = sale.totalAmount - totalPaid;
+
+    return await this.prisma.$transaction(async (tx) => {
+      // If there is a pending balance, record a liquidation payment
+      if (pendingAmount > 0) {
+        await tx.salePayment.create({
+          data: {
+            saleId,
+            amount: pendingAmount,
+            method: 'LIQUIDACION',
+            notes: 'Liquidación manual de saldo pendiente',
+          }
+        });
+      }
+
+      return await tx.sale.update({
+        where: { id: saleId },
+        data: { paymentStatus: 'CANCELADO' }
+      });
+    });
+  }
+
   // Clients
   async createClient(user: any, data: any) {
     const clientData = { ...data };
-    
+
     // Auto-set zone if the creator is a zone-specific vendor
     if (user.role === 'VENDEDOR_LIMA') clientData.zone = 'LIMA';
     if (user.role === 'VENDEDOR_ORIENTE') clientData.zone = 'ORIENTE';
-    
+
     // Track creator
     clientData.createdById = user.id;
 
@@ -164,11 +242,11 @@ export class SalesService {
         throw new BadRequestException(`Ya existe un cliente registrado con el número de documento ${clientData.documentNumber}`);
       }
     }
-    
+
     // Sanitize data before create
     const { id: _id, createdAt, createdBy, createdById: _createdById, updatedAt, sales, ...cleanData } = clientData;
 
-    const client = await (this.prisma.client as any).create({ 
+    const client = await (this.prisma.client as any).create({
       data: {
         ...cleanData,
         createdById: user.id
@@ -193,7 +271,7 @@ export class SalesService {
   async updateClient(user: any, id: string, data: any) {
     const client = await (this.prisma.client as any).findUnique({ where: { id } });
     if (!client) throw new NotFoundException('Cliente no encontrado');
-    
+
     // Security check: vendors can only edit clients in their zone
     if (user.role === 'VENDEDOR_LIMA' && client.zone !== 'LIMA') {
       throw new BadRequestException('No tienes permiso para editar clientes de Lima');
@@ -236,16 +314,16 @@ export class SalesService {
 
   async findAllClients(user: any) {
     const where: any = {};
-    
+
     if (user.role === 'VENDEDOR_LIMA') where.zone = 'LIMA';
     if (user.role === 'VENDEDOR_ORIENTE') where.zone = 'ORIENTE';
 
     return (this.prisma.client as any).findMany({
       where,
-      include: { 
-        createdBy: { 
-          select: { name: true, zone: true } 
-        } 
+      include: {
+        createdBy: {
+          select: { name: true, zone: true }
+        }
       },
       orderBy: { name: 'asc' },
     });

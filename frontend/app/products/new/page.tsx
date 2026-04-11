@@ -396,7 +396,7 @@ export default function NewProductPage() {
                               <div className="flex items-center gap-4 mt-2 text-[11px] font-bold">
                                 <span className="text-emerald-600">Cant: {item.quantity} {item.unit}</span>
                                 <span className="text-gray-400 text-lg leading-none self-center">•</span>
-                                <span className="text-blue-600">Precio: ${item.price.toFixed(2)}</span>
+                                <span className="text-blue-600">Precio: S/ {item.price.toFixed(2)}</span>
                               </div>
                             </div>
                             <button

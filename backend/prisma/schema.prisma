@@ -28,6 +28,7 @@ model User {
   samplesCreated ProductSample[] @relation("SampleCreator")
   samplesReviewed ProductSample[] @relation("SampleReviewer")
   createdClients Client[] @relation("ClientCreator")
+  createdAgencies Agency[] @relation("AgencyCreator")
 
   @@map("users")
 }
@@ -353,6 +354,19 @@ model OrderItem {
   unitPrice       Float    @map("unit_price")
   totalPrice      Float    @map("total_price")
   
+  // Actually dispatched quantities (tracked during logistics phase)
+  dispS28         Int      @default(0) @map("disp_s28")
+  dispM30         Int      @default(0) @map("disp_m30")
+  dispL32         Int      @default(0) @map("disp_l32")
+  dispXL34        Int      @default(0) @map("disp_xl34")
+  dispXXL36       Int      @default(0) @map("disp_xxl36")
+  dispSize38      Int      @default(0) @map("disp_size38")
+  dispSize40      Int      @default(0) @map("disp_size40")
+  dispSize42      Int      @default(0) @map("disp_size42")
+  dispSize44      Int      @default(0) @map("disp_size44")
+  dispSize46      Int      @default(0) @map("disp_size46")
+  dispQuantity    Int      @default(0) @map("disp_quantity")
+
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@map("order_items")
@@ -366,7 +380,9 @@ model Sale {
   totalAmount     Float      @map("total_amount")
   paymentMethod   String     @map("payment_method") // EFECTIVO, TARJETA, TRANSFERENCIA
   status          String     @default("COMPLETADO") // COMPLETADO, ANULADO
+  paymentStatus   String     @default("PENDIENTE") @map("payment_status") // PENDIENTE, PARCIAL, CANCELADO
   items           SaleItem[]
+  payments        SalePayment[]
   sellerId        String     @map("seller_id")
   seller          User       @relation("UserSales", fields: [sellerId], references: [id])
   notes           String?    @db.Text
@@ -374,6 +390,21 @@ model Sale {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   @@map("sales")
+}
+
+model SalePayment {
+  id              String   @id @default(cuid())
+  saleId          String   @map("sale_id")
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount          Float
+  paymentDate     DateTime @default(now()) @map("payment_date")
+  method          String   // EFECTIVO, TRANSFERENCIA, etc.
+  evidenceUrl     String?  @map("evidence_url") // Voucher image
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("sale_payments")
 }
 
 model SaleItem {
@@ -451,3 +482,20 @@ model SampleMaterial {
   @@map("sample_materials")
 }
 
+model Agency {
+  id              String   @id @default(cuid())
+  name            String
+  address         String?
+  phone           String?
+  zone            String   // LIMA, ORIENTE, COMERCIAL
+  ruc             String?
+  contactName     String?  @map("contact_name")
+  
+  createdById     String   @map("created_by_id")
+  createdBy       User     @relation("AgencyCreator", fields: [createdById], references: [id])
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("agencies")
+}

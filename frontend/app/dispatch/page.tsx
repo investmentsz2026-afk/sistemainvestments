@@ -27,6 +27,14 @@ import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { NotaPedidoModal } from '../../components/orders/NotaPedidoModal';
 
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
+
 export default function DispatchPage() {
     const { user } = useAuth();
     const [orders, setOrders] = useState<any[]>([]);
@@ -60,11 +68,13 @@ export default function DispatchPage() {
         setShowModal(true);
     };
 
-    const dispatchOrders = orders.filter(o => 
-        (o.status === 'EN_LOGISTICA' || o.status === 'DESPACHADO' || o.status === 'COMPLETADO') &&
-        (o.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-         o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const dispatchOrders = orders
+        .filter(o => 
+            (o.status === 'EN_LOGISTICA' || o.status === 'DESPACHADO' || o.status === 'COMPLETADO') &&
+            (o.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
+        )
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const stats = [
         { 
@@ -210,7 +220,7 @@ export default function DispatchPage() {
                                                 </div>
                                                 <div className="flex items-center gap-2 text-xs text-gray-400 font-bold">
                                                     <Calendar className="w-4 h-4" />
-                                                    {new Date(order.createdAt).toLocaleDateString()}
+                                                    {formatDate(order.createdAt)}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-xs text-indigo-500 font-black">
                                                     <Tag className="w-4 h-4" />

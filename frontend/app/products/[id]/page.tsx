@@ -177,7 +177,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'Precio de Compra'}
             </span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${product.purchasePrice}</p>
+          <p className="text-2xl font-bold text-gray-900">S/ {product.purchasePrice}</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -187,7 +187,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </div>
             <span className="text-sm text-gray-500">Precio Venta</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${product.sellingPrice}</p>
+          <p className="text-2xl font-bold text-gray-900">S/ {product.sellingPrice}</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -197,7 +197,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </div>
             <span className="text-sm text-gray-500">Valor Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">${totalValue.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">S/ {totalValue.toFixed(2)}</p>
         </div>
       </div>
 

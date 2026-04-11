@@ -29,16 +29,24 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-interface CommercialDashboardProps {
-  user: any;
-}
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
 
 export function CommercialDashboard({ user }: CommercialDashboardProps) {
   const [stats, setStats] = useState({
     totalSales: 0,
     salesCount: 0,
     pendingApprovals: 0,
-    activeClients: 0
+    activeClients: 0,
+    limaSalesTotal: 0,
+    orienteSalesTotal: 0,
+    limaOrdersCount: 0,
+    orienteOrdersCount: 0
   });
   const [salesData, setSalesData] = useState<any[]>([]);
   const [pendingAudits, setPendingAudits] = useState<any[]>([]);
@@ -63,11 +71,21 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
 
       const total = sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       
+      const limaSales = sales.filter((s: any) => s.seller?.zone === 'LIMA');
+      const orienteSales = sales.filter((s: any) => s.seller?.zone === 'ORIENTE');
+      
+      const limaTotal = limaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
+      const orienteTotal = orienteSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
+
       setStats({
         totalSales: total,
         salesCount: sales.length,
         pendingApprovals: audits.length,
-        activeClients: clients.length
+        activeClients: clients.length,
+        limaSalesTotal: limaTotal,
+        orienteSalesTotal: orienteTotal,
+        limaOrdersCount: limaSales.length,
+        orienteOrdersCount: orienteSales.length
       });
 
       setPendingAudits(audits.slice(0, 5));
@@ -137,11 +155,33 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
       {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Ventas Totales', value: `$${stats.totalSales.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+15.4%' },
-          { label: 'Pedidos Realizados', value: stats.salesCount, icon: ShoppingBag, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+8%' },
-          { label: 'Auditorías Pendientes', value: stats.pendingApprovals, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Prioridad Alta' },
-          { label: 'Clientes Activos', value: stats.activeClients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', trend: 'Crecimiento linear' },
-        ].map((item, i) => (
+          { 
+            label: 'Ventas Totales', 
+            value: `S/ ${stats.totalSales.toLocaleString()}`, 
+            icon: DollarSign, 
+            color: 'text-emerald-600', 
+            bg: 'bg-emerald-50', 
+            trend: '+15.4%',
+            extraInfo: [
+              { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()}` },
+              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()}` }
+            ]
+          },
+          { 
+            label: 'Pedidos Realizados', 
+            value: stats.salesCount.toString(), 
+            icon: ShoppingBag, 
+            color: 'text-indigo-600', 
+            bg: 'bg-indigo-50', 
+            trend: '+8%',
+            extraInfo: [
+              { label: 'Lima', value: stats.limaOrdersCount.toString() },
+              { label: 'Oriente', value: stats.orienteOrdersCount.toString() }
+            ]
+          },
+          { label: 'Auditorías Pendientes', value: stats.pendingApprovals.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Prioridad Alta' },
+          { label: 'Clientes Activos', value: stats.activeClients.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', trend: 'Crecimiento linear' },
+        ].map((item: any, i) => (
           <motion.div 
             key={i} 
             initial={{ opacity: 0, y: 20 }}
@@ -159,6 +199,17 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             </div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{item.label}</p>
             <h3 className="text-3xl font-black text-gray-900">{item.value}</h3>
+            
+            {item.extraInfo && user?.role === 'COMERCIAL' && (
+              <div className="mt-5 pt-4 border-t border-gray-50 flex flex-col gap-1.5 text-[10px] font-black uppercase tracking-widest">
+                {item.extraInfo.map((extra: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className="text-gray-400">{extra.label}</span>
+                    <span className="text-gray-900">{extra.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         ))}
       </div>
@@ -215,7 +266,7 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
                       <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{audit.process}</span>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-500">{new Date(audit.auditDate || audit.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[10px] font-bold text-gray-500">{formatDate(audit.auditDate || audit.createdAt)}</span>
                   </div>
                   <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{audit.product?.name || audit.sample?.name}</h4>
                   <div className="flex items-center justify-between mt-3">

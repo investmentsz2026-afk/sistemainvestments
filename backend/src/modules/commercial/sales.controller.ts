@@ -36,4 +36,14 @@ export class SalesController {
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);
   }
+
+  @Post(':id/payments')
+  addPayment(@Param('id') id: string, @Body() data: any) {
+    return this.salesService.addPayment(id, data);
+  }
+
+  @Patch(':id/finalize')
+  finalizePayment(@Param('id') id: string) {
+    return this.salesService.finalizePayment(id);
+  }
 }

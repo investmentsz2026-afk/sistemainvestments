@@ -29,6 +29,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
+
 const PROCESS_INFO = {
     'Corte': { color: 'bg-orange-100 text-orange-700', icon: Box },
     'Confección': { color: 'bg-blue-100 text-blue-700', icon: CheckSquare },
@@ -231,7 +239,7 @@ export default function AuditPage() {
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-1.5 text-sm text-gray-700 font-semibold">
                                                     <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                                                    {new Date(audit.auditDate).toLocaleDateString('es-PE')}
+                                                    {formatDate(audit.auditDate)}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
                                                     <UserIcon className="w-3.5 h-3.5" />

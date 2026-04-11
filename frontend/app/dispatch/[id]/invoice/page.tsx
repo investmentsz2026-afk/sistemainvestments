@@ -25,6 +25,14 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
+
 type DocumentType = 'BOLETA' | 'FACTURA';
 
 export default function InvoicePage() {
@@ -76,7 +84,8 @@ export default function InvoicePage() {
             await api.patch(`/orders/${orderId}/complete`, {
                 docNumber,
                 docType,
-                paymentMethod
+                paymentMethod,
+                igv
             });
             toast.success('¡Pedido finalizado con éxito! La venta ha sido registrada.');
             router.push('/dispatch');
@@ -89,26 +98,26 @@ export default function InvoicePage() {
     };
 
     const SIZE_FIELDS = [
-        { field: 's28', label: 'S/28' },
-        { field: 'm30', label: 'M/30' },
-        { field: 'l32', label: 'L/32' },
-        { field: 'xl34', label: 'XL/34' },
-        { field: 'xxl36', label: 'XXL/36' },
-        { field: 'size38', label: '38' },
-        { field: 'size40', label: '40' },
-        { field: 'size42', label: '42' },
-        { field: 'size44', label: '44' },
-        { field: 'size46', label: '46' },
+        { field: 's28', dispField: 'dispS28', label: 'S/28' },
+        { field: 'm30', dispField: 'dispM30', label: 'M/30' },
+        { field: 'l32', dispField: 'dispL32', label: 'L/32' },
+        { field: 'xl34', dispField: 'dispXL34', label: 'XL/34' },
+        { field: 'xxl36', dispField: 'dispXXL36', label: 'XXL/36' },
+        { field: 'size38', dispField: 'dispSize38', label: '38' },
+        { field: 'size40', dispField: 'dispSize40', label: '40' },
+        { field: 'size42', dispField: 'dispSize42', label: '42' },
+        { field: 'size44', dispField: 'dispSize44', label: '44' },
+        { field: 'size46', dispField: 'dispSize46', label: '46' },
     ];
 
-    const subtotal = order?.totalAmount || 0;
+    // Filter size fields that have dispatched data
+    const activeSizes = SIZE_FIELDS.filter(sf => 
+        order?.items?.some((it: any) => (it[sf.dispField] || 0) > 0)
+    );
+
+    const subtotal = order?.items?.reduce((acc: number, it: any) => acc + (it.dispQuantity * it.unitPrice), 0) || 0;
     const igvAmount = subtotal * (igv / 100);
     const total = subtotal + igvAmount;
-
-    // Filter size fields that have data
-    const activeSizes = SIZE_FIELDS.filter(sf => 
-        order?.items?.some((it: any) => (it[sf.field] || 0) > 0)
-    );
 
     const handlePrint = () => {
         if (!order) return;
@@ -116,7 +125,7 @@ export default function InvoicePage() {
         const docTitle = docType === 'BOLETA' ? 'Boleta de Venta' : 'Factura';
         const docNum = docNumber || (docType === 'BOLETA' ? 'B001-XXXXXX' : 'F001-XXXXXX');
         const today = new Date().toLocaleDateString('es-PE');
-        const pedidoDate = new Date(order.createdAt).toLocaleDateString('es-PE');
+        const pedidoDate = formatDate(order.createdAt);
 
         // Build size columns header
         const sizeHeaders = activeSizes.map(sf => 
@@ -124,11 +133,12 @@ export default function InvoicePage() {
         ).join('');
 
         // Build item rows
-        const itemRows = (order.items || []).map((item: any) => {
+        const itemRows = (order.items || []).filter((it: any) => it.dispQuantity > 0).map((item: any) => {
             const sizeCells = activeSizes.map(sf => {
-                const val = item[sf.field] || 0;
+                const val = item[sf.dispField] || 0;
                 return `<td style="text-align:center;padding:8px 4px;font-size:11px;font-weight:600;color:#555;border-bottom:1px solid #eee;">${val > 0 ? val : '—'}</td>`;
             }).join('');
+            const itemTotal = item.dispQuantity * item.unitPrice;
             return `
                 <tr>
                     <td style="padding:8px 4px;border-bottom:1px solid #eee;">
@@ -136,9 +146,9 @@ export default function InvoicePage() {
                         <div style="font-size:10px;color:#888;font-weight:600;">${item.color}</div>
                     </td>
                     ${sizeCells}
-                    <td style="text-align:center;padding:8px 4px;font-weight:800;color:#111;font-size:12px;border-bottom:1px solid #eee;">${item.quantity}</td>
+                    <td style="text-align:center;padding:8px 4px;font-weight:800;color:#111;font-size:12px;border-bottom:1px solid #eee;">${item.dispQuantity}</td>
                     <td style="text-align:right;padding:8px 4px;font-weight:600;color:#555;font-size:11px;border-bottom:1px solid #eee;">S/ ${item.unitPrice?.toFixed(2)}</td>
-                    <td style="text-align:right;padding:8px 4px;font-weight:800;color:#111;font-size:12px;border-bottom:1px solid #eee;">S/ ${item.totalPrice?.toFixed(2)}</td>
+                    <td style="text-align:right;padding:8px 4px;font-weight:800;color:#111;font-size:12px;border-bottom:1px solid #eee;">S/ ${itemTotal.toFixed(2)}</td>
                 </tr>
             `;
         }).join('');
@@ -262,7 +272,7 @@ export default function InvoicePage() {
         <div style="padding:12px 28px;border:1px solid #e5e7eb;border-top:none;background:#fafafa;text-align:center;border-radius:0 0 16px 16px;">
             <div style="font-size:9px;color:#9ca3af;font-weight:700;">
                 Vendedor: ${order.seller?.name || ''} (${order.zone || 'OFICINA'}) &nbsp;|&nbsp; 
-                Total Prendas: ${order.totalQuantity} &nbsp;|&nbsp; 
+                Total Despachado: ${order.items?.reduce((acc: number, it: any) => acc + (it.dispQuantity || 0), 0)} &nbsp;|&nbsp; 
                 Generado: ${new Date().toLocaleString('es-PE')}
             </div>
         </div>
@@ -468,7 +478,7 @@ export default function InvoicePage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                                        <span className="font-bold text-gray-600 text-xs">Fecha: {new Date(order.createdAt).toLocaleDateString('es-PE')}</span>
+                                        <span className="font-bold text-gray-600 text-xs">Fecha: {formatDate(order.createdAt)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Truck className="w-3.5 h-3.5 text-gray-400" />
@@ -500,23 +510,23 @@ export default function InvoicePage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {order.items?.map((item: any, idx: number) => (
+                                {order.items?.filter((it: any) => it.dispQuantity > 0).map((item: any, idx: number) => (
                                     <tr key={item.id || idx}>
                                         <td className="py-3">
                                             <p className="font-black text-gray-900 uppercase text-xs">{item.modelName}</p>
                                             <p className="text-[10px] text-gray-400 font-bold">{item.color}</p>
                                         </td>
                                         {activeSizes.map(sf => {
-                                            const val = item[sf.field] || 0;
+                                            const val = item[sf.dispField] || 0;
                                             return (
                                                 <td key={sf.field} className="text-center py-3 text-[11px] font-bold text-gray-600">
                                                     {val > 0 ? val : '—'}
                                                 </td>
                                             );
                                         })}
-                                        <td className="text-center py-3 font-black text-gray-900 text-xs">{item.quantity}</td>
+                                        <td className="text-center py-3 font-black text-gray-900 text-xs">{item.dispQuantity}</td>
                                         <td className="text-right py-3 font-bold text-gray-600 text-xs">S/ {item.unitPrice?.toFixed(2)}</td>
-                                        <td className="text-right py-3 font-black text-gray-900 text-xs">S/ {item.totalPrice?.toFixed(2)}</td>
+                                        <td className="text-right py-3 font-black text-gray-900 text-xs">S/ {(item.dispQuantity * item.unitPrice).toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -548,7 +558,7 @@ export default function InvoicePage() {
                     <div className="px-10 py-4 border-t border-gray-100 bg-gray-50/30 text-center">
                         <p className="text-[10px] text-gray-400 font-bold">
                             Vendedor: {order.seller?.name} ({order.zone || 'OFICINA'}) | 
-                            Total Prendas: {order.totalQuantity} | 
+                            Total Despachado: {order.items?.reduce((acc: number, it: any) => acc + (it.dispQuantity || 0), 0)} | 
                             Generado: {new Date().toLocaleString('es-PE')}
                         </p>
                     </div>

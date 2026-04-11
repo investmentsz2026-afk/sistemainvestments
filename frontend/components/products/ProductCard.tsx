@@ -79,7 +79,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
             <p className="text-xs text-gray-500">Precio Venta</p>
-            <p className="text-lg font-bold text-gray-900">${product.sellingPrice}</p>
+            <p className="text-lg font-bold text-gray-900">S/ {product.sellingPrice}</p>
           </div>
         </div>
 

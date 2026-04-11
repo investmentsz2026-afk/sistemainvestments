@@ -230,7 +230,7 @@ export default function NewSalePage() {
                                     <div>
                                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{p.sku}</span>
                                         <h3 className="font-black text-gray-900 line-clamp-1">{p.name}</h3>
-                                        <p className="text-xl font-black text-gray-900 mt-2">${p.sellingPrice}</p>
+                                        <p className="text-xl font-black text-gray-900 mt-2">S/ {p.sellingPrice}</p>
                                     </div>
                                     
                                     <div className="mt-2 space-y-2">
@@ -345,7 +345,7 @@ export default function NewSalePage() {
                                                     <span className="px-3 font-black text-sm">{item.quantity}</span>
                                                     <button onClick={() => updateQuantity(item.variantId, item.quantity + 1)} className="p-1 hover:text-indigo-600 transition"><Plus className="w-3 h-3" /></button>
                                                 </div>
-                                                <span className="font-black text-gray-900 ml-auto">${(item.quantity * item.unitPrice).toLocaleString()}</span>
+                                                <span className="font-black text-gray-900 ml-auto">S/ {(item.quantity * item.unitPrice).toLocaleString()}</span>
                                             </div>
                                         </div>
                                         <button 
@@ -363,15 +363,15 @@ export default function NewSalePage() {
                                 <div className="space-y-4 mb-8">
                                     <div className="flex items-center justify-between text-gray-400 font-bold">
                                         <span>Subtotal</span>
-                                        <span>${(total * 0.82).toLocaleString()}</span>
+                                        <span>S/ {(total * 0.82).toLocaleString()}</span>
                                     </div>
                                     <div className="flex items-center justify-between text-gray-400 font-bold">
                                         <span>IGV (18%)</span>
-                                        <span>${(total * 0.18).toLocaleString()}</span>
+                                        <span>S/ {(total * 0.18).toLocaleString()}</span>
                                     </div>
                                     <div className="flex items-center justify-between pt-4 border-t border-white/10">
                                         <span className="text-xl font-black uppercase">Total a Pagar</span>
-                                        <span className="text-4xl font-black text-emerald-400">${total.toLocaleString()}</span>
+                                        <span className="text-4xl font-black text-emerald-400">S/ {total.toLocaleString()}</span>
                                     </div>
                                 </div>
 

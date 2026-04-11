@@ -154,20 +154,20 @@ export default function InventoryPage() {
   }, [searchTerm, selectedCategory, selectedSize, selectedColor, stockFilter, selectedInventoryType, sortBy]);
 
   // Estadísticas
-  const totalProducts = products?.length || 0;
-  const totalVariants = products?.reduce((acc, p) => acc + p.variants.length, 0) || 0;
-  const totalStock = products?.reduce((acc, p) =>
+  const totalProducts = filteredProducts.length;
+  const totalVariants = filteredProducts.reduce((acc, p) => acc + p.variants.length, 0);
+  const totalStock = filteredProducts.reduce((acc, p) =>
     acc + p.variants.reduce((sum, v) => sum + v.stock, 0), 0
-  ) || 0;
-  const lowStockCount = products?.filter(p =>
+  );
+  const lowStockCount = filteredProducts.filter(p =>
     p.variants.some(v => v.stock <= p.minStock)
-  ).length || 0;
-  const outOfStockCount = products?.filter(p =>
+  ).length;
+  const outOfStockCount = filteredProducts.filter(p =>
     p.variants.every(v => v.stock === 0)
-  ).length || 0;
-  const totalValue = products?.reduce((acc, p) =>
+  ).length;
+  const totalValue = filteredProducts.reduce((acc, p) =>
     acc + p.variants.reduce((sum, v) => sum + (v.stock * p.purchasePrice), 0), 0
-  ) || 0;
+  );
 
   const inventoryTypes = [
     { id: 'TODOS', label: 'Todos', icon: Package },
@@ -398,7 +398,7 @@ export default function InventoryPage() {
             </span>
           </div>
           <h3 className="text-2xl font-bold text-gray-900">
-            ${totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            S/ {totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h3>
           <p className="text-gray-600 text-sm">Valor del inventario</p>
         </div>
@@ -721,10 +721,10 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-6 py-4">
                           <p className="font-medium text-gray-900">
-                            ${(totalStock * product.purchasePrice).toLocaleString()}
+                            S/ {(totalStock * product.purchasePrice).toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500">
-                            ${product.sellingPrice} c/u
+                            S/ {product.sellingPrice} c/u
                           </p>
                         </td>
                         <td className="px-6 py-4 text-right whitespace-nowrap">

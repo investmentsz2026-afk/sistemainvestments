@@ -99,7 +99,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE' ? [
       { name: 'Pedidos', href: '/orders', icon: ShoppingBag },
       { name: 'Ventas', href: '/sales', icon: ShoppingCart },
-      { name: 'Clientes', href: '/sales/clients', icon: Users }
+      { name: 'Cobranza', href: '/sales/collections', icon: CreditCard },
+      { name: 'Clientes', href: '/sales/clients', icon: Users },
+      { name: 'Agencias', href: '/commercial/agencies', icon: Building2 }
     ] : []),
     ...(user?.role === 'ADMIN' ? [
       { name: 'Proveedores', href: '/suppliers', icon: Building2 },
@@ -123,10 +125,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
 
               {/* Logo */}
-              <div className="flex items-center lg:hidden">
-                <Package className="w-8 h-8 text-blue-600" />
-                <span className="ml-2 text-lg font-bold text-gray-900">StockMaster</span>
-              </div>
+              <Link href="/" className="flex items-center px-4 gap-3">
+                <img src="/logo.jpeg" alt="Logo" className="h-11 w-auto rounded-lg object-contain" />
+                <span className="text-2xl font-black text-gray-900 tracking-tighter">Investments Z&G</span>
+              </Link>
             </div>
 
             {/* Right side icons */}
@@ -193,7 +195,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl">
           <div className="flex items-center justify-between h-16 px-4 border-b">
-            <span className="text-lg font-bold text-gray-900">StockMaster</span>
+            <Link href="/" onClick={() => setSidebarOpen(false)}>
+              <img src="/logo.jpeg" alt="Logo" className="h-8 w-auto rounded-lg object-contain" />
+            </Link>
             <button onClick={() => setSidebarOpen(false)}>
               <X className="w-6 h-6 text-gray-500" />
             </button>
@@ -279,9 +283,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-1 min-h-0 bg-white border-r">
-          <div className="flex items-center h-16 px-4 border-b">
-            <Package className="w-8 h-8 text-blue-600" />
-            <span className="ml-2 text-lg font-bold text-gray-900">StockMaster</span>
+          <div className="flex items-center h-16 px-4 border-b bg-white">
+            {/* Logo will be shown in the Top Nav instead for better visibility */}
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {

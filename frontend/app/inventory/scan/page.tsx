@@ -795,7 +795,7 @@ export default function ScanPage() {
                               </button>
                             </div>
                             <span className="font-medium text-gray-900">
-                              ${(item.quantity * item.price).toFixed(2)}
+                              S/ {(item.quantity * item.price).toFixed(2)}
                             </span>
                           </div>
                         </div>

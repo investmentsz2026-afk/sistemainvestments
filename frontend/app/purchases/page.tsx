@@ -204,7 +204,7 @@ export default function PurchasesPage() {
             doc.text(`Generado: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`, 14, 22);
             doc.text(`Total de registros: ${purchases.length}`, pageWidth - 60, 14);
             const totalGeneral = purchases.reduce((s, p) => s + p.totalAmount, 0);
-            doc.text(`Monto total: $${totalGeneral.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, pageWidth - 60, 22);
+            doc.text(`Monto total: S/ ${totalGeneral.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, pageWidth - 60, 22);
 
             // Summary table
             doc.setTextColor(0, 0, 0);
@@ -214,7 +214,7 @@ export default function PurchasesPage() {
 
             autoTable(doc, {
                 startY: 40,
-                head: [['Nro', 'Factura/Ref', 'OP', 'Fecha', 'Hora', 'Registrado por', 'Ítems', 'Total ($)']],
+                head: [['Nro', 'Factura/Ref', 'OP', 'Fecha', 'Hora', 'Registrado por', 'Ítems', 'Total (S/)']],
                 body: purchases.map((p, i) => {
                     const d = new Date(p.createdAt);
                     return [
@@ -225,14 +225,14 @@ export default function PurchasesPage() {
                         d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
                         p.user?.name || '-',
                         p.items.map((it: any) => it.name).join(', '),
-                        `$${p.totalAmount.toFixed(2)}`
+                        `S/ ${p.totalAmount.toFixed(2)}`
                     ];
                 }),
                 theme: 'grid',
                 headStyles: { fillColor: moduleType === 'PURCHASE' ? [16, 185, 129] : [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 8 },
                 bodyStyles: { fontSize: 8 },
                 alternateRowStyles: { fillColor: [245, 245, 245] },
-                foot: [['', '', '', '', '', '', 'TOTAL:', `$${totalGeneral.toFixed(2)}`]],
+                foot: [['', '', '', '', '', '', 'TOTAL:', `S/ ${totalGeneral.toFixed(2)}`]],
                 footStyles: { fillColor: moduleType === 'PURCHASE' ? [16, 185, 129] : [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: 9 },
                 margin: { left: 14, right: 14 },
             });
@@ -261,11 +261,11 @@ export default function PurchasesPage() {
                 'Hora': d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
                 'Registrado por': p.user?.name || '-',
                 'Productos/Servicios': p.items.map((it: any) => it.name).join(', '),
-                'Total ($)': p.totalAmount
+                'Total (S/)': p.totalAmount
             };
         });
         const totalGeneral = purchases.reduce((s, p) => s + p.totalAmount, 0);
-        summaryData.push({ 'Nro': '' as any, 'Factura/Ref': '', 'OP': '', 'Fecha': '', 'Hora': '', 'Registrado por': '', 'Productos/Servicios': 'TOTAL:' as any, 'Total ($)': totalGeneral });
+        summaryData.push({ 'Nro': '' as any, 'Factura/Ref': '', 'OP': '', 'Fecha': '', 'Hora': '', 'Registrado por': '', 'Productos/Servicios': 'TOTAL:' as any, 'Total (S/)': totalGeneral });
 
         const wb = XLSX.utils.book_new();
         const ws1 = XLSX.utils.json_to_sheet(summaryData);
@@ -451,7 +451,7 @@ export default function PurchasesPage() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <span className={`text-lg font-black ${moduleType === 'PURCHASE' ? 'text-gray-900' : 'text-indigo-900'}`}>${p.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <span className={`text-lg font-black ${moduleType === 'PURCHASE' ? 'text-gray-900' : 'text-indigo-900'}`}>S/ {p.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-1">
@@ -545,7 +545,7 @@ export default function PurchasesPage() {
                                     </div>
                                     <div className={`${moduleType === 'PURCHASE' ? 'bg-emerald-50' : 'bg-indigo-50'} p-4 rounded-xl`}>
                                         <p className={`text-[10px] uppercase font-black mb-1 ${moduleType === 'PURCHASE' ? 'text-emerald-500' : 'text-indigo-500'}`}>Total</p>
-                                        <p className={`font-black text-xl ${moduleType === 'PURCHASE' ? 'text-emerald-700' : 'text-indigo-700'}`}>${selectedPurchase.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                        <p className={`font-black text-xl ${moduleType === 'PURCHASE' ? 'text-emerald-700' : 'text-indigo-700'}`}>S/ {selectedPurchase.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                     </div>
                                 </div>
                                 {(selectedPurchase.notes || selectedPurchase.supplier) && (
@@ -583,8 +583,8 @@ export default function PurchasesPage() {
                                                             </td>
                                                             <td className="px-4 py-3">{getCategoryBadge(item.category)}</td>
                                                             <td className="px-4 py-3 text-right font-bold text-gray-900">{item.quantity} <span className="text-xs text-gray-400">{item.unit}</span></td>
-                                                            <td className="px-4 py-3 text-right text-gray-700">${item.price.toFixed(2)}</td>
-                                                            <td className="px-4 py-3 text-right font-bold text-gray-900">${(item.quantity * item.price).toFixed(2)}</td>
+                                                            <td className="px-4 py-3 text-right text-gray-700">S/ {item.price.toFixed(2)}</td>
+                                                            <td className="px-4 py-3 text-right font-bold text-gray-900">S/ {(item.quantity * item.price).toFixed(2)}</td>
                                                         </tr>
                                                         {item.qualityControl && (
                                                             <tr className="bg-gray-50/30">
@@ -750,7 +750,7 @@ export default function PurchasesPage() {
                                                 <div className="col-span-4 sm:col-span-2">
                                                     <label className="text-[10px] uppercase font-black text-gray-400 mb-1 block">Costo Unit.</label>
                                                     <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">$</span>
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">S/ </span>
                                                         <input required type="number" step="0.01" min="0"
                                                             className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-sm"
                                                             value={item.price} onChange={e => updateItem(idx, 'price', parseFloat(e.target.value) || 0)} />
@@ -758,7 +758,7 @@ export default function PurchasesPage() {
                                                 </div>
                                                 <div className="col-span-12 sm:col-span-1 flex flex-col justify-end items-end pb-1">
                                                     <p className="text-[10px] text-gray-400 font-bold">Subtotal</p>
-                                                    <p className="font-bold text-gray-900 text-sm">${(item.price * item.quantity).toFixed(2)}</p>
+                                                    <p className="font-bold text-gray-900 text-sm">S/ {(item.price * item.quantity).toFixed(2)}</p>
                                                 </div>
                                             </div>
                                             <div className="mt-2">
@@ -772,7 +772,7 @@ export default function PurchasesPage() {
                                 <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
                                     <div className="bg-gray-50 px-6 py-4 rounded-2xl border border-gray-100 text-center md:text-left">
                                         <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total de la Factura / Honorarios</p>
-                                        <p className="text-3xl font-black text-gray-900">${formData.items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                        <p className="text-3xl font-black text-gray-900">S/ {formData.items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                                     </div>
                                     <button type="submit"
                                         className={`w-full md:w-auto px-14 py-4 text-white rounded-2xl font-black shadow-xl transition active:scale-95 flex items-center justify-center gap-3 ${moduleType === 'PURCHASE' ? 'bg-emerald-600 shadow-emerald-500/40 hover:bg-emerald-700' : 'bg-indigo-600 shadow-indigo-500/40 hover:bg-indigo-700'}`}>

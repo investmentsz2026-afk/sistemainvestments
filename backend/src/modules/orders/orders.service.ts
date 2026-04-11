@@ -248,40 +248,30 @@ export class OrdersService {
         const totalQty = (di.s28 || 0) + (di.m30 || 0) + (di.l32 || 0) + (di.xl34 || 0) + 
                           (di.xxl36 || 0) + (di.size38 || 0) + (di.size40 || 0) + 
                           (di.size42 || 0) + (di.size44 || 0) + (di.size46 || 0);
-        const totalPrice = totalQty * (di.unitPrice || 0);
 
         await (this.prisma as any).orderItem.update({
           where: { id: di.orderItemId },
           data: {
-            s28: di.s28 || 0,
-            m30: di.m30 || 0,
-            l32: di.l32 || 0,
-            xl34: di.xl34 || 0,
-            xxl36: di.xxl36 || 0,
-            size38: di.size38 || 0,
-            size40: di.size40 || 0,
-            size42: di.size42 || 0,
-            size44: di.size44 || 0,
-            size46: di.size46 || 0,
-            quantity: totalQty,
-            totalPrice,
+            dispS28: di.s28 || 0,
+            dispM30: di.m30 || 0,
+            dispL32: di.l32 || 0,
+            dispXL34: di.xl34 || 0,
+            dispXXL36: di.xxl36 || 0,
+            dispSize38: di.size38 || 0,
+            dispSize40: di.size40 || 0,
+            dispSize42: di.size42 || 0,
+            dispSize44: di.size44 || 0,
+            dispSize46: di.size46 || 0,
+            dispQuantity: totalQty,
           }
         });
       }
 
-      // Recalculate order totals
-      const updatedItems = await (this.prisma as any).orderItem.findMany({
-        where: { orderId: id }
-      });
-      const newTotalQuantity = updatedItems.reduce((acc: number, it: any) => acc + it.quantity, 0);
-      const newTotalAmount = updatedItems.reduce((acc: number, it: any) => acc + it.totalPrice, 0);
 
       await (this.prisma as any).order.update({
         where: { id },
         data: { 
           status: 'DESPACHADO',
-          totalQuantity: newTotalQuantity,
-          totalAmount: newTotalAmount,
         }
       });
     } else {
@@ -337,7 +327,8 @@ export class OrdersService {
       throw new BadRequestException('Solo los pedidos despachados pueden completarse.');
     }
 
-    const { docNumber, docType, paymentMethod } = data;
+    const { docNumber, docType, paymentMethod, igv } = data;
+    const igvRate = (igv || 18) / 100;
 
     // 1. Update order status
     const updated = await (this.prisma as any).order.update({
@@ -346,20 +337,20 @@ export class OrdersService {
     });
 
     // 2. Create Sale Record
-    // Map OrderItems to SaleItems
+    // Map OrderItems to SaleItems (USING DISPATCHED QUANTITIES)
     const saleItems: any[] = [];
     const sizeMap: Record<string, string> = {
-      's28': '28', 'm30': '30', 'l32': '32', 'xl34': '34', 'xxl36': '36',
-      'size38': '38', 'size40': '40', 'size42': '42', 'size44': '44', 'size46': '46',
+      'dispS28': '28', 'dispM30': '30', 'dispL32': '32', 'dispXL34': '34', 'dispXXL36': '36',
+      'dispSize38': '38', 'dispSize40': '40', 'dispSize42': '42', 'dispSize44': '44', 'dispSize46': '46',
     };
+
+    let actualTotalAmount = 0;
 
     for (const item of order.items) {
       for (const [field, sizeNum] of Object.entries(sizeMap)) {
         const qty = item[field] || 0;
         if (qty <= 0) continue;
 
-        // Find the variant
-        // We look for product by name (case-insensitive) and variant by color and size
         const products = await this.prisma.product.findMany({
           where: { name: { contains: item.modelName, mode: 'insensitive' } },
           include: { variants: true }
@@ -377,28 +368,31 @@ export class OrdersService {
           );
 
           if (variant) {
+            const itemTotal = qty * item.unitPrice;
             saleItems.push({
               variantId: variant.id,
               quantity: qty,
               unitPrice: item.unitPrice,
-              totalPrice: qty * item.unitPrice
+              totalPrice: itemTotal
             });
+            actualTotalAmount += itemTotal;
           }
         }
       }
     }
 
-    // Create the Sale record
-    // Note: This does NOT deduct stock again, because stock was already deducted during Dispatch.
+    // Create the Sale record with the REAL dispatched total (Including IGV)
+    const finalTotalWithTax = actualTotalAmount * (1 + igvRate);
+
     await this.prisma.sale.create({
       data: {
         invoiceNumber: docNumber || `REF-${order.orderNumber || order.id.slice(-6)}`,
         clientId: order.clientId,
-        totalAmount: order.totalAmount,
+        totalAmount: finalTotalWithTax, // Ahora incluye el IGV tal como sale en la boleta
         paymentMethod: paymentMethod || 'CREDITO',
         status: 'COMPLETADO',
         sellerId: order.sellerId,
-        notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'}`,
+        notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'} (DESPACHO PARCIAL)`,
         items: {
           create: saleItems
         }

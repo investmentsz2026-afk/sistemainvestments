@@ -14,6 +14,8 @@ import { CommercialModule } from './modules/commercial/commercial.module';
 import { SamplesModule } from './modules/samples/samples.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { AgenciesModule } from './modules/agencies/agencies.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -35,6 +37,8 @@ import { AppController } from './app.controller';
     SamplesModule,
     NotificationsModule,
     OrdersModule,
+    AgenciesModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [],

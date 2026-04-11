@@ -30,6 +30,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { NotaPedidoModal } from '../../components/orders/NotaPedidoModal';
 import { toast } from 'react-hot-toast';
 
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { FileSpreadsheet, FileText } from 'lucide-react';
+
+const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    if (dateString.endsWith('T00:00:00.000Z')) {
+        return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
+    }
+    return new Date(dateString).toLocaleDateString('es-PE');
+};
+
 export default function OrdersPage() {
     const { user } = useAuth();
     const [orders, setOrders] = useState<any[]>([]);
@@ -113,6 +126,167 @@ export default function OrdersPage() {
 
         return matchesSearch && matchesStatus && matchesStart && matchesEnd && matchesZone;
     });
+
+    const getExportData = () => {
+        const data: any[] = [];
+        filteredOrders.forEach(order => {
+            const date = formatDate(order.createdAt);
+            const clientName = order.client?.name || 'Varios';
+            
+            if (order.items && order.items.length > 0) {
+                order.items.forEach((item: any) => {
+                    data.push({
+                        'Nro Pedido': order.orderNumber || order.id.slice(-6).toUpperCase(),
+                        'Fecha': date,
+                        'Cliente': clientName,
+                        'Vendedor': order.seller?.name || 'N/A',
+                        'Zona': order.zone || 'N/A',
+                        'Condición': order.condition || 'N/A',
+                        'Agencia': order.agency || 'N/A',
+                        'Modelo': item.modelName || 'N/A',
+                        'Color': item.color || 'N/A',
+                        'S/28': item.s28 || 0,
+                        'M/30': item.m30 || 0,
+                        'L/32': item.l32 || 0,
+                        'XL/34': item.xl34 || 0,
+                        'XXL/36': item.xxl36 || 0,
+                        'T/38': item.size38 || 0,
+                        'T/40': item.size40 || 0,
+                        'T/42': item.size42 || 0,
+                        'T/44': item.size44 || 0,
+                        'T/46': item.size46 || 0,
+                        'Cant. Total': item.quantity || 0,
+                        'Precio U.': item.unitPrice || 0,
+                        'Subtotal': item.totalPrice || 0,
+                        'Monto Total Pedido': order.totalAmount,
+                        'Estado Pedido': order.status
+                    });
+                });
+            } else {
+                data.push({
+                    'Nro Pedido': order.orderNumber || order.id.slice(-6).toUpperCase(),
+                    'Fecha': date,
+                    'Cliente': clientName,
+                    'Vendedor': order.seller?.name || 'N/A',
+                    'Zona': order.zone || 'N/A',
+                    'Condición': order.condition || 'N/A',
+                    'Agencia': order.agency || 'N/A',
+                    'Modelo': 'N/A',
+                    'Color': 'N/A',
+                    'S/28': 0, 'M/30': 0, 'L/32': 0, 'XL/34': 0, 'XXL/36': 0, 'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0,
+                    'Cant. Total': 0,
+                    'Precio U.': 0,
+                    'Subtotal': 0,
+                    'Monto Total Pedido': order.totalAmount,
+                    'Estado Pedido': order.status
+                });
+            }
+        });
+        return data;
+    };
+
+    const exportToExcel = async () => {
+        const promise = new Promise(async (resolve, reject) => {
+            try {
+                // Sheet 1: Pedidos
+                const data = getExportData();
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+                // Sheet 2: Stock
+                const resp = await api.get('/products');
+                const allProducts = resp.data || [];
+                
+                const orderedVariants = new Set();
+                filteredOrders.forEach(order => {
+                    if (order.items && order.items.length > 0) {
+                        order.items.forEach((item: any) => {
+                            if (item.modelName && item.color) {
+                                orderedVariants.add(`${item.modelName.trim().toUpperCase()}|${item.color.trim().toUpperCase()}`);
+                            }
+                        });
+                    }
+                });
+
+                const stockMatrix: Record<string, any> = {};
+                allProducts.forEach((p: any) => {
+                    if (p.variants) {
+                        p.variants.forEach((v: any) => {
+                            const key = `${p.name?.trim().toUpperCase()}|${v.color?.trim().toUpperCase()}`;
+                            if (orderedVariants.has(key)) {
+                                if (!stockMatrix[key]) {
+                                    stockMatrix[key] = {
+                                        'Modelo': p.name,
+                                        'Color': v.color,
+                                        'S/28': 0, 'M/30': 0, 'L/32': 0, 'XL/34': 0, 'XXL/36': 0, 
+                                        'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0,
+                                        'Stock Total': 0
+                                    };
+                                }
+                                
+                                const sizeMapping: Record<string, string> = {
+                                    '28': 'S/28', '30': 'M/30', '32': 'L/32', '34': 'XL/34', '36': 'XXL/36',
+                                    '38': 'T/38', '40': 'T/40', '42': 'T/42', '44': 'T/44', '46': 'T/46',
+                                    'S': 'S/28', 'M': 'M/30', 'L': 'L/32', 'XL': 'XL/34', 'XXL': 'XXL/36'
+                                };
+                                
+                                const colName = sizeMapping[v.size] || v.size;
+                                if (stockMatrix[key][colName] !== undefined) {
+                                    stockMatrix[key][colName] += v.stock;
+                                } else {
+                                    stockMatrix[key][colName] = v.stock; 
+                                }
+                                stockMatrix[key]['Stock Total'] += v.stock;
+                            }
+                        });
+                    }
+                });
+                
+                const stockData = Object.values(stockMatrix);
+                if (stockData.length === 0) {
+                    stockData.push({ 'Información': 'No se encontró stock para los modelos filtrados en el sistema.' });
+                }
+
+                const wsStock = XLSX.utils.json_to_sheet(stockData);
+                XLSX.utils.book_append_sheet(wb, wsStock, "Stock Disponible");
+
+                XLSX.writeFile(wb, `Reporte_Pedidos_${new Date().toISOString().split('T')[0]}.xlsx`);
+                resolve(true);
+            } catch (error) {
+                console.error(error);
+                reject(error);
+            }
+        });
+
+        toast.promise(promise, {
+            loading: 'Calculando stock y generando Excel...',
+            success: 'Excel descargado correctamente.',
+            error: 'Ocurrió un error al generar el archivo.'
+        });
+    };
+
+    const exportToPDF = () => {
+        const data = getExportData();
+        if (data.length === 0) return;
+        const doc = new jsPDF('landscape');
+        
+        doc.setFontSize(14);
+        doc.text('Reporte de Pedidos Detallado - Investments Z&G', 14, 20);
+        
+        const tableColumn = Object.keys(data[0]);
+        const tableRows = data.map(item => Object.values(item));
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows as any[],
+            startY: 30,
+            styles: { fontSize: 6, cellPadding: 1 },
+            headStyles: { fillColor: [79, 70, 229] }
+        });
+        
+        doc.save(`Reporte_Pedidos_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
 
     const getStatusStyle = (status: string) => {
         switch (status) {
@@ -253,6 +427,16 @@ export default function OrdersPage() {
                     </AnimatePresence>
                 </div>
 
+                {/* EXPORT BUTTONS */}
+                <div className="flex justify-end gap-3 mb-2">
+                     <button onClick={exportToExcel} className="flex items-center gap-2 px-6 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl font-black text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm text-sm">
+                        <FileSpreadsheet className="w-4 h-4" /> Exportar Excel
+                     </button>
+                     <button onClick={exportToPDF} className="flex items-center gap-2 px-6 py-2.5 bg-red-50 border border-red-100 rounded-xl font-black text-red-600 hover:bg-red-100 transition-all shadow-sm text-sm">
+                        <FileText className="w-4 h-4" /> Exportar PDF
+                     </button>
+                </div>
+
                 {/* LISTING */}
                 <div className="space-y-4">
                     {isLoading ? (
@@ -293,7 +477,7 @@ export default function OrdersPage() {
                                             <div className="flex flex-wrap items-center gap-4 mt-2">
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold text-nowrap">
                                                     <Calendar className="w-3.5 h-3.5" />
-                                                    {new Date(order.createdAt).toLocaleDateString()}
+                                                    {formatDate(order.createdAt)}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold whitespace-nowrap">
                                                     <Clock className="w-3.5 h-3.5" />

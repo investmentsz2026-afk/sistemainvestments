@@ -56,20 +56,25 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50 flex items-center justify-center p-6">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-slate-900">
+      {/* Background Video */}
+      <video 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        className="absolute inset-0 w-full h-full object-cover z-0 opacity-90"
+      >
+        <source src="/video.mp4" type="video/mp4" />
+      </video>
 
-      {/* Main Container - Perfectly Centered */}
-      <div className="relative w-full max-w-4xl mx-auto">
-        <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-100">
+      {/* Main Container - Glassmorphism */}
+      <div className="relative z-10 w-full max-w-4xl mx-auto">
+        <div className="backdrop-blur-xl bg-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] rounded-2xl overflow-hidden border border-white/20">
           <div className="flex flex-col lg:flex-row">
 
-            {/* Left Side - Branding (visible en desktop) */}
-            <div className="hidden lg:flex lg:w-6/12 bg-gradient-to-br from-indigo-600 to-sky-600 p-12 relative overflow-hidden flex-col justify-between">
+            {/* Left Side - Branding (Translucent Gradient) */}
+            <div className="hidden lg:flex lg:w-6/12 bg-gradient-to-br from-blue-600/40 to-blue-800/40 p-8 relative overflow-hidden flex-col justify-between">
               {/* Pattern Overlay */}
               <div className="absolute inset-0 opacity-10">
                 <div className="absolute inset-0" style={{
@@ -81,60 +86,58 @@ export default function LoginPage() {
               {/* Content */}
               <div className="relative h-full flex flex-col justify-between text-white">
                 <div>
-                  <div className="flex items-center gap-3 mb-12">
-                    <div className="bg-white/20 p-3 rounded-2xl">
-                      <Package className="w-8 h-8 text-white" />
+                  <div className="flex items-center gap-4 mb-10 bg-white/10 p-5 rounded-[2.5rem] backdrop-blur-md border border-white/20 shadow-xl w-max">
+                    <img src="/logo.jpeg" alt="Logo" className="w-16 h-16 rounded-2xl object-contain bg-white p-1" />
+                    <div>
+                      <h1 className="text-xl font-black text-white italic tracking-tighter pr-4">Investments Z&G</h1>
+                      <p className="text-[10px] font-bold text-sky-200 uppercase tracking-[0.3em]">Corporativo</p>
                     </div>
-                    <span className="text-2xl font-bold text-white">StockMaster</span>
                   </div>
 
-                  <h2 className="text-3xl font-bold text-white mb-3">
-                    Gestiona tu inventario
-                    <span className="block text-sky-200 font-medium">de manera inteligente</span>
+                  <h2 className="text-3xl font-black text-white mb-2 leading-tight">
+                    Plataforma Integral de
+                    <span className="block text-sky-200">Gestión Comercial</span>
                   </h2>
 
-                  <p className="text-white/90 text-base mb-6">
-                    Control total de tu tienda con sistema de códigos de barras y kardex automático.
+                  <p className="text-white/80 text-base mb-6 font-medium">
+                    Control absoluto de producción, inventarios y ventas en tiempo real.
                   </p>
 
                   <div className="space-y-4">
                     {[
-                      '📦 Gestión por talla y color',
-                      '📊 Kardex automático',
-                      '🏷️ Códigos de barras',
-                      '📱 Escaneo USB'
+                      '🚀 Gestión de Pedidos y Ventas',
+                      '📦 Inventario Multizona (Lima/Oriente)',
+                      '📑 Notas de Cobranza Automáticas',
+                      '📈 Reportes de Calidad y Calzado'
                     ].map((feature, i) => (
-                      <div key={i} className="flex items-center gap-3 text-white/90">
-                        <div className="w-1.5 h-1.5 bg-yellow-300 rounded-full"></div>
-                        <span>{feature}</span>
+                      <div key={i} className="flex items-center gap-4 text-white font-bold group">
+                        <div className="w-2 h-2 bg-yellow-400 rounded-full group-hover:scale-150 transition-transform"></div>
+                        <span className="text-sm tracking-wide">{feature}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-
-
               </div>
             </div>
 
-            {/* Right Side - Login Form */}
-            <div className="w-full lg:w-6/12 p-8 lg:p-12 flex items-center">
+            {/* Right Side - Login Form (Frosted Glass) */}
+            <div className="w-full lg:w-6/12 p-6 lg:p-10 flex items-center bg-white/10">
               <div className="max-w-md mx-auto w-full">
                 {/* Logo móvil */}
-                <div className="lg:hidden flex justify-center mb-8">
-                  <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-2xl">
-                    <Package className="w-8 h-8 text-white" />
-                  </div>
+                <div className="lg:hidden flex flex-col items-center justify-center mb-10">
+                  <img src="/logo.jpeg" alt="Logo" className="w-28 h-28 rounded-3xl object-contain bg-white shadow-2xl p-2 mb-4 border border-slate-100" />
+                  <h3 className="text-xl font-black text-slate-900 tracking-tighter italic">Investments Z&G</h3>
                 </div>
 
                 {showRoleSelection ? (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="space-y-6"
+                    className="space-y-6 bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white"
                   >
                     <div className="text-center mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">Selecciona un rol</h2>
-                      <p className="text-gray-600">¿Como qué perfil deseas ingresar hoy?</p>
+                      <h2 className="text-2xl font-black text-slate-900 mb-2">Selecciona un rol</h2>
+                      <p className="text-slate-800 font-bold">¿Como qué perfil deseas ingresar hoy?</p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
@@ -143,22 +146,22 @@ export default function LoginPage() {
                           key={role}
                           onClick={() => handleRoleSelect(role)}
                           disabled={isSelectingRole}
-                          className="flex items-center justify-between p-4 border-2 border-gray-100 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+                          className="flex items-center justify-between p-4 bg-white border-2 border-slate-200 rounded-xl hover:border-indigo-500 hover:shadow-md transition-all group"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                              <span className="font-bold text-sm">{role.charAt(0)}</span>
+                              <span className="font-black text-sm">{role.charAt(0)}</span>
                             </div>
-                            <span className="font-semibold text-gray-800">{role}</span>
+                            <span className="font-extrabold text-slate-800">{role}</span>
                           </div>
-                          <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
                         </button>
                       ))}
                     </div>
 
                     <button
                       onClick={() => setShowRoleSelection(false)}
-                      className="w-full text-center text-sm text-gray-500 hover:text-gray-700"
+                      className="w-full text-center text-sm text-slate-700 font-bold hover:text-slate-900 hover:underline transition-all mt-2"
                     >
                       Volver al login
                     </button>
@@ -169,20 +172,20 @@ export default function LoginPage() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.35 }}
-                    className="space-y-6 bg-white p-6 rounded-xl shadow-sm"
+                    className="space-y-6 bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white"
                   >
                     {/* Email Field */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email
+                      <label className="block text-sm font-bold text-slate-800 mb-2">
+                        Correo Electrónico
                       </label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
                         <input
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition bg-gray-50"
+                          className="w-full pl-10 pr-4 py-3.5 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white/90 text-slate-900 font-semibold placeholder-slate-400 shadow-sm"
                           placeholder="ejemplo@correo.com"
                           required
                         />
@@ -191,23 +194,23 @@ export default function LoginPage() {
 
                     {/* Password Field */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-slate-800 mb-2">
                         Contraseña
                       </label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition bg-gray-50"
+                          className="w-full pl-10 pr-12 py-3.5 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white/90 text-slate-900 font-semibold placeholder-slate-400 shadow-sm"
                           placeholder="••••••••"
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                         >
                           {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
@@ -221,13 +224,13 @@ export default function LoginPage() {
                           type="checkbox"
                           checked={rememberMe}
                           onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                         />
-                        <span className="text-sm text-gray-600">Recordarme</span>
+                        <span className="text-sm font-semibold text-slate-700">Recordarme</span>
                       </label>
                       <Link
                         href="/forgot-password"
-                        className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                        className="text-sm text-indigo-600 hover:text-indigo-800 font-bold transition-colors"
                       >
                         ¿Olvidaste tu contraseña?
                       </Link>
@@ -237,7 +240,7 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3.5 px-4 rounded-xl font-bold text-[15px] tracking-wide hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isLoading ? (
                         <>
@@ -288,17 +291,17 @@ export default function LoginPage() {
       <AnimatePresence>
         {showErrorModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" 
-              onClick={handleCloseError} 
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              onClick={handleCloseError}
             />
 
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden p-8 text-center border border-red-50"
             >
@@ -311,7 +314,7 @@ export default function LoginPage() {
                 El <span className="text-red-600 font-bold">Email</span> o la <span className="text-red-600 font-bold">Contraseña</span> son incorrectos. Por favor, verifica tus credenciales e intenta de nuevo.
               </p>
 
-              <button 
+              <button
                 onClick={handleCloseError}
                 className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-red-700 transition transform active:scale-95 shadow-lg shadow-red-200"
               >
