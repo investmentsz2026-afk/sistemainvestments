@@ -195,7 +195,7 @@ export default function CollectionsPage() {
         const sizeColumns = ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'];
         
         // Prepare Data for Excel
-        const rows = [
+        const rows: any[][] = [
             ['NOTA DE COBRANZA'],
             [`FECHA: ${new Date(sale.createdAt).toLocaleDateString('es-PE')}`],
             [`FACTURA: ${sale.invoiceNumber || 'S/N'}`],
@@ -226,7 +226,7 @@ export default function CollectionsPage() {
         rows.push([
             grandTotalQty,
             'TOTAL FINAL',
-            '', '', '', '', '', '', '', '', '', '',
+            ...sizeColumns.map(() => ''),
             '',
             grandTotalPrice
         ]);

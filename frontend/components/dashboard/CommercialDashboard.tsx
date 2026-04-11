@@ -29,6 +29,10 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+interface CommercialDashboardProps {
+  user: any;
+}
+
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
     if (dateString.endsWith('T00:00:00.000Z')) {
