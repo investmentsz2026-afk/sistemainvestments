@@ -47,6 +47,17 @@ export class ProductsService {
       },
     });
 
+    // Si viene de una compra, vincular el ítem
+    if (createProductDto.purchaseItemId) {
+      await this.prisma.purchaseItem.update({
+        where: { id: createProductDto.purchaseItemId },
+        data: {
+          productId: product.id,
+          status: 'RECIBIDO', // Marcar como ya inventariado/recibido (Consistente con Quality)
+        },
+      });
+    }
+
     // Si hay variantes, crearlas
     if (createProductDto.variants && createProductDto.variants.length > 0) {
       for (const variant of createProductDto.variants) {

@@ -190,14 +190,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             // Clear color if product changes
             newItems[index].color = '';
             
-            // Auto-propagate to next row if it's empty
-            if (index < newItems.length - 1 && !newItems[index + 1].modelName) {
-                newItems[index + 1].modelName = product.name;
-                newItems[index + 1].unitPrice = product.sellingPrice;
-                newItems[index + 1].productId = product.id;
-                newItems[index + 1].color = '';
-            }
-            
+            // Auto-propagate removed to follow new requirement
             setProductSearch(null);
         } else {
             newItems[index][field] = value;
@@ -376,11 +369,30 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                 // Next field same row
                 focusElement(rowIndex, fieldsOrder[currentCol + 1]);
             } else {
-                // Next row first field
+                // Next row first field - Copy model information to the next row
+                const currentModel = items[rowIndex].modelName;
+                const currentProductId = items[rowIndex].productId;
+                const currentUnitPrice = items[rowIndex].unitPrice;
+
                 if (rowIndex < items.length - 1) {
+                    const newItems = [...items];
+                    newItems[rowIndex + 1] = {
+                        ...newItems[rowIndex + 1],
+                        modelName: currentModel,
+                        productId: currentProductId,
+                        unitPrice: currentUnitPrice
+                    };
+                    setItems(newItems);
                     focusElement(rowIndex + 1, fieldsOrder[0]);
                 } else {
-                    addRow();
+                    setItems([...items, {
+                        modelName: currentModel,
+                        productId: currentProductId,
+                        unitPrice: currentUnitPrice,
+                        color: '', s28: 0, m30: 0, l32: 0, xl34: 0, xxl36: 0,
+                        size38: 0, size40: 0, size42: 0, size44: 0, size46: 0,
+                        quantity: 0, totalPrice: 0
+                    }]);
                     focusElement(rowIndex + 1, fieldsOrder[0]);
                 }
             }

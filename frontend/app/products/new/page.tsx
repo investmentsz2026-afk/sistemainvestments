@@ -82,7 +82,8 @@ export default function NewProductPage() {
       purchasePrice: item.price,
       sellingPrice: item.price * 1.3,
       minStock: 5,
-      variants: [{ size: 'ESTÁNDAR', color: 'ÚNICO', initialStock: item.quantity }]
+      variants: [{ size: 'ESTÁNDAR', color: 'ÚNICO', initialStock: item.quantity }],
+      purchaseItemId: item.id
     };
 
     setInitialData(importedData);
@@ -226,10 +227,16 @@ export default function NewProductPage() {
     }
   };
 
-  const filteredPurchases = purchases.filter(p =>
-    (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.items.some((item: any) => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredPurchases = purchases
+    .map(p => ({
+      ...p,
+      items: p.items.filter((item: any) => !item.productId && item.status === 'RECIBIDO')
+    }))
+    .filter(p => p.items.length > 0)
+    .filter(p =>
+      (p.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.items.some((item: any) => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
 
   const filteredAudits = finalizedAudits.filter(a =>
     a.sampleName.toLowerCase().includes(auditSearchTerm.toLowerCase()) ||

@@ -24,6 +24,7 @@ const productSchema = z.object({
     initialStock: z.number().min(0, 'El stock inicial debe ser mayor o igual a 0').default(0),
     variantSku: z.string().optional(),
   })).min(1, 'Debe agregar al menos una variante'),
+  purchaseItemId: z.string().optional(),
 }).superRefine((data, ctx) => {
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
 

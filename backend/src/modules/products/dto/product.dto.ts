@@ -55,6 +55,10 @@ export class CreateProductDto {
   @Min(0)
   minStock?: number;
 
+  @IsString()
+  @IsOptional()
+  purchaseItemId?: string;
+
   @IsArray()
   @IsOptional()
   @Type(() => CreateVariantDto)
