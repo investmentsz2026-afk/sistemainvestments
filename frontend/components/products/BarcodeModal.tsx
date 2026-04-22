@@ -1,7 +1,7 @@
 // frontend/components/products/BarcodeModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, Printer, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductBarcode } from './Barcode';
 import * as XLSX from 'xlsx';
@@ -12,13 +12,22 @@ import autoTable from 'jspdf-autotable';
 interface BarcodeModalProps {
   product: any;
   onClose: () => void;
+  selectedVariant?: any;
+  isOpen?: boolean;
 }
 
-export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) => {
-  const [selectedVariant, setSelectedVariant] = useState<any>(product.variants[0]);
+export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, selectedVariant: propSelectedVariant, isOpen }) => {
+  const [selectedVariant, setSelectedVariant] = useState<any>(propSelectedVariant || product.variants[0]);
   const [copied, setCopied] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
+
+  // Sync selected variant when it changes from props
+  useEffect(() => {
+    if (propSelectedVariant) {
+      setSelectedVariant(propSelectedVariant);
+    }
+  }, [propSelectedVariant]);
 
   const copyToClipboard = (text: string, variantId?: string) => {
     navigator.clipboard.writeText(text);
