@@ -26,6 +26,7 @@ import {
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { BarcodeModal } from '../../../components/products/BarcodeModal';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -39,6 +40,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [variantForBarcode, setVariantForBarcode] = useState<any>(null);
 
   useEffect(() => {
     if (products) {
@@ -263,7 +266,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     <button
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
                       title="Imprimir etiqueta"
-                      onClick={() => window.print()}
+                      onClick={() => {
+                        setVariantForBarcode(variant);
+                        setShowBarcodeModal(true);
+                      }}
                     >
                       <Printer className="w-5 h-5" />
                     </button>
@@ -534,6 +540,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </div>
           </div>
         </div>
+      )}
+      {/* Modal de etiquetas */}
+      {showBarcodeModal && variantForBarcode && (
+        <BarcodeModal
+          isOpen={showBarcodeModal}
+          onClose={() => setShowBarcodeModal(false)}
+          product={product}
+          selectedVariant={variantForBarcode}
+        />
       )}
     </Layout>
   );
