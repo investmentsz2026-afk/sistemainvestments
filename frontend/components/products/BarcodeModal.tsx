@@ -131,6 +131,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
     const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
+      const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
+      const hasPrice = parseFloat(product.sellingPrice) > 0;
+
       return `
         <div class="barcode-label">
           <div class="label-header">
@@ -143,9 +146,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
             <div class="barcode-wrapper">
               <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
             </div>
-            <div class="size-text">${variant.size}</div>
+            ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
           </div>
-          <div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>
+          ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
         </div>
       `;
     }).join('');
@@ -193,6 +196,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
     const items = product.variants.flatMap((variant: any) => 
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
+        const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
+        const hasPrice = parseFloat(product.sellingPrice) > 0;
+
         return `
           <div class="barcode-label">
             <div class="label-header">
@@ -205,9 +211,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
               <div class="barcode-wrapper">
                 <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
               </div>
-              <div class="size-text">${variant.size}</div>
+              ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
             </div>
-            <div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>
+            ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
           </div>
         `;
       })
@@ -355,14 +361,18 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
                         fontSize={10}
                       />
                     </div>
-                    <div className="text-[15pt] font-black leading-none ml-[4mm]">
-                      {selectedVariant.size}
-                    </div>
+                    {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
+                      <div className="text-[15pt] font-black leading-none ml-[4mm]">
+                        {selectedVariant.size}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="text-[9.5pt] font-black w-full text-center border-t border-black pt-[0.8mm] mt-[0.2mm]">
-                    PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
-                  </div>
+                  {parseFloat(product.sellingPrice) > 0 && (
+                    <div className="text-[9.5pt] font-black w-full text-center border-t border-black pt-[0.8mm] mt-[0.2mm]">
+                      PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
