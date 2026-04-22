@@ -8,7 +8,7 @@ import { generateSKU, generateVariantSKU } from '../../utils/sku-generator';
 export class ProductsService {
   constructor(private prisma: PrismaService) { }
 
-  async create(createProductDto: CreateProductDto) {
+  async create(userId: string, createProductDto: CreateProductDto) {
     // Obtener el último contador para generar SKU
     const lastProduct = await this.prisma.product.findFirst({
       orderBy: { createdAt: 'desc' },
@@ -61,14 +61,14 @@ export class ProductsService {
     // Si hay variantes, crearlas
     if (createProductDto.variants && createProductDto.variants.length > 0) {
       for (const variant of createProductDto.variants) {
-        await this.createVariant(product.id, variant);
+        await this.createVariant(userId, product.id, variant);
       }
     }
 
     return this.findOne(product.id);
   }
 
-  async createVariant(productId: string, createVariantDto: CreateVariantDto) {
+  async createVariant(userId: string, productId: string, createVariantDto: CreateVariantDto) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
@@ -100,7 +100,7 @@ export class ProductsService {
       );
     }
 
-    return this.prisma.productVariant.create({
+    const variant = await this.prisma.productVariant.create({
       data: {
         productId,
         size: createVariantDto.size,
@@ -109,6 +109,24 @@ export class ProductsService {
         variantSku,
       },
     });
+
+    // Registrar movimiento si hay stock inicial
+    if (createVariantDto.initialStock && createVariantDto.initialStock > 0) {
+      await this.prisma.movement.create({
+        data: {
+          type: 'ENTRY',
+          quantity: createVariantDto.initialStock,
+          reason: 'STOCK_INICIAL',
+          reference: 'INVENTARIO_INICIAL',
+          previousStock: 0,
+          newStock: createVariantDto.initialStock,
+          variantId: variant.id,
+          userId,
+        },
+      });
+    }
+
+    return variant;
   }
 
   async findAll() {
@@ -154,7 +172,7 @@ export class ProductsService {
     });
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto) {
+  async update(userId: string, id: string, updateProductDto: UpdateProductDto) {
     const product = await this.findOne(id);
 
     const { variants, ...productData } = updateProductDto;
@@ -204,7 +222,7 @@ export class ProductsService {
         } else {
           // Crear nueva variante
           const stockValue = variant.stock !== undefined ? variant.stock : variant.initialStock;
-          const newVariant = await this.createVariant(id, {
+          const newVariant = await this.createVariant(userId, id, {
             size: variant.size,
             color: variant.color,
             initialStock: stockValue || 0,

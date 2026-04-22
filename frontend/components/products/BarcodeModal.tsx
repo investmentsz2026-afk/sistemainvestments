@@ -31,26 +31,121 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
     }
   };
 
+  const commonStyles = `
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      text-transform: uppercase;
+    }
+    body {
+      font-family: 'Arial Black', Arial, sans-serif;
+      padding: 0;
+      margin: 0;
+      background: #fff;
+    }
+    .barcode-label {
+      width: 50mm;
+      height: 40mm;
+      padding: 1mm 1.5mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      page-break-inside: avoid;
+      background: white;
+      overflow: hidden;
+    }
+    .label-header {
+      text-align: center;
+      width: 100%;
+      line-height: 1;
+    }
+    .brand {
+      font-size: 7pt;
+      font-weight: 900;
+      margin-bottom: 0.2mm;
+    }
+    .category {
+      font-size: 5.5pt;
+      font-weight: 900;
+      margin-bottom: 0.4mm;
+    }
+    .model {
+      font-size: 11pt;
+      font-weight: 900;
+      margin-bottom: 0.4mm;
+      letter-spacing: -0.2mm;
+    }
+    .color-text {
+      font-size: 7.5pt;
+      font-weight: 900;
+      margin-bottom: 0.5mm;
+    }
+    .barcode-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      flex: 1;
+    }
+    .barcode-wrapper {
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .barcode-svg {
+      height: 15mm !important;
+      width: auto !important;
+    }
+    .size-text {
+      font-size: 15pt;
+      font-weight: 900;
+      line-height: 1;
+      margin-left: 4mm;
+      text-align: left;
+    }
+    .price-text {
+      font-size: 9.5pt;
+      font-weight: 900;
+      width: 100%;
+      text-align: center;
+      border-top: 0.1mm solid #000;
+      padding-top: 0.8mm;
+      margin-top: 0.2mm;
+    }
+    @media print {
+      body { padding: 0; }
+      .barcode-label { border: none; }
+    }
+    @page {
+      size: 50mm 40mm;
+      margin: 0;
+    }
+  `;
+
   const printBarcodes = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // Generar etiquetas individuales para cada variante seleccionada
     const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
+      const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       return `
         <div class="barcode-label">
-          <div class="label-content">
-            <div class="product-info">
-              <strong>${product.name}</strong><br>
-              <span class="variant-info">${variant.size} / ${variant.color}</span>
-            </div>
-            <div class="barcode-container">
+          <div class="label-header">
+            <div class="brand">AMERICAN COLT</div>
+            <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+            <div class="model">${modelDisplay}</div>
+            <div class="color-text">COLOR: ${variant.color}</div>
+          </div>
+          <div class="barcode-section">
+            <div class="barcode-wrapper">
               <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
             </div>
-            <div class="sku">${variant.variantSku}</div>
-            <div class="price">$${product.sellingPrice}</div>
+            <div class="size-text">${variant.size}</div>
           </div>
+          <div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>
         </div>
       `;
     }).join('');
@@ -60,102 +155,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
         <head>
           <title>Etiquetas - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>
-            * {
-              box-sizing: border-box;
-              margin: 0;
-              padding: 0;
-            }
-            body {
-              font-family: 'Arial', sans-serif;
-              padding: 15px;
-              margin: 0;
-              background: #f5f5f5;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px;
-              justify-content: flex-start;
-            }
-            .barcode-label {
-              width: 180px;
-              height: 120px;
-              background: white;
-              border: 1px dashed #ccc;
-              border-radius: 4px;
-              padding: 6px;
-              page-break-inside: avoid;
-              break-inside: avoid;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .label-content {
-              width: 100%;
-              height: 100%;
-              display: flex;
-              flex-direction: column;
-            }
-            .product-info {
-              font-size: 8px;
-              color: #333;
-              line-height: 1.2;
-              margin-bottom: 2px;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .variant-info {
-              font-size: 7px;
-              color: #666;
-            }
-            .barcode-container {
-              flex: 1;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 50px;
-              margin: 2px 0;
-            }
-            .barcode-svg {
-              max-width: 100%;
-              height: 50px !important;
-              display: block;
-            }
-            .sku {
-              font-size: 7px;
-              color: #666;
-              text-align: center;
-              font-family: monospace;
-              margin: 1px 0;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .price {
-              font-size: 9px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-align: center;
-              margin-top: 1px;
-            }
-            @media print {
-              body {
-                background: white;
-                padding: 0;
-              }
-              .barcode-label {
-                border: none;
-                box-shadow: none;
-                page-break-inside: avoid;
-                break-inside: avoid;
-              }
-            }
-            @page {
-              size: auto;
-              margin: 8mm;
-            }
-          </style>
+          <style>${commonStyles}</style>
         </head>
         <body>
           ${items}
@@ -163,12 +163,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
             setTimeout(() => {
               document.querySelectorAll('.barcode-svg').forEach((el, index) => {
                 try {
-                  JsBarcode(el, "${selectedVariant.variantSku}", {
+                   JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 0.6,
-                    height: 45,
-                    displayValue: false,
-                    fontSize: 0,
+                    width: 0.8,
+                    height: 55,
+                    displayValue: true,
+                    fontSize: 10,
                     margin: 0,
                     lineColor: "#000000"
                   });
@@ -177,6 +177,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
                 }
               });
               window.print();
+              window.close();
             }, 500);
           </script>
         </body>
@@ -189,23 +190,27 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // Generar una etiqueta por cada variante
     const items = product.variants.flatMap((variant: any) => 
-      Array(quantity).fill(0).map((_, index) => `
-        <div class="barcode-label">
-          <div class="label-content">
-            <div class="product-info">
-              <strong>${product.name}</strong><br>
-              <span class="variant-info">${variant.size} / ${variant.color}</span>
+      Array(quantity).fill(0).map((_, index) => {
+        const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
+        return `
+          <div class="barcode-label">
+            <div class="label-header">
+              <div class="brand">AMERICAN COLT</div>
+              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+              <div class="model">${modelDisplay}</div>
+              <div class="color-text">COLOR: ${variant.color}</div>
             </div>
-            <div class="barcode-container">
-              <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+            <div class="barcode-section">
+              <div class="barcode-wrapper">
+                <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+              </div>
+              <div class="size-text">${variant.size}</div>
             </div>
-            <div class="sku">${variant.variantSku}</div>
-            <div class="price">$${product.sellingPrice}</div>
+            <div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>
           </div>
-        </div>
-      `)
+        `;
+      })
     ).join('');
 
     printWindow.document.write(`
@@ -213,117 +218,23 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
         <head>
           <title>Todas las Variantes - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>
-            * {
-              box-sizing: border-box;
-              margin: 0;
-              padding: 0;
-            }
-            body {
-              font-family: 'Arial', sans-serif;
-              padding: 15px;
-              margin: 0;
-              background: #f5f5f5;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px;
-              justify-content: flex-start;
-            }
-            .barcode-label {
-              width: 180px;
-              height: 120px;
-              background: white;
-              border: 1px dashed #ccc;
-              border-radius: 4px;
-              padding: 6px;
-              page-break-inside: avoid;
-              break-inside: avoid;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .label-content {
-              width: 100%;
-              height: 100%;
-              display: flex;
-              flex-direction: column;
-            }
-            .product-info {
-              font-size: 8px;
-              color: #333;
-              line-height: 1.2;
-              margin-bottom: 2px;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .variant-info {
-              font-size: 7px;
-              color: #666;
-            }
-            .barcode-container {
-              flex: 1;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 50px;
-              margin: 2px 0;
-            }
-            .barcode-svg {
-              max-width: 100%;
-              height: 50px !important;
-              display: block;
-            }
-            .sku {
-              font-size: 7px;
-              color: #666;
-              text-align: center;
-              font-family: monospace;
-              margin: 1px 0;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .price {
-              font-size: 9px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-align: center;
-              margin-top: 1px;
-            }
-            @media print {
-              body {
-                background: white;
-                padding: 0;
-              }
-              .barcode-label {
-                border: none;
-                box-shadow: none;
-                page-break-inside: avoid;
-                break-inside: avoid;
-              }
-            }
-            @page {
-              size: auto;
-              margin: 8mm;
-            }
-          </style>
+          <style>${commonStyles}</style>
         </head>
         <body>
           ${items}
           <script>
             setTimeout(() => {
+              const variants = ${JSON.stringify(product.variants)};
               document.querySelectorAll('.barcode-svg').forEach((el, index) => {
                 try {
                   const variantId = el.id.split('-')[1];
-                  const variant = ${JSON.stringify(product.variants)}.find(v => v.id === variantId);
-                  JsBarcode(el, variant.variantSku, {
+                  const variant = variants.find(v => v.id === variantId);
+                   JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 0.6,
-                    height: 45,
-                    displayValue: false,
-                    fontSize: 0,
+                    width: 0.8,
+                    height: 55,
+                    displayValue: true,
+                    fontSize: 10,
                     margin: 0,
                     lineColor: "#000000"
                   });
@@ -332,6 +243,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
                 }
               });
               window.print();
+              window.close();
             }, 500);
           </script>
         </body>
@@ -360,7 +272,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
   const exportToPDF = () => {
     try {
       const doc = new jsPDF();
-      
       doc.text(`Códigos de Barras - ${product.name}`, 14, 15);
       doc.text(`SKU: ${product.sku}`, 14, 25);
       doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 35);
@@ -384,33 +295,26 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
       doc.save(`codigos-${product.sku}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('No se pudo generar el PDF. Por favor inténtalo de nuevo.');
+      alert('No se pudo generar el PDF.');
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Códigos de Barras</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Configuración de Etiquetas (5x4cm)</h2>
             <p className="text-sm text-gray-600">{product.name}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6">
-          {/* Selector de variante */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Seleccionar Variante
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Variante</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {product.variants.map((variant: any) => (
                 <button
@@ -424,162 +328,78 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose }) 
                 >
                   <p className="font-medium text-gray-900">{variant.size}</p>
                   <p className="text-sm text-gray-600">{variant.color}</p>
-                  <p className="text-xs text-gray-400 mt-1">Stock: {variant.stock}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Vista previa de la etiqueta seleccionada - MÁS COMPACTA */}
           {selectedVariant && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Vista previa de la etiqueta
-              </label>
+            <div className="mb-8">
+              <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (50mm x 40mm)</label>
               <div className="flex justify-center">
-                <div className="w-[180px] h-[100px] bg-white border-2 border-blue-300 rounded-lg shadow-lg p-2">
-                  <div className="w-full h-full flex flex-col">
-                    <div className="text-[8px] text-gray-800 leading-tight truncate font-bold">
-                      {product.name}
-                    </div>
-                    <div className="text-[7px] text-gray-600">
-                      {selectedVariant.size} / {selectedVariant.color}
-                    </div>
-                    <div className="flex-1 flex items-center justify-center my-1">
+                <div className="w-[189px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-between uppercase p-[1.5mm] overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+                  <div className="text-center w-full">
+                    <div className="text-[7pt] font-black leading-none">AMERICAN COLT</div>
+                    <div className="text-[5.5pt] font-bold text-slate-500 mt-[0.5mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
+                    <div className="text-[10pt] font-black leading-tight mt-[0.5mm]">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
+                    <div className="text-[7pt] font-bold text-slate-700 mt-[0.5mm]">COLOR: {selectedVariant.color}</div>
+                  </div>
+                  
+                  <div className="flex items-center justify-center w-full flex-1">
+                    <div className="flex justify-center overflow-hidden">
                       <ProductBarcode 
                         value={selectedVariant.variantSku} 
-                        width={0.6}
-                        height={45}
-                        displayValue={false}
+                        width={0.8}
+                        height={55}
+                        displayValue={true}
+                        fontSize={10}
                       />
                     </div>
-                    <div className="text-[7px] text-gray-500 text-center font-mono truncate">
-                      {selectedVariant.variantSku}
+                    <div className="text-[15pt] font-black leading-none ml-[4mm]">
+                      {selectedVariant.size}
                     </div>
-                    <div className="text-[9px] font-bold text-gray-800 text-center">
-                      ${product.sellingPrice}
-                    </div>
+                  </div>
+                  
+                  <div className="text-[9.5pt] font-black w-full text-center border-t border-black pt-[0.8mm] mt-[0.2mm]">
+                    PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Opciones de impresión */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cantidad de etiquetas
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="p-2 border border-gray-300 bg-white rounded-lg hover:bg-gray-50"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-20 text-center px-3 py-2 border border-gray-300 rounded-lg bg-white"
-              />
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="p-2 border border-gray-300 bg-white rounded-lg hover:bg-gray-50"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-gray-600 ml-2">
-                {quantity} {quantity === 1 ? 'etiqueta' : 'etiquetas'}
-              </span>
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg flex items-center justify-between">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Cantidad por etiqueta</label>
+              <div className="flex items-center gap-3 mt-1">
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-2 border bg-white rounded-lg hover:bg-gray-50"><ChevronLeft className="w-4 h-4" /></button>
+                <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} className="w-16 text-center py-2 border rounded-lg bg-white" />
+                <button onClick={() => setQuantity(quantity + 1)} className="p-2 border bg-white rounded-lg hover:bg-gray-50"><ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-gray-500 block mb-1">Impresora sugerida:</span>
+              <span className="text-sm font-semibold text-blue-600">Zebra TLP2844</span>
             </div>
           </div>
 
-          {/* Botones de acción */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-6">
-            <button
-              onClick={printBarcodes}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
-            >
-              <Printer className="w-4 h-4" />
-              Imprimir selección
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <button onClick={printBarcodes} className="flex flex-col items-center justify-center p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition">
+              <Printer className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">Imprimir Selección</span>
             </button>
-            <button
-              onClick={printAllVariants}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm"
-            >
-              <Printer className="w-4 h-4" />
-              Todas las variantes
+            <button onClick={printAllVariants} className="flex flex-col items-center justify-center p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition">
+              <Printer className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">Todas Variantes</span>
             </button>
-            <button
-              onClick={exportToExcel}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
-            >
-              <Download className="w-4 h-4" />
-              Excel
+            <button onClick={exportToExcel} className="flex flex-col items-center justify-center p-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition">
+              <Download className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">Excel</span>
             </button>
-            <button
-              onClick={exportToPDF}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
-            >
-              <Download className="w-4 h-4" />
-              PDF
+            <button onClick={exportToPDF} className="flex flex-col items-center justify-center p-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition">
+              <Download className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">PDF</span>
             </button>
-          </div>
-
-          {/* Lista de todas las variantes con miniaturas - MÁS COMPACTAS */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h3 className="font-medium text-gray-900 mb-4">Todas las variantes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {product.variants.map((variant: any) => (
-                <div key={variant.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  {/* Miniatura de la etiqueta - MÁS PEQUEÑA */}
-                  <div className="w-[90px] h-[60px] bg-white border border-gray-200 rounded p-1 flex-shrink-0">
-                    <div className="w-full h-full flex flex-col">
-                      <div className="text-[6px] text-gray-800 truncate font-bold">{product.name}</div>
-                      <div className="text-[5px] text-gray-500">{variant.size}/{variant.color}</div>
-                      <div className="flex-1 flex items-center justify-center">
-                        <ProductBarcode 
-                          value={variant.variantSku} 
-                          width={0.6}
-                          height={45}
-                          displayValue={false}
-                        />
-                      </div>
-                      <div className="text-[5px] text-gray-400 text-center truncate">
-                        {variant.variantSku}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Información de la variante */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">
-                          {variant.size} / {variant.color}
-                        </p>
-                        <p className="text-xs text-gray-500">Stock: {variant.stock}</p>
-                        <p className="text-xs text-gray-400 font-mono">{variant.variantSku}</p>
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(variant.variantSku, variant.id)}
-                        className="p-1.5 text-gray-600 hover:bg-white rounded-lg relative"
-                        title="Copiar SKU"
-                      >
-                        {copiedVariant === variant.id ? (
-                          <Check className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>
