@@ -60,15 +60,16 @@ export class ProductsService {
 
     // Si hay variantes, crearlas
     if (createProductDto.variants && createProductDto.variants.length > 0) {
+      const isOnlyVariant = createProductDto.variants.length === 1;
       for (const variant of createProductDto.variants) {
-        await this.createVariant(userId, product.id, variant);
+        await this.createVariant(userId, product.id, variant, isOnlyVariant);
       }
     }
 
     return this.findOne(product.id);
   }
 
-  async createVariant(userId: string, productId: string, createVariantDto: CreateVariantDto) {
+  async createVariant(userId: string, productId: string, createVariantDto: CreateVariantDto, isOnlyVariant = false) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
@@ -93,11 +94,15 @@ export class ProductsService {
     // Generar SKU único para la variante si no se proporciona uno manual
     let variantSku = createVariantDto.variantSku;
     if (!variantSku) {
-      variantSku = generateVariantSKU(
-        product.sku,
-        createVariantDto.size,
-        createVariantDto.color
-      );
+      if (isOnlyVariant) {
+        variantSku = product.sku;
+      } else {
+        variantSku = generateVariantSKU(
+          product.sku,
+          createVariantDto.size,
+          createVariantDto.color
+        );
+      }
     }
 
     const variant = await this.prisma.productVariant.create({
@@ -188,12 +193,15 @@ export class ProductsService {
 
     // Si el SKU cambió, actualizar todos los variantSku de sus variantes
     if (productData.sku && productData.sku !== product.sku) {
+      const isOnlyVariant = updatedProduct.variants.length === 1;
       for (const variant of updatedProduct.variants) {
-        const variantSku = generateVariantSKU(
-          productData.sku,
-          variant.size,
-          variant.color
-        );
+        const variantSku = isOnlyVariant 
+          ? productData.sku 
+          : generateVariantSKU(
+            productData.sku,
+            variant.size,
+            variant.color
+          );
         await this.prisma.productVariant.update({
           where: { id: variant.id },
           data: { variantSku },
@@ -222,11 +230,13 @@ export class ProductsService {
         } else {
           // Crear nueva variante
           const stockValue = variant.stock !== undefined ? variant.stock : variant.initialStock;
+          const isOnlyVariant = variants.length === 1;
           const newVariant = await this.createVariant(userId, id, {
             size: variant.size,
             color: variant.color,
+            variantSku: variant.variantSku,
             initialStock: stockValue || 0,
-          });
+          }, isOnlyVariant);
           if (newVariant.id) {
             variantIdsToKeep.push(newVariant.id);
           }
