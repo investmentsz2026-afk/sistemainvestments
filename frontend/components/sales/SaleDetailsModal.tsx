@@ -12,10 +12,12 @@ import {
     Building2,
     Hash,
     Loader2,
-    FileText
+    FileText,
+    ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
+import { toast } from 'react-hot-toast';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -34,6 +36,7 @@ interface SaleDetailsModalProps {
 export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetailsModalProps) {
     const [sale, setSale] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => {
         if (isOpen && saleId) {
@@ -50,6 +53,24 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             console.error('Error fetching sale details:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSendToSunat = async () => {
+        setIsSending(true);
+        try {
+            const resp = await api.post(`/sales/${saleId}/sunat`);
+            if (resp.data.success) {
+                toast.success('Documento enviado correctamente');
+                fetchSaleDetails();
+            } else {
+                toast.error(resp.data.message || 'Error al enviar a SUNAT');
+            }
+        } catch (error) {
+            console.error('Error sending to SUNAT:', error);
+            toast.error('Error de conexión con el servidor de SUNAT');
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -272,6 +293,42 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                 </p>
                                             )}
                                         </div>
+
+                                        {sale.invoiceNumber && (
+                                            <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className="w-8 h-8 bg-white rounded-xl shadow-sm flex items-center justify-center text-gray-400">
+                                                        <ShieldCheck className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Información SUNAT</span>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase">Estado</span>
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                                            sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600' : 
+                                                            sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                                                        }`}>{sale.sunatStatus || 'PENDIENTE'}</span>
+                                                    </div>
+                                                    
+                                                    {(!sale.sunatStatus || sale.sunatStatus === 'ERROR') && (
+                                                        <button 
+                                                            onClick={handleSendToSunat}
+                                                            disabled={isSending}
+                                                            className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-100"
+                                                        >
+                                                            {isSending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
+                                                        </button>
+                                                    )}
+
+                                                    {sale.sunatResponse && (
+                                                        <p className="text-[9px] text-gray-400 font-medium italic border-t border-gray-200 pt-2">
+                                                            {sale.sunatResponse}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* PRODUCTS TABLE */}

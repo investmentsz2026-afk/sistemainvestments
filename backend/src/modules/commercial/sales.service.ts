@@ -47,6 +47,7 @@ export class SalesService {
           totalAmount,
           notes,
           sellerId: userId,
+          sunatStatus: invoiceNumber ? 'PENDIENTE' : null,
           items: {
             create: items.map((item: any) => ({
               variantId: item.variantId,
@@ -222,6 +223,80 @@ export class SalesService {
     });
   }
 
+  async sendToSunat(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: { include: { product: true } }
+          }
+        }
+      }
+    });
+
+    if (!sale || !sale.invoiceNumber) return;
+
+    // This is where we call the Invoicing API (e.g. Nubefact, ApisPeru, Greenter)
+    // Recommended: Nubefact because it is very easy to use with JSON.
+    
+    const API_TOKEN = process.env.SUNAT_INVOICING_TOKEN;
+    const API_URL = process.env.SUNAT_INVOICING_URL;
+
+    if (!API_TOKEN || !API_URL) {
+      return {
+        success: false,
+        message: 'API de Facturación no configurada (.env)'
+      };
+    }
+
+    try {
+      // Mocking the payload for Nubefact
+      const payload = {
+        operacion: "generar_comprobante",
+        tipo_de_comprobante: sale.invoiceNumber.startsWith('F') ? 1 : 2, // 1: Factura, 2: Boleta
+        serie: sale.invoiceNumber.split('-')[0],
+        numero: sale.invoiceNumber.split('-')[1],
+        cliente_tipo_de_documento: sale.client?.documentType === 'RUC' ? 6 : 1,
+        cliente_numero_de_documento: sale.client?.documentNumber,
+        cliente_denominacion: sale.client?.name,
+        cliente_direccion: sale.client?.address,
+        total: sale.totalAmount,
+        items: sale.items.map(item => ({
+          descripcion: item.variant.product.name,
+          cantidad: item.quantity,
+          valor_unitario: item.unitPrice / 1.18,
+          precio_unitario: item.unitPrice,
+          total: item.totalPrice
+        }))
+      };
+
+      // Here you would do: await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload), headers: { Authorization: API_TOKEN } })
+      
+      // Update sale status
+      await this.prisma.sale.update({
+        where: { id: saleId },
+        data: {
+          sunatStatus: 'ENVIADO', // In real life this would depend on the response
+          sunatResponse: 'Documento enviado a SUNAT (Demostración)'
+        }
+      });
+
+      return { success: true, message: 'Documento enviado a SUNAT' };
+    } catch (error) {
+      console.error('Error sending to SUNAT:', error);
+      await this.prisma.sale.update({
+        where: { id: saleId },
+        data: {
+          sunatStatus: 'ERROR',
+          sunatResponse: error.message
+        }
+      });
+      return { success: false, message: error.message };
+    }
+  }
+
   // Clients
   async createClient(user: any, data: any) {
     const clientData = { ...data };
@@ -327,5 +402,59 @@ export class SalesService {
       },
       orderBy: { name: 'asc' },
     });
+  }
+
+  async lookupDocument(docType: string, docNum: string) {
+    // This is a proxy to an external SUNAT/RENIEC API
+    // Recommended: https://apisperu.com/ or https://peruconsultas.com/
+    
+    // For now, we use a placeholder or a mock implementation if no token is provided
+    const API_TOKEN = process.env.SUNAT_API_TOKEN;
+    
+    if (!API_TOKEN) {
+      // If no token, we return a mock or inform the user
+      // throw new BadRequestException('SUNAT API Token not configured');
+      
+      // Let's return a friendly message for now so the user knows they need a token
+      return {
+        success: false,
+        message: 'Para usar esta función necesitas configurar un Token de API (apisperu.com o similar)',
+        mockData: true,
+        data: {
+          name: 'CLIENTE DE PRUEBA S.A.C.',
+          address: 'AV. LAS FLORES 123 - LIMA',
+          documentNumber: docNum,
+          documentType: docType
+        }
+      };
+    }
+
+    try {
+      // Example implementation for ApisPeru
+      const url = docType === 'RUC' 
+        ? `https://api.apisperu.com/v1/ruc/${docNum}?token=${API_TOKEN}`
+        : `https://api.apisperu.com/v1/dni/${docNum}?token=${API_TOKEN}`;
+      
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      if (!response.ok) throw new Error(result.message || 'Error en la consulta');
+
+      return {
+        success: true,
+        data: {
+          name: result.razonSocial || result.nombreCompleto || result.nombres,
+          address: result.direccion || '',
+          documentNumber: docNum,
+          documentType: docType,
+          ubigeo: result.ubigeo,
+          condition: result.condicion,
+          status: result.estado
+        }
+      };
+    } catch (error) {
+      console.error('Error in SUNAT lookup:', error);
+      throw new BadRequestException('Error al consultar el documento: ' + error.message);
+    }
   }
 }

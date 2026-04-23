@@ -386,6 +386,11 @@ model Sale {
   sellerId        String     @map("seller_id")
   seller          User       @relation("UserSales", fields: [sellerId], references: [id])
   notes           String?    @db.Text
+  sunatStatus     String?    @map("sunat_status") // PENDIENTE, ENVIADO, ACEPTADO, RECHAZADO, ERROR
+  sunatResponse   String?    @map("sunat_response") @db.Text
+  sunatXmlUrl     String?    @map("sunat_xml_url")
+  sunatPdfUrl     String?    @map("sunat_pdf_url")
+  sunatCdrUrl     String?    @map("sunat_cdr_url")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 

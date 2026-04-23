@@ -25,7 +25,8 @@ import {
     Eye,
     ShoppingBag,
     ShieldCheck,
-    Calendar
+    Calendar,
+    Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
@@ -49,6 +50,7 @@ export default function ClientsPage() {
     const [clientSales, setClientSales] = useState<any[]>([]);
     const [isImporting, setIsImporting] = useState(false);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
 
     // New client form state
     const [newClient, setNewClient] = useState({
@@ -109,6 +111,38 @@ export default function ClientsPage() {
         } catch (error) {
             console.error('Error updating client:', error);
             toast.error('Error al actualizar cliente');
+        }
+    };
+
+    const handleLookup = async () => {
+        if (!newClient.documentNumber || newClient.documentNumber.length < 8) {
+            toast.error('Ingresa un número de documento válido');
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const resp = await api.get(`/sales/clients/lookup/${newClient.documentType}/${newClient.documentNumber}`);
+            if (resp.data.data) {
+                const { name, address } = resp.data.data;
+                setNewClient(prev => ({
+                    ...prev,
+                    name: name || '',
+                    address: address || ''
+                }));
+                if (resp.data.mockData) {
+                    toast.error(resp.data.message, { duration: 5000 });
+                } else {
+                    toast.success('Datos recuperados de SUNAT/RENIEC');
+                }
+            } else {
+                toast.error('No se encontraron datos para este documento');
+            }
+        } catch (error) {
+            console.error('Error in lookup:', error);
+            toast.error('Error al consultar el documento');
+        } finally {
+            setIsSearching(false);
         }
     };
 
@@ -421,12 +455,23 @@ export default function ClientsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número</label>
-                                        <input 
-                                            type="text" required
-                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
-                                            value={newClient.documentNumber}
-                                            onChange={(e) => setNewClient({ ...newClient, documentNumber: e.target.value })}
-                                        />
+                                        <div className="relative">
+                                            <input 
+                                                type="text" required
+                                                className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm pr-16"
+                                                value={newClient.documentNumber}
+                                                onChange={(e) => setNewClient({ ...newClient, documentNumber: e.target.value })}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleLookup}
+                                                disabled={isSearching}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:bg-indigo-700 transition disabled:opacity-50"
+                                                title="Consultar SUNAT/RENIEC"
+                                            >
+                                                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 

@@ -46,4 +46,14 @@ export class SalesController {
   finalizePayment(@Param('id') id: string) {
     return this.salesService.finalizePayment(id);
   }
+
+  @Get('clients/lookup/:docType/:docNum')
+  lookup(@Param('docType') docType: string, @Param('docNum') docNum: string) {
+    return this.salesService.lookupDocument(docType, docNum);
+  }
+
+  @Post(':id/sunat')
+  sendToSunat(@Param('id') id: string) {
+    return this.salesService.sendToSunat(id);
+  }
 }

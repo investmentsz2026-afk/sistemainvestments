@@ -367,6 +367,7 @@ export default function SalesPage() {
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
+                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">SUNAT</th>
                                     <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
@@ -427,6 +428,20 @@ export default function SalesPage() {
                                                 }`}>
                                                     {sale.paymentStatus || 'PENDIENTE'}
                                                 </span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                {sale.invoiceNumber ? (
+                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                                        sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600' :
+                                                        sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'
+                                                    }`}>
+                                                        {sale.sunatStatus || 'PENDIENTE'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                                                        N/A
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">
