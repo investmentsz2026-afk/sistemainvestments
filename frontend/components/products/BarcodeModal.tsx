@@ -64,9 +64,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     .barcode-label {
       width: 30.2mm;
       height: 40mm;
-      padding: 3mm 2mm;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       page-break-after: always;
@@ -74,28 +72,38 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       background: white;
       overflow: hidden;
     }
+    .label-inner {
+      width: 40mm;
+      height: 30.2mm;
+      transform: rotate(90deg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1mm 2mm;
+    }
     .barcode-label:last-child {
       page-break-after: auto;
     }
     .label-header {
       text-align: center;
       width: 100%;
-      line-height: 1.15;
+      line-height: 1.1;
     }
     .brand {
-      font-size: 5pt;
+      font-size: 6pt;
+      font-weight: 900;
+      margin-bottom: 0.2mm;
+    }
+    .category {
+      font-size: 6pt;
       font-weight: 900;
       margin-bottom: 0.3mm;
     }
-    .category {
-      font-size: 5pt;
-      font-weight: 900;
-      margin-bottom: 0.5mm;
-    }
     .model {
-      font-size: 7pt;
+      font-size: 8pt;
       font-weight: 900;
-      margin-bottom: 0.5mm;
+      margin-bottom: 0.3mm;
       line-height: 1.1;
       text-align: center;
       width: 100%;
@@ -104,23 +112,23 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-overflow: ellipsis;
     }
     .color-text {
-      font-size: 6pt;
+      font-size: 7pt;
       font-weight: 900;
-      margin-bottom: 1mm;
+      margin-bottom: 0.5mm;
     }
     .barcode-section {
       display: flex;
       align-items: center;
       justify-content: center;
       width: 100%;
-      margin-bottom: 1mm;
+      margin-bottom: 0.5mm;
     }
     .barcode-wrapper {
       display: flex;
       justify-content: center;
       flex-shrink: 1;
       overflow: hidden;
-      max-width: 22mm;
+      max-width: 32mm;
     }
     .barcode-svg {
       display: block;
@@ -128,19 +136,19 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       height: auto;
     }
     .size-text {
-      font-size: 12pt;
+      font-size: 16pt;
       font-weight: 900;
       line-height: 1;
-      margin-left: 1mm;
+      margin-left: 2mm;
       flex-shrink: 0;
     }
     .price-text {
-      font-size: 4pt;
+      font-size: 5pt;
       font-weight: 900;
       width: 100%;
       text-align: center;
       border-top: 0.3mm solid #000;
-      padding-top: 0.5mm;
+      padding-top: 0.3mm;
     }
     @media print {
       html, body {
@@ -165,19 +173,21 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
       return `
         <div class="barcode-label">
-          <div class="label-header">
-            <div class="brand">AMERICAN COLT</div>
-            <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
-            <div class="model">${modelDisplay}</div>
-            <div class="color-text">COLOR: ${variant.color}</div>
-          </div>
-          <div class="barcode-section">
-            <div class="barcode-wrapper">
-              <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
+          <div class="label-inner">
+            <div class="label-header">
+              <div class="brand">AMERICAN COLT</div>
+              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+              <div class="model">${modelDisplay}</div>
+              <div class="color-text">COLOR: ${variant.color}</div>
             </div>
-            ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
+            <div class="barcode-section">
+              <div class="barcode-wrapper">
+                <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
+              </div>
+              ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
+            </div>
+            ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
           </div>
-          ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
         </div>
       `;
     }).join('');
@@ -231,19 +241,21 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
         return `
           <div class="barcode-label">
-            <div class="label-header">
-              <div class="brand">AMERICAN COLT</div>
-              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
-              <div class="model">${modelDisplay}</div>
-              <div class="color-text">COLOR: ${variant.color}</div>
-            </div>
-            <div class="barcode-section">
-              <div class="barcode-wrapper">
-                <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+            <div class="label-inner">
+              <div class="label-header">
+                <div class="brand">AMERICAN COLT</div>
+                <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+                <div class="model">${modelDisplay}</div>
+                <div class="color-text">COLOR: ${variant.color}</div>
               </div>
-              ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
+              <div class="barcode-section">
+                <div class="barcode-wrapper">
+                  <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+                </div>
+                ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
+              </div>
+              ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
             </div>
-            ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
           </div>
         `;
       })
@@ -374,36 +386,38 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
             <div className="mb-8">
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
-                <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center uppercase p-[3mm] overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="text-center w-full">
-                    <div style={{ fontSize: '5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
-                    <div style={{ fontSize: '5pt' }} className="font-black text-slate-600 mt-[0.3mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
-                    <div style={{ fontSize: '7pt' }} className="font-black leading-tight mt-[0.5mm] overflow-hidden text-center whitespace-nowrap">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
-                    <div style={{ fontSize: '6pt' }} className="font-black text-slate-700 mt-[0.5mm]">COLOR: {selectedVariant.color}</div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center w-full my-[1mm]">
-                    <div className="flex justify-center overflow-hidden" style={{ maxWidth: '22mm' }}>
-                      <ProductBarcode 
-                        value={selectedVariant.variantSku} 
-                        width={1.0}
-                        height={28}
-                        displayValue={true}
-                        fontSize={7}
-                      />
+                <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+                  <div className="flex flex-col items-center justify-center p-[2mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                    <div className="text-center w-full">
+                      <div style={{ fontSize: '6pt' }} className="font-black leading-tight">AMERICAN COLT</div>
+                      <div style={{ fontSize: '6pt' }} className="font-black text-slate-600 mt-[0.2mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
+                      <div style={{ fontSize: '8pt' }} className="font-black leading-tight mt-[0.3mm] overflow-hidden text-center whitespace-nowrap">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
+                      <div style={{ fontSize: '7pt' }} className="font-black text-slate-700 mt-[0.5mm]">COLOR: {selectedVariant.color}</div>
                     </div>
-                    {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
-                      <div style={{ fontSize: '12pt' }} className="font-black leading-none ml-[1mm]">
-                        {selectedVariant.size}
+                    
+                    <div className="flex items-center justify-center w-full my-[0.5mm]">
+                      <div className="flex justify-center overflow-hidden" style={{ maxWidth: '32mm' }}>
+                        <ProductBarcode 
+                          value={selectedVariant.variantSku} 
+                          width={1.2}
+                          height={30}
+                          displayValue={true}
+                          fontSize={7}
+                        />
+                      </div>
+                      {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
+                        <div style={{ fontSize: '16pt' }} className="font-black leading-none ml-[2mm]">
+                          {selectedVariant.size}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {parseFloat(product.sellingPrice) > 0 && (
+                      <div style={{ fontSize: '5pt' }} className="font-black w-full text-center border-t border-black pt-[0.3mm]">
+                        PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
                       </div>
                     )}
                   </div>
-                  
-                  {parseFloat(product.sellingPrice) > 0 && (
-                    <div style={{ fontSize: '4pt' }} className="font-black w-full text-center border-t border-black pt-[0.5mm]">
-                      PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
