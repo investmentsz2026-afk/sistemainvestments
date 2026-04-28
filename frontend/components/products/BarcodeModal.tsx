@@ -51,15 +51,20 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       margin: 0;
       padding: 0;
       text-transform: uppercase;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      font-smoothing: none;
+      text-rendering: crispEdges;
     }
     html, body {
       width: 30.2mm;
       margin: 0;
       padding: 0;
       background: #fff;
+      color: #000;
     }
     body {
-      font-family: 'Arial Black', 'Arial', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
     }
     .barcode-label {
       width: 30.2mm;
@@ -81,6 +86,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       align-items: center;
       justify-content: center;
       padding: 1mm 2mm;
+      image-rendering: pixelated;
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -92,17 +98,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .brand {
       font-size: 6pt;
-      font-weight: 900;
+      font-weight: bold;
       margin-bottom: 0.2mm;
     }
     .category {
       font-size: 6pt;
-      font-weight: 900;
+      font-weight: bold;
       margin-bottom: 0.3mm;
     }
     .model {
       font-size: 8pt;
-      font-weight: 900;
+      font-weight: bold;
       margin-bottom: 0.3mm;
       line-height: 1.1;
       text-align: center;
@@ -113,7 +119,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .color-text {
       font-size: 7pt;
-      font-weight: 900;
+      font-weight: bold;
       margin-bottom: 0.5mm;
     }
     .barcode-section {
@@ -134,26 +140,29 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       display: block;
       max-width: 100%;
       height: auto;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
     }
     .size-text {
       font-size: 16pt;
-      font-weight: 900;
+      font-weight: bold;
       line-height: 1;
       margin-left: 2mm;
       flex-shrink: 0;
     }
     .price-text {
       font-size: 5pt;
-      font-weight: 900;
+      font-weight: bold;
       width: 100%;
       text-align: center;
-      border-top: 0.3mm solid #000;
+      border-top: 0.4mm solid #000;
       padding-top: 0.3mm;
     }
     @media print {
       html, body {
         width: 30.2mm;
         -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
       .barcode-label {
         border: none;
