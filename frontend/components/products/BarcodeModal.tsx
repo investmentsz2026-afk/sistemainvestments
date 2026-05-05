@@ -42,7 +42,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 95mm 40mm;
+      size: 30.2mm 40mm;
       margin: 0;
       padding: 0;
     }
@@ -57,7 +57,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-rendering: crispEdges;
     }
     html, body {
-      width: 95mm;
+      width: 30.2mm;
       margin: 0;
       padding: 0;
       background: #fff;
@@ -66,21 +66,16 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     body {
       font-family: Arial, Helvetica, sans-serif;
     }
-    .labels-container {
-      display: flex;
-      flex-wrap: wrap;
-      width: 95mm;
-      background: white;
-    }
     .barcode-label {
-      width: 31.6mm; /* 95mm / 3 labels */
+      width: 30.2mm;
       height: 40mm;
       display: flex;
       align-items: center;
       justify-content: center;
+      page-break-after: always;
+      page-break-inside: avoid;
       background: white;
       overflow: hidden;
-      page-break-inside: avoid;
     }
     .label-inner {
       width: 40mm;
@@ -174,7 +169,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     @media print {
       html, body {
-        width: 95mm;
+        width: 30.2mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -223,21 +218,19 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <style>${commonStyles}</style>
         </head>
         <body>
-          <div class="labels-container">
-            ${items}
-          </div>
+          ${items}
           <script>
             setTimeout(() => {
               document.querySelectorAll('.barcode-svg').forEach((el, index) => {
                 try {
-                    JsBarcode(el, "${selectedVariant.variantSku}", {
+                   JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 1.2,
-                    height: 40,
+                    width: 1.3,
+                    height: 22,
                     displayValue: true,
-                    fontSize: 10,
+                    fontSize: 9,
                     margin: 0,
-                    textMargin: 1,
+                    textMargin: 0,
                     lineColor: "#000000"
                   });
                 } catch (e) {
@@ -294,9 +287,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <style>${commonStyles}</style>
         </head>
         <body>
-          <div class="labels-container">
-            ${items}
-          </div>
+          ${items}
           <script>
             setTimeout(() => {
               const variants = ${JSON.stringify(product.variants)};
@@ -304,14 +295,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 try {
                   const variantId = el.id.split('-')[1];
                   const variant = variants.find(v => v.id === variantId);
-                    JsBarcode(el, variant.variantSku, {
+                   JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 1.2,
-                    height: 40,
+                    width: 1.3,
+                    height: 22,
                     displayValue: true,
-                    fontSize: 10,
+                    fontSize: 9,
                     margin: 0,
-                    textMargin: 1,
+                    textMargin: 0,
                     lineColor: "#000000"
                   });
                 } catch (e) {
@@ -425,10 +416,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                       <div className="flex justify-center overflow-hidden" style={{ maxWidth: '32mm' }}>
                         <ProductBarcode
                           value={selectedVariant.variantSku}
-                          width={1.3}
-                          height={30}
+                          width={1.2}
+                          height={22}
                           displayValue={true}
-                          fontSize={8}
+                          fontSize={9}
                         />
                       </div>
                       {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
