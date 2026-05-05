@@ -54,7 +54,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       -webkit-font-smoothing: none;
       -moz-osx-font-smoothing: grayscale;
       font-smoothing: none;
-      text-rendering: crispEdges;
+      text-rendering: geometricPrecision;
+      -webkit-text-stroke: 0.3px #000;
     }
     html, body {
       width: 30.2mm;
@@ -86,7 +87,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       align-items: center;
       justify-content: center;
       padding: 0.2mm 1mm;
-      image-rendering: pixelated;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      filter: contrast(1.5);
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -154,8 +157,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       display: block;
       max-width: 100%;
       height: auto;
+      image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
-      image-rendering: pixelated;
+      shape-rendering: crispEdges;
     }
     .size-text {
       font-size: 18pt;
