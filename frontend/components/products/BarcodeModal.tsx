@@ -137,10 +137,18 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .barcode-wrapper {
       display: flex;
+      flex-direction: column;
+      align-items: center;
       justify-content: center;
       flex-shrink: 1;
-      overflow: hidden;
       max-width: 32mm;
+    }
+    .sku-text {
+      font-size: 8pt;
+      font-weight: bold;
+      margin-top: 0.2mm;
+      text-align: center;
+      width: 100%;
     }
     .barcode-svg {
       display: block;
@@ -201,6 +209,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
             <div class="barcode-section">
               <div class="barcode-wrapper">
                 <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
+                <div class="sku-text">${variant.variantSku}</div>
               </div>
               ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
             </div>
@@ -226,11 +235,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
                     width: 1.3,
-                    height: 22,
-                    displayValue: true,
-                    fontSize: 9,
+                    height: 16,
+                    displayValue: false,
                     margin: 0,
-                    textMargin: 0,
                     lineColor: "#000000"
                   });
                 } catch (e) {
@@ -269,6 +276,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <div class="barcode-section">
                 <div class="barcode-wrapper">
                   <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+                  <div class="sku-text">${variant.variantSku}</div>
                 </div>
                 ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
               </div>
@@ -298,11 +306,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
                     width: 1.3,
-                    height: 22,
-                    displayValue: true,
-                    fontSize: 9,
+                    height: 16,
+                    displayValue: false,
                     margin: 0,
-                    textMargin: 0,
                     lineColor: "#000000"
                   });
                 } catch (e) {
