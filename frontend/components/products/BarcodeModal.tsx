@@ -54,8 +54,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       -webkit-font-smoothing: none;
       -moz-osx-font-smoothing: grayscale;
       font-smoothing: none;
-      text-rendering: geometricPrecision;
-      -webkit-text-stroke: 0.3px #000;
+      text-rendering: crispEdges;
     }
     html, body {
       width: 30.2mm;
@@ -87,9 +86,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       align-items: center;
       justify-content: center;
       padding: 0.2mm 1mm;
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
-      filter: contrast(1.5);
+      image-rendering: pixelated;
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -101,7 +98,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .brand {
       font-size: 4.5pt;
-      font-family: 'Arial Black', sans-serif;
+      font-family: Arial, sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
@@ -114,7 +111,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .model {
       font-size: 5.5pt;
-      font-family: 'Arial Black', sans-serif;
+      font-family: Arial, sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
       line-height: 1.0;
@@ -157,13 +154,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       display: block;
       max-width: 100%;
       height: auto;
-      image-rendering: -webkit-optimize-contrast;
       image-rendering: crisp-edges;
-      shape-rendering: crispEdges;
+      image-rendering: pixelated;
     }
     .size-text {
       font-size: 18pt;
-      font-family: 'Arial Black', sans-serif;
+      font-family: Arial, sans-serif;
       font-weight: 900;
       line-height: 1;
       margin-left: 2mm;
@@ -171,7 +167,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .price-text {
       font-size: 4pt;
-      font-family: 'Arial Black', sans-serif;
+      font-family: Arial, sans-serif;
       font-weight: 900;
       width: 100%;
       text-align: center;
