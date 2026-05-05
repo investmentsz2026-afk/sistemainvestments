@@ -85,7 +85,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.5mm 2mm;
+      padding: 0.2mm 1mm;
       image-rendering: pixelated;
     }
     .barcode-label:last-child {
@@ -97,20 +97,20 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       line-height: 1.1;
     }
     .brand {
-      font-size: 5.5pt;
+      font-size: 4.5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
     }
     .category {
-      font-size: 5.5pt;
+      font-size: 4.5pt;
       font-weight: bold;
-      margin-bottom: 0.2mm;
+      margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
     }
     .model {
-      font-size: 6.5pt;
+      font-size: 5.5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
@@ -123,9 +123,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       letter-spacing: 0.1mm;
     }
     .color-text {
-      font-size: 6.5pt;
+      font-size: 5pt;
       font-weight: bold;
-      margin-bottom: 0.3mm;
+      margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
     }
     .barcode-section {
@@ -144,7 +144,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       max-width: 32mm;
     }
     .sku-text {
-      font-size: 6.5pt;
+      font-size: 5pt;
       font-weight: bold;
       margin-top: 0.1mm;
       text-align: center;
@@ -166,13 +166,13 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       flex-shrink: 0;
     }
     .price-text {
-      font-size: 6pt;
+      font-size: 4pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       width: 100%;
       text-align: center;
-      border-top: 0.5mm solid #000;
-      padding-top: 0.3mm;
+      border-top: 0.4mm solid #000;
+      padding-top: 0.2mm;
       letter-spacing: 0.1mm;
     }
     @media print {
@@ -412,22 +412,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
                   <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
                     <div className="text-center w-full">
-                      <div style={{ fontSize: '5.5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
-                      <div style={{ fontSize: '5.5pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
-                      <div style={{ fontSize: '6.5pt' }} className="font-black leading-tight mt-[0.1mm] text-center">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
-                      <div style={{ fontSize: '6pt' }} className="font-black text-slate-700 mt-[0.2mm]">COLOR: {selectedVariant.color}</div>
+                      <div style={{ fontSize: '4.5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
+                      <div style={{ fontSize: '4.5pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
+                      <div style={{ fontSize: '5.5pt' }} className="font-black leading-tight mt-[0.1mm] text-center">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
+                      <div style={{ fontSize: '5pt' }} className="font-black text-slate-700 mt-[0.2mm]">COLOR: {selectedVariant.color}</div>
                     </div>
-
-                    <div className="flex items-center justify-center w-full my-[0.3mm]">
-                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '32mm' }}>
-                        <ProductBarcode
-                          value={selectedVariant.variantSku}
+                    
+                    <div className="flex items-center justify-center w-full my-[0.2mm]">
+                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
+                        <ProductBarcode 
+                          value={selectedVariant.variantSku} 
                           width={1.2}
                           height={45}
                           displayValue={false}
-                          fontSize={6.5}
+                          fontSize={5}
                         />
-                        <div style={{ fontSize: '6.5pt' }} className="font-bold mt-[0.1mm]">{selectedVariant.variantSku}</div>
+                        <div style={{ fontSize: '5pt' }} className="font-bold mt-[0.1mm]">{selectedVariant.variantSku}</div>
                       </div>
                       {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
                         <div style={{ fontSize: '16pt' }} className="font-black leading-none ml-[2mm]">
@@ -435,9 +435,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                         </div>
                       )}
                     </div>
-
+                    
                     {parseFloat(product.sellingPrice) > 0 && (
-                      <div style={{ fontSize: '6pt' }} className="font-black w-full text-center border-t-2 border-black pt-[0.3mm]">
+                      <div style={{ fontSize: '4pt' }} className="font-black w-full text-center border-t-2 border-black pt-[0.2mm]">
                         PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
                       </div>
                     )}
