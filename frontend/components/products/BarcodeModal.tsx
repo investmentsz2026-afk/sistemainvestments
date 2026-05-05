@@ -42,7 +42,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 30.2mm 40mm;
+      size: 94mm 40mm;
       margin: 0;
       padding: 0;
     }
@@ -57,7 +57,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-rendering: crispEdges;
     }
     html, body {
-      width: 30.2mm;
+      width: 94mm;
       margin: 0;
       padding: 0;
       background: #fff;
@@ -66,16 +66,28 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     body {
       font-family: Arial, Helvetica, sans-serif;
     }
+    .labels-row {
+      display: flex;
+      width: 94mm;
+      height: 40mm;
+      page-break-after: always;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 1.5mm; /* Espacio entre columnas */
+      padding-left: 0.5mm;
+    }
+    .labels-row:last-child {
+      page-break-after: auto;
+    }
     .barcode-label {
       width: 30.2mm;
       height: 40mm;
       display: flex;
       align-items: center;
       justify-content: center;
-      page-break-after: always;
-      page-break-inside: avoid;
       background: white;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .label-inner {
       width: 40mm;
@@ -87,9 +99,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       justify-content: center;
       padding: 1mm 2mm;
       image-rendering: pixelated;
-    }
-    .barcode-label:last-child {
-      page-break-after: auto;
     }
     .label-header {
       text-align: center;
@@ -169,12 +178,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     @media print {
       html, body {
-        width: 30.2mm;
+        width: 94mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-      }
-      .barcode-label {
-        border: none;
       }
     }
   `;
@@ -183,7 +189,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    const allLabels = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -208,7 +214,18 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    // Agrupar en filas de 3
+    const rows: string[] = [];
+    for (let i = 0; i < allLabels.length; i += 3) {
+      rows.push(`
+        <div class="labels-row">
+          ${allLabels.slice(i, i + 3).join('')}
+        </div>
+      `);
+    }
+    const items = rows.join('');
 
     printWindow.document.write(`
       <html>
@@ -228,10 +245,11 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     width: 1.3,
                     height: 30,
                     displayValue: true,
-                    fontSize: 8,
+                    fontSize: 10,
                     margin: 0,
-                    textMargin: 1,
-                    lineColor: "#000000"
+                    textMargin: 3,
+                    lineColor: "#000000",
+                    font: "Arial"
                   });
                 } catch (e) {
                   console.error('Error generating barcode:', e);
@@ -251,7 +269,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = product.variants.flatMap((variant: any) => 
+    const allLabels = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -277,7 +295,18 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    ).join('');
+    );
+
+    // Agrupar en filas de 3
+    const rows: string[] = [];
+    for (let i = 0; i < allLabels.length; i += 3) {
+      rows.push(`
+        <div class="labels-row">
+          ${allLabels.slice(i, i + 3).join('')}
+        </div>
+      `);
+    }
+    const items = rows.join('');
 
     printWindow.document.write(`
       <html>
@@ -300,10 +329,11 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     width: 1.3,
                     height: 30,
                     displayValue: true,
-                    fontSize: 8,
+                    fontSize: 10,
                     margin: 0,
-                    textMargin: 1,
-                    lineColor: "#000000"
+                    textMargin: 3,
+                    lineColor: "#000000",
+                    font: "Arial"
                   });
                 } catch (e) {
                   console.error('Error generating barcode:', e);
@@ -387,11 +417,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 <button
                   key={variant.id}
                   onClick={() => setSelectedVariant(variant)}
-                  className={`p-3 border rounded-lg text-left transition ${
-                    selectedVariant?.id === variant.id
-                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                      : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
-                  }`}
+                  className={`p-3 border rounded-lg text-left transition ${selectedVariant?.id === variant.id
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                    : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
+                    }`}
                 >
                   <p className="font-medium text-gray-900">{variant.size}</p>
                   <p className="text-sm text-gray-600">{variant.color}</p>
@@ -412,11 +441,11 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                       <div style={{ fontSize: '9pt' }} className="font-black leading-tight mt-[0.3mm] overflow-hidden text-center whitespace-nowrap">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
                       <div style={{ fontSize: '8pt' }} className="font-black text-slate-700 mt-[0.5mm]">COLOR: {selectedVariant.color}</div>
                     </div>
-                    
+
                     <div className="flex items-center justify-center w-full my-[0.5mm]">
                       <div className="flex justify-center overflow-hidden" style={{ maxWidth: '32mm' }}>
-                        <ProductBarcode 
-                          value={selectedVariant.variantSku} 
+                        <ProductBarcode
+                          value={selectedVariant.variantSku}
                           width={1.3}
                           height={30}
                           displayValue={true}
@@ -429,7 +458,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                         </div>
                       )}
                     </div>
-                    
+
                     {parseFloat(product.sellingPrice) > 0 && (
                       <div style={{ fontSize: '6pt' }} className="font-black w-full text-center border-t-2 border-black pt-[0.3mm]">
                         PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
