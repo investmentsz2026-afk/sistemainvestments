@@ -55,6 +55,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       -moz-osx-font-smoothing: grayscale;
       font-smoothing: none;
       text-rendering: crispEdges;
+      color: #000 !important;
     }
     html, body {
       width: 30.2mm;
@@ -98,20 +99,23 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .brand {
       font-size: 4.5pt;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
+      text-shadow: 0.05mm 0 0 #000;
     }
     .category {
       font-size: 4.5pt;
-      font-weight: bold;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
+      text-shadow: 0.05mm 0 0 #000;
     }
     .model {
       font-size: 5.5pt;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
       line-height: 1.0;
@@ -121,12 +125,15 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       white-space: normal;
       word-break: break-word;
       letter-spacing: 0.1mm;
+      text-shadow: 0.05mm 0 0 #000;
     }
     .color-text {
       font-size: 5pt;
-      font-weight: bold;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
       margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
+      text-shadow: 0.05mm 0 0 #000;
     }
     .barcode-section {
       display: flex;
@@ -145,10 +152,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .sku-text {
       font-size: 5pt;
-      font-weight: bold;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
       margin-top: 0.1mm;
       text-align: center;
       width: 100%;
+      text-shadow: 0.05mm 0 0 #000;
     }
     .barcode-svg {
       display: block;
@@ -159,21 +168,23 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     .size-text {
       font-size: 18pt;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       line-height: 1;
       margin-left: 2mm;
       flex-shrink: 0;
+      text-shadow: 0.1mm 0 0 #000;
     }
     .price-text {
       font-size: 4pt;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       width: 100%;
       text-align: center;
       border-top: 0.4mm solid #000;
       padding-top: 0.2mm;
       letter-spacing: 0.1mm;
+      text-shadow: 0.05mm 0 0 #000;
     }
     @media print {
       html, body {
