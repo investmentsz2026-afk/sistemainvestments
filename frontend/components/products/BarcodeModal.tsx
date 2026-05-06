@@ -87,7 +87,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       align-items: center;
       justify-content: center;
       padding: 0.2mm 1mm;
-      image-rendering: pixelated;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -103,6 +104,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
     }
     .category {
       font-size: 4.5pt;
@@ -110,6 +112,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       font-weight: 900;
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
     }
     .model {
       font-size: 5.5pt;
@@ -123,6 +126,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       white-space: normal;
       word-break: break-word;
       letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
     }
     .color-text {
       font-size: 5pt;
@@ -130,6 +134,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       font-weight: 900;
       margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
     }
     .barcode-section {
       display: flex;
@@ -153,6 +158,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       margin-top: 0.1mm;
       text-align: center;
       width: 100%;
+      -webkit-text-stroke: 0.05pt #000;
     }
     .barcode-svg {
       display: block;
@@ -178,6 +184,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       border-top: 0.4mm solid #000;
       padding-top: 0.2mm;
       letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
     }
     @media print {
       html, body {
@@ -238,7 +245,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 try {
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 2.0,
+                    width: 1.88,
                     height: 50,
                     displayValue: false,
                     margin: 0,
@@ -309,7 +316,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                   const variant = variants.find(v => v.id === variantId);
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 2.0,
+                    width: 1.88,
                     height: 50,
                     displayValue: false,
                     margin: 0,
@@ -426,7 +433,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                       <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
-                          width={2.0}
+                          width={1.88}
                           height={50}
                           displayValue={false}
                           fontSize={5}
