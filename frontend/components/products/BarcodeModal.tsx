@@ -42,7 +42,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 30.2mm 40mm;
       margin: 0;
       padding: 0;
     }
@@ -66,22 +65,26 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
-      width: 96mm; /* Ajuste para 3 etiquetas de 30.2mm + pequeños gaps */
+      width: 100mm; /* Ancho total para 3 columnas de 30.2mm */
       margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      gap: 1.5mm; /* Gap entre etiquetas para coincidir con el rollo */
+      padding: 0;
+      display: block; /* Volvemos a block + float para mayor compatibilidad en impresión */
     }
     .barcode-label {
       width: 30.2mm;
       height: 40mm;
+      float: left;
       display: flex;
       align-items: center;
       justify-content: center;
       page-break-inside: avoid;
       background: white;
       overflow: hidden;
+      margin-right: 2mm; /* Espacio entre columnas */
+      margin-bottom: 0;
+    }
+    .barcode-label:nth-child(3n) {
+      margin-right: 0; /* No hay margen en la tercera columna */
     }
     .label-inner {
       width: 40mm;
@@ -419,22 +422,44 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         </div>
 
         <div className="p-6">
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Variante</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {product.variants.map((variant: any) => (
-                <button
-                  key={variant.id}
-                  onClick={() => setSelectedVariant(variant)}
-                  className={`p-3 border rounded-lg text-left transition ${selectedVariant?.id === variant.id
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                    : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
-                    }`}
-                >
-                  <p className="font-medium text-gray-900">{variant.size}</p>
-                  <p className="text-sm text-gray-600">{variant.color}</p>
-                </button>
-              ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 font-black uppercase tracking-widest text-[10px]">1. Seleccionar Variante</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {product.variants.map((variant: any) => (
+                  <button
+                    key={variant.id}
+                    onClick={() => setSelectedVariant(variant)}
+                    className={`p-3 border rounded-xl text-left transition ${selectedVariant?.id === variant.id
+                      ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-100 shadow-sm'
+                      : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50'
+                      }`}
+                  >
+                    <p className="font-black text-gray-900 text-xs">{variant.size}</p>
+                    <p className="text-[10px] text-gray-500 font-bold">{variant.color}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 font-black uppercase tracking-widest text-[10px]">2. Cantidad de Etiquetas</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none font-bold text-lg"
+                />
+                <div className="bg-blue-50 text-blue-600 p-3 rounded-xl">
+                  <Printer className="w-6 h-6" />
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-tighter italic">
+                * El rollo tiene 3 etiquetas por fila. Para llenar una fila completa pon cantidad: 3
+              </p>
             </div>
           </div>
 
