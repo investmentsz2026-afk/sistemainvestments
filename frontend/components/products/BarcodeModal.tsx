@@ -66,9 +66,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
+      width: 96mm; /* Ajuste para 3 etiquetas de 30.2mm + pequeños gaps */
+      margin: 0;
       display: flex;
       flex-wrap: wrap;
-      align-content: flex-start;
+      justify-content: flex-start;
+      gap: 1.5mm; /* Gap entre etiquetas para coincidir con el rollo */
     }
     .barcode-label {
       width: 30.2mm;
