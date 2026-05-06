@@ -88,6 +88,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       justify-content: center;
       padding: 0.2mm 1mm;
       image-rendering: pixelated;
+      image-rendering: -webkit-optimize-contrast;
+      filter: contrast(1.5) brightness(1.05);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -239,7 +243,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
                     width: 2.0,
-                    height: 50,
+                    height: 60,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -310,7 +314,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
                     width: 2.0,
-                    height: 50,
+                    height: 60,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -427,7 +431,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
                           width={2.0}
-                          height={50}
+                          height={60}
                           displayValue={false}
                           fontSize={5}
                         />

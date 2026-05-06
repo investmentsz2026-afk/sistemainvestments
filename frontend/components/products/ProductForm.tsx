@@ -135,8 +135,44 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const inputNormal = "border-gray-200";
   const labelClass = "flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2";
 
+  const handleFormSubmit = (data: ProductFormData) => {
+    // Lógica de autogeneración de SKU basada en OP
+    const isOpType = ['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(data.inventoryType);
+    
+    if (isOpType && data.op) {
+      const opDigits = data.op.replace(/\D/g, '');
+      
+      // Generar SKU principal si está vacío
+      if (!data.sku || data.sku.trim() === '') {
+        const neededRandom = Math.max(0, 12 - opDigits.length);
+        let randomPart = '';
+        for (let i = 0; i < neededRandom; i++) {
+          randomPart += Math.floor(Math.random() * 10).toString();
+        }
+        data.sku = (randomPart + opDigits).slice(-12);
+      }
+
+      // Generar SKUs para variantes si están vacíos
+      if (data.variants && Array.isArray(data.variants)) {
+        data.variants = data.variants.map((v: any) => {
+          if (!v.variantSku || v.variantSku.trim() === '') {
+            const neededRandomVar = Math.max(0, 12 - opDigits.length);
+            let randomPartVar = '';
+            for (let i = 0; i < neededRandomVar; i++) {
+              randomPartVar += Math.floor(Math.random() * 10).toString();
+            }
+            return { ...v, variantSku: (randomPartVar + opDigits).slice(-12) };
+          }
+          return v;
+        });
+      }
+    }
+
+    onSubmit(data);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* ── Información Básica ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
