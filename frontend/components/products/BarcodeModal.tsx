@@ -42,7 +42,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 96mm 40mm;
+      size: 30.2mm 40mm;
       margin: 0;
       padding: 0;
     }
@@ -66,12 +66,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
-      width: 96mm; /* Ajuste para 3 etiquetas de 30.2mm + pequeños gaps */
+      width: 96mm;
       margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      gap: 1.5mm; /* Gap entre etiquetas para coincidir con el rollo */
+      display: grid;
+      grid-template-columns: repeat(3, 30.2mm);
+      grid-auto-rows: 40mm;
+      gap: 1.5mm;
     }
     .barcode-label {
       width: 30.2mm;
@@ -79,6 +79,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       display: flex;
       align-items: center;
       justify-content: center;
+      break-inside: avoid;
       page-break-inside: avoid;
       background: white;
       overflow: hidden;
@@ -210,7 +211,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     @media print {
       html, body {
-        width: 30.2mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
