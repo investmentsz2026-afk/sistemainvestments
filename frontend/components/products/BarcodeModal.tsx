@@ -71,23 +71,20 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     .barcode-label {
       width: 33.3mm;
       height: 40mm;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      display: inline-block;
+      float: left;
       page-break-inside: avoid;
       background: white;
       overflow: hidden;
-      float: left;
     }
     .label-inner {
-      width: 40mm;
-      height: 30.2mm;
-      transform: rotate(90deg);
+      width: 100%;
+      height: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.2mm 1mm;
+      padding: 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -183,12 +180,13 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       image-rendering: crisp-edges;
     }
     .size-text {
-      font-size: 18pt;
+      font-size: 24pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       line-height: 1;
       margin-left: 2mm;
       flex-shrink: 0;
+      -webkit-text-stroke: 0.1pt #000;
     }
     .price-text {
       font-size: 4pt;
@@ -438,8 +436,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
             <div className="mb-8">
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
-                <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                <div className="w-[125px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '100%', height: '100%' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '4.5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '4.5pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
