@@ -105,6 +105,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     .category {
       font-size: 4.5pt;
@@ -113,6 +116,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       margin-bottom: 0.1mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     .model {
       font-size: 5.5pt;
@@ -127,6 +133,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       word-break: break-word;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     .color-text {
       font-size: 5pt;
@@ -135,6 +144,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     .barcode-section {
       display: flex;
@@ -159,13 +171,15 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-align: center;
       width: 100%;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     .barcode-svg {
       display: block;
       max-width: 100%;
       height: auto;
       image-rendering: crisp-edges;
-      image-rendering: pixelated;
     }
     .size-text {
       font-size: 18pt;
@@ -185,6 +199,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       padding-top: 0.2mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
     }
     @media print {
       html, body {
