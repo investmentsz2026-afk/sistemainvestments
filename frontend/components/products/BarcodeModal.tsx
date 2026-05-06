@@ -41,225 +41,147 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
   };
 
   const commonStyles = `
-    @page {
-      size: 30.2mm 40mm;
-      margin: 0;
-      padding: 0;
-    }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      text-transform: uppercase;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      font-smoothing: none;
-      text-rendering: crispEdges;
-      color: #000 !important;
-    }
-    html, body {
-      width: 30.2mm;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      color: #000;
-    }
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    .barcode-label {
-      width: 30.2mm;
-      height: 40mm;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      page-break-after: always;
-      page-break-inside: avoid;
-      background: white;
-      overflow: hidden;
-    }
-    .label-inner {
-      width: 320px;
-      height: 242px;
-      transform: rotate(90deg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 10px;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      -webkit-font-smoothing: none;
-    }
-    .barcode-label:last-child {
-      page-break-after: auto;
-    }
-    .label-header {
-      text-align: center;
-      width: 100%;
-      line-height: 1.1;
-    }
-    .brand {
-      font-size: 10px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      margin-bottom: 1px;
-      letter-spacing: 1px;
-    }
-    .category {
-      font-size: 10px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      margin-bottom: 2px;
-      letter-spacing: 1px;
-    }
-    .model {
-      font-size: 13px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      margin-bottom: 2px;
-      line-height: 1.1;
-      text-align: center;
-      width: 100%;
-      overflow: hidden;
-      white-space: normal;
-      word-break: break-word;
-      letter-spacing: 0.5px;
-    }
-    .color-text {
-      font-size: 11px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      margin-bottom: 3px;
-      letter-spacing: 0.5px;
-    }
-    .barcode-section {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      margin-bottom: 0.5mm;
-    }
-    .barcode-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 1;
-      max-width: 32mm;
-    }
-    .sku-text {
-      font-size: 10px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      margin-top: 2px;
-      text-align: center;
-      width: 100%;
-    }
-    .barcode-svg {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      image-rendering: crisp-edges;
-      image-rendering: pixelated;
-      shape-rendering: crispEdges;
-    }
-    .size-text {
-      font-size: 38px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      line-height: 1;
-      margin-left: 8px;
-      flex-shrink: 0;
-    }
-    .price-text {
-      font-size: 9px;
-      font-family: 'Arial Black', sans-serif;
-      font-weight: 900;
-      width: 100%;
-      text-align: center;
-      border-top: 1px solid #000;
-      padding-top: 4px;
-      letter-spacing: 0.5px;
-    }
-    @media print {
-      html, body {
-        width: 30.2mm;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .barcode-label {
-        border: none;
-      }
-    }
-  `;
+  @page {
+    size: 40mm 30.2mm;
+    margin: 0;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    text-transform: uppercase;
+    color: #000 !important;
+  }
+
+  html, body {
+    width: 40mm;
+    height: 30.2mm;
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .barcode-label {
+    width: 40mm;
+    height: 30.2mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 1mm;
+    page-break-after: always;
+  }
+
+  .label-header {
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  .brand, .category {
+    font-size: 7pt;
+    font-weight: bold;
+  }
+
+  .model {
+    font-size: 8pt;
+    font-weight: bold;
+  }
+
+  .color-text {
+    font-size: 7pt;
+    font-weight: bold;
+  }
+
+  .barcode-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .barcode-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sku-text {
+    font-size: 7pt;
+    font-weight: bold;
+  }
+
+  .size-text {
+    font-size: 16pt;
+    font-weight: bold;
+  }
+
+  .price-text {
+    font-size: 7pt;
+    text-align: center;
+    border-top: 1px solid #000;
+    padding-top: 1mm;
+    font-weight: bold;
+  }
+`;
 
   const printBarcodes = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
-      const variant = selectedVariant;
-      const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
-      const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
-      const hasPrice = parseFloat(product.sellingPrice) > 0;
+  const items = Array(quantity).fill(0).map(() => {
+    const variant = selectedVariant;
 
-      return `
-        <div class="barcode-label">
-          <div class="label-inner">
-            <div class="label-header">
-              <div class="brand">AMERICAN COLT</div>
-              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
-              <div class="model">${modelDisplay}</div>
-              <div class="color-text">COLOR: ${variant.color}</div>
-            </div>
-            <div class="barcode-section">
-              <div class="barcode-wrapper">
-                <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
-                <div class="sku-text">${variant.variantSku}</div>
-              </div>
-              ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
-            </div>
-            ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
-          </div>
+    return `
+      <div class="barcode-label">
+        <div class="label-header">
+          <div class="brand">AMERICAN COLT</div>
+          <div class="category">${product.category || 'PANTALON'}</div>
+          <div class="model">${product.name}</div>
+          <div class="color-text">COLOR: ${variant.color}</div>
         </div>
-      `;
-    }).join('');
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Etiquetas - ${product.name}</title>
-          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${commonStyles}</style>
-        </head>
-        <body>
-          ${items}
-          <script>
-            setTimeout(() => {
-              document.querySelectorAll('.barcode-svg').forEach((el, index) => {
-                try {
-                   JsBarcode(el, "${selectedVariant.variantSku}", {
-                    format: "CODE128",
-                    width: 1.5,
-                    height: 80,
-                    displayValue: false,
-                    margin: 0,
-                    lineColor: "#000000"
-                  });
-                } catch (e) {
-                  console.error('Error generating barcode:', e);
-                }
+        <div class="barcode-section">
+          <div class="barcode-wrapper">
+            <svg class="barcode-svg"></svg>
+            <div class="sku-text">${variant.variantSku}</div>
+          </div>
+          <div class="size-text">${variant.size}</div>
+        </div>
+
+        <div class="price-text">
+          PRECIO SUG: S/. ${parseFloat(product.sellingPrice).toFixed(2)}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+        <style>${commonStyles}</style>
+      </head>
+      <body>
+        ${items}
+        <script>
+          window.onload = () => {
+            document.querySelectorAll('.barcode-svg').forEach(el => {
+              JsBarcode(el, "${selectedVariant.variantSku}", {
+                format: "CODE128",
+                width: 1.2,
+                height: 40,
+                displayValue: false,
+                margin: 0
               });
-              window.print();
-              window.close();
-            }, 500);
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+            });
+            window.print();
+            window.close();
+          }
+        </script>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+};
 
   const printAllVariants = () => {
     const printWindow = window.open('', '_blank');
