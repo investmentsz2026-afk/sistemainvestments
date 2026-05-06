@@ -81,16 +81,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       image-rendering: crisp-edges;
     }
     .label-inner {
-      width: 40mm;
-      height: 30.2mm;
+      width: 38mm;
+      height: 32mm;
       transform: rotate(90deg);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.2mm 1mm;
+      padding: 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      margin: auto;
     }
     .barcode-label:last-child {
       page-break-after: auto;
@@ -101,10 +102,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       line-height: 1.1;
     }
     .brand {
-      font-size: 4.5pt;
+      font-size: 7pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
+      margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
       -webkit-font-smoothing: none;
@@ -112,10 +113,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-rendering: geometricPrecision;
     }
     .category {
-      font-size: 4.5pt;
+      font-size: 7pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
+      margin-bottom: 0.2mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
       -webkit-font-smoothing: none;
@@ -123,10 +124,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-rendering: geometricPrecision;
     }
     .model {
-      font-size: 5.5pt;
+      font-size: 9pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
+      margin-bottom: 0.3mm;
       line-height: 1.0;
       text-align: center;
       width: 100%;
@@ -140,10 +141,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       text-rendering: geometricPrecision;
     }
     .color-text {
-      font-size: 5pt;
+      font-size: 7pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.2mm;
+      margin-bottom: 0.5mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
       -webkit-font-smoothing: none;
@@ -166,10 +167,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       max-width: 32mm;
     }
     .sku-text {
-      font-size: 5pt;
+      font-size: 7pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-top: 0.1mm;
+      margin-top: 0.2mm;
       text-align: center;
       width: 100%;
       -webkit-text-stroke: 0.05pt #000;
@@ -192,13 +193,13 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       flex-shrink: 0;
     }
     .price-text {
-      font-size: 4pt;
+      font-size: 8pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       width: 100%;
       text-align: center;
-      border-top: 0.4mm solid #000;
-      padding-top: 0.2mm;
+      border-top: 0.5mm solid #000;
+      padding-top: 0.5mm;
       letter-spacing: 0.1mm;
       -webkit-text-stroke: 0.05pt #000;
       -webkit-font-smoothing: none;
@@ -223,7 +224,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    const items = Array(quantity * 3).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -266,8 +267,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 try {
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 1.88,
-                    height: 50,
+                    width: 2.2,
+                    height: 60,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -291,7 +292,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     if (!printWindow) return;
 
     const items = product.variants.flatMap((variant: any) =>
-      Array(quantity).fill(0).map((_, index) => {
+      Array(quantity * 3).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
         const hasPrice = parseFloat(product.sellingPrice) > 0;
@@ -337,8 +338,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                   const variant = variants.find(v => v.id === variantId);
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 1.88,
-                    height: 50,
+                    width: 2.2,
+                    height: 60,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -442,22 +443,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '38mm', height: '32mm', transform: 'rotate(90deg)' }}>
                     <div className="text-center w-full">
-                      <div style={{ fontSize: '4.5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
-                      <div style={{ fontSize: '4.5pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
-                      <div style={{ fontSize: '5.5pt' }} className="font-black leading-tight mt-[0.1mm] text-center">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
-                      <div style={{ fontSize: '5pt' }} className="font-black text-slate-700 mt-[0.2mm]">COLOR: {selectedVariant.color}</div>
+                      <div style={{ fontSize: '7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
+                      <div style={{ fontSize: '7pt' }} className="font-black text-slate-600 mt-[0.2mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
+                      <div style={{ fontSize: '9pt' }} className="font-black leading-tight mt-[0.3mm] text-center">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
+                      <div style={{ fontSize: '7pt' }} className="font-black text-slate-700 mt-[0.5mm]">COLOR: {selectedVariant.color}</div>
                     </div>
                     
                     <div className="flex items-center justify-center w-full my-[0.2mm]">
                       <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
-                          width={1.88}
-                          height={50}
+                          width={2.2}
+                          height={60}
                           displayValue={false}
-                          fontSize={5}
+                          fontSize={7}
                         />
                         <div style={{ fontSize: '5pt' }} className="font-bold mt-[0.1mm]">{selectedVariant.variantSku}</div>
                       </div>
