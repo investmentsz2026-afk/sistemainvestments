@@ -27,7 +27,8 @@ import {
   FileSearch,
   Users,
   Beaker,
-  ShoppingBag
+  ShoppingBag,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -83,6 +84,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Productos', href: '/products', icon: Package },
       { name: 'Inventario', href: '/inventory', icon: ShoppingCart },
       { name: 'Kardex', href: '/kardex', icon: BookOpen },
+      { name: 'Banco de Costos', href: '/inventory/cost-bank', icon: DollarSign },
       { name: 'Reportes', href: '/reports', icon: BarChart3 },
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' ? [

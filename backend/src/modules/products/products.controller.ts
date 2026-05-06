@@ -43,6 +43,11 @@ export class ProductsController {
     return this.productsService.findBySku(sku);
   }
 
+  @Get('cost-breakdown/:sku')
+  getCostBreakdown(@Param('sku') sku: string) {
+    return this.productsService.getCostBreakdown(sku);
+  }
+
   @Get('variant-sku/:variantSku')
   findByVariantSku(@Param('variantSku') variantSku: string) {
     return this.productsService.findByVariantSku(variantSku);

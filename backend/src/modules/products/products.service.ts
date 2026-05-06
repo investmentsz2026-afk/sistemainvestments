@@ -298,4 +298,111 @@ export class ProductsService {
       product.variants.some(variant => variant.stock <= product.minStock)
     );
   }
+
+  async getCostBreakdown(sku: string) {
+    // 1. Encontrar el producto o variante
+    let product = await this.prisma.product.findUnique({
+      where: { sku },
+      include: { variants: true }
+    });
+
+    if (!product) {
+      const variant = await this.prisma.productVariant.findUnique({
+        where: { variantSku: sku },
+        include: { product: { include: { variants: true } } }
+      });
+      if (variant) {
+        product = variant.product;
+      }
+    }
+
+    if (!product) {
+      throw new NotFoundException('Producto o variante no encontrado');
+    }
+
+    // 2. Si el producto no tiene OP, no podemos jalar costos de producción vinculados
+    if (!product.op) {
+      return {
+        product,
+        materials: [],
+        services: [],
+        totalMaterialCost: 0,
+        totalServiceCost: 0,
+        totalCost: product.purchasePrice || 0,
+        message: 'Este producto no tiene una Orden de Producción (OP) vinculada para desglosar costos.'
+      };
+    }
+
+    // 3. Buscar todas las compras y servicios vinculados a esta OP
+    const relatedPurchases = await this.prisma.purchase.findMany({
+      where: { op: product.op },
+      include: {
+        items: true,
+        supplier: true
+      }
+    });
+
+    const materials: any[] = [];
+    const services: any[] = [];
+    let totalMaterialCost = 0;
+    let totalServiceCost = 0;
+
+    relatedPurchases.forEach(purchase => {
+      purchase.items.forEach(item => {
+        const costItem = {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.quantity * item.price,
+          supplier: purchase.supplier?.name || 'N/A',
+          date: purchase.createdAt
+        };
+
+        if (purchase.type === 'SERVICE') {
+          services.push(costItem);
+          totalServiceCost += costItem.total;
+        } else {
+          materials.push(costItem);
+          totalMaterialCost += costItem.total;
+        }
+      });
+    });
+
+    // 4. Intentar jalar también de SampleMaterials si existe relación
+    const sampleMaterials = await this.prisma.sampleMaterial.findMany({
+      where: {
+        sample: { op: product.op }
+      },
+      include: {
+        product: true
+      }
+    });
+
+    sampleMaterials.forEach(sm => {
+      const costItem = {
+        id: sm.id,
+        name: sm.product?.name || sm.customMaterial || 'Material de Muestra',
+        category: 'Insumo',
+        quantity: sm.quantity,
+        price: sm.unitPriceAtTime,
+        total: sm.quantity * sm.unitPriceAtTime,
+        supplier: 'Inventario Interno',
+        date: sm.createdAt
+      };
+      materials.push(costItem);
+      totalMaterialCost += costItem.total;
+    });
+
+    return {
+      product,
+      op: product.op,
+      materials,
+      services,
+      totalMaterialCost,
+      totalServiceCost,
+      totalCost: totalMaterialCost + totalServiceCost
+    };
+  }
 }
