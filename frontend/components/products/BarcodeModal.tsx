@@ -65,13 +65,15 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       width: 100mm !important;
       height: auto !important;
     }
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      text-align: left !important;
-      display: grid !important;
-      grid-template-columns: repeat(3, 30.2mm) !important;
-      gap: 2mm;
-    }
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff;
+  width: 30.2mm !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
     @page {
       margin: 0 !important;
       size: 100mm 40mm;
