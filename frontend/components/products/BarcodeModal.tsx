@@ -42,119 +42,106 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: auto;
-      margin: 0;
+      size: 94mm 40mm;
+      margin: 0mm;
     }
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       text-transform: uppercase;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      font-smoothing: none;
-      text-rendering: crispEdges;
-      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      background: #fff;
-      color: #000;
+      background: white;
+      width: 100%;
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
-      display: grid !important;
-      grid-template-columns: repeat(3, 30.2mm) !important;
-      gap: 0mm !important;
-      justify-content: start !important;
-      align-content: start !important;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Contenedor de fila - 3 etiquetas por fila */
+    .barcode-row {
+      display: flex;
+      flex-direction: row;
+      width: 100%;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .barcode-label {
-      width: 30.2mm;
+      width: 31.33mm;
       height: 40mm;
       display: flex;
       align-items: center;
       justify-content: center;
       background: white;
       overflow: hidden;
+      flex-shrink: 0;
+      margin: 0;
+      padding: 0;
+      position: relative;
     }
     .label-inner {
       width: 40mm;
-      height: 30.2mm;
+      height: 31.33mm;
       transform: rotate(90deg);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.2mm 1mm;
+      padding: 0.5mm 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-    }
-    .barcode-label:last-child {
-      page-break-after: auto;
     }
     .label-header {
       text-align: center;
       width: 100%;
-      line-height: 1.1;
+      line-height: 1.15;
     }
     .brand {
       font-size: 4.5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
+      margin-bottom: 0.3mm;
       letter-spacing: 0.1mm;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     .category {
       font-size: 4.5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
+      margin-bottom: 0.3mm;
       letter-spacing: 0.1mm;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     .model {
       font-size: 5.5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.1mm;
-      line-height: 1.0;
+      margin-bottom: 0.3mm;
+      line-height: 1.1;
       text-align: center;
       width: 100%;
-      overflow: hidden;
-      white-space: normal;
       word-break: break-word;
       letter-spacing: 0.1mm;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     .color-text {
       font-size: 5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-bottom: 0.2mm;
+      margin-bottom: 0.3mm;
       letter-spacing: 0.1mm;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     .barcode-section {
       display: flex;
       align-items: center;
       justify-content: center;
       width: 100%;
-      margin-bottom: 0.5mm;
+      margin: 0.3mm 0;
     }
     .barcode-wrapper {
       display: flex;
@@ -168,22 +155,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       font-size: 5pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
-      margin-top: 0.1mm;
+      margin-top: 0.3mm;
       text-align: center;
       width: 100%;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     .barcode-svg {
       display: block;
       max-width: 100%;
       height: auto;
-      image-rendering: crisp-edges;
     }
     .size-text {
-      font-size: 18pt;
+      font-size: 16pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       line-height: 1;
@@ -197,18 +179,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       width: 100%;
       text-align: center;
       border-top: 0.4mm solid #000;
-      padding-top: 0.2mm;
+      padding-top: 0.3mm;
+      margin-top: 0.3mm;
       letter-spacing: 0.1mm;
-      -webkit-text-stroke: 0.05pt #000;
-      -webkit-font-smoothing: none;
-      -moz-osx-font-smoothing: grayscale;
-      text-rendering: geometricPrecision;
     }
     @media print {
       html, body {
-        width: 30.2mm;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+        margin: 0;
+        padding: 0;
       }
       .barcode-label {
         border: none;
@@ -220,7 +198,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    // Generar todas las etiquetas
+    const allLabels = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -246,9 +225,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    // Agrupar en filas de 3
+    const rows: string[] = [];
+    for (let i = 0; i < allLabels.length; i += 3) {
+      const rowLabels = allLabels.slice(i, i + 3);
+      rows.push(`<div class="barcode-row">${rowLabels.join('')}</div>`);
+    }
 
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Etiquetas - ${product.name}</title>
@@ -256,26 +243,32 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <style>${commonStyles}</style>
         </head>
         <body>
-          ${items}
+          ${rows.join('')}
           <script>
-            setTimeout(() => {
-              document.querySelectorAll('.barcode-svg').forEach((el, index) => {
+            (function() {
+              const variantSku = "${selectedVariant.variantSku}";
+              const svgs = document.querySelectorAll('.barcode-svg');
+              
+              svgs.forEach((el) => {
                 try {
-                   JsBarcode(el, "${selectedVariant.variantSku}", {
+                  JsBarcode(el, variantSku, {
                     format: "CODE128",
                     width: 1.88,
-                    height: 50,
+                    height: 45,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
                   });
-                } catch (e) {
+                } catch(e) {
                   console.error('Error generating barcode:', e);
                 }
               });
-              window.print();
-              window.close();
-            }, 500);
+              
+              setTimeout(() => {
+                window.print();
+                setTimeout(() => window.close(), 500);
+              }, 300);
+            })();
           </script>
         </body>
       </html>
@@ -287,7 +280,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = product.variants.flatMap((variant: any) =>
+    // Generar todas las etiquetas para todas las variantes
+    const allLabels = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -304,7 +298,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               </div>
               <div class="barcode-section">
                 <div class="barcode-wrapper">
-                  <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
+                  <svg id="barcode-${variant.id}-${index}" class="barcode-svg" data-sku="${variant.variantSku}"></svg>
                   <div class="sku-text">${variant.variantSku}</div>
                 </div>
                 ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
@@ -314,9 +308,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    ).join('');
+    );
+
+    // Agrupar en filas de 3
+    const rows: string[] = [];
+    for (let i = 0; i < allLabels.length; i += 3) {
+      const rowLabels = allLabels.slice(i, i + 3);
+      rows.push(`<div class="barcode-row">${rowLabels.join('')}</div>`);
+    }
 
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
           <title>Todas las Variantes - ${product.name}</title>
@@ -324,29 +326,32 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <style>${commonStyles}</style>
         </head>
         <body>
-          ${items}
+          ${rows.join('')}
           <script>
-            setTimeout(() => {
-              const variants = ${JSON.stringify(product.variants)};
-              document.querySelectorAll('.barcode-svg').forEach((el, index) => {
+            (function() {
+              const svgs = document.querySelectorAll('.barcode-svg');
+              
+              svgs.forEach((el) => {
                 try {
-                  const variantId = el.id.split('-')[1];
-                  const variant = variants.find(v => v.id === variantId);
-                   JsBarcode(el, variant.variantSku, {
+                  const sku = el.getAttribute('data-sku');
+                  JsBarcode(el, sku, {
                     format: "CODE128",
                     width: 1.88,
-                    height: 50,
+                    height: 45,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
                   });
-                } catch (e) {
+                } catch(e) {
                   console.error('Error generating barcode:', e);
                 }
               });
-              window.print();
-              window.close();
-            }, 500);
+              
+              setTimeout(() => {
+                window.print();
+                setTimeout(() => window.close(), 500);
+              }, 300);
+            })();
           </script>
         </body>
       </html>
@@ -439,7 +444,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                  <div className="flex flex-col items-center justify-center p-[1mm] uppercase" style={{ width: '40mm', height: '31.33mm', transform: 'rotate(90deg)' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '4.5pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '4.5pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
@@ -452,14 +457,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
                           width={1.88}
-                          height={50}
+                          height={45}
                           displayValue={false}
                           fontSize={5}
                         />
                         <div style={{ fontSize: '5pt' }} className="font-bold mt-[0.1mm]">{selectedVariant.variantSku}</div>
                       </div>
                       {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
-                        <div style={{ fontSize: '16pt' }} className="font-black leading-none ml-[2mm]">
+                        <div style={{ fontSize: '14pt' }} className="font-black leading-none ml-[2mm]">
                           {selectedVariant.size}
                         </div>
                       )}
