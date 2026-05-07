@@ -42,9 +42,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 30.2mm 40mm;
+      size: auto;
       margin: 0;
-      padding: 0;
     }
     * {
       box-sizing: border-box;
@@ -62,21 +61,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       padding: 0 !important;
       background: #fff;
       color: #000;
-      width: 100mm !important;
-      height: auto !important;
     }
-body {
-  margin: 0 !important;
-  padding: 0 !important;
-  background: #fff;
-  width: 30.2mm !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-}
-    @page {
-      margin: 0 !important;
-      size: 100mm 40mm;
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      display: grid !important;
+      grid-template-columns: repeat(3, 30.2mm) !important;
+      gap: 0mm !important;
+      justify-content: start !important;
+      align-content: start !important;
     }
     .barcode-label {
       width: 30.2mm;
@@ -84,10 +76,8 @@ body {
       display: flex;
       align-items: center;
       justify-content: center;
-      page-break-inside: avoid;
       background: white;
       overflow: hidden;
-      margin: 0 !important;
     }
     .label-inner {
       width: 40mm;
@@ -273,8 +263,8 @@ body {
                 try {
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 1.5,
-                    height: 70,
+                    width: 1.88,
+                    height: 50,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -344,8 +334,8 @@ body {
                   const variant = variants.find(v => v.id === variantId);
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 1.5,
-                    height: 70,
+                    width: 1.88,
+                    height: 50,
                     displayValue: false,
                     margin: 0,
                     lineColor: "#000000"
@@ -461,8 +451,8 @@ body {
                       <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
-                          width={1.5}
-                          height={70}
+                          width={1.88}
+                          height={50}
                           displayValue={false}
                           fontSize={5}
                         />
