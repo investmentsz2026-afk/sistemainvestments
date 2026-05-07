@@ -263,7 +263,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 try {
                    JsBarcode(el, "${selectedVariant.variantSku}", {
                     format: "CODE128",
-                    width: 1.88,
+                    width: 1.0,
                     height: 50,
                     displayValue: false,
                     margin: 0,
@@ -334,7 +334,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                   const variant = variants.find(v => v.id === variantId);
                    JsBarcode(el, variant.variantSku, {
                     format: "CODE128",
-                    width: 1.88,
+                    width: 1.0,
                     height: 50,
                     displayValue: false,
                     margin: 0,
@@ -451,7 +451,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                       <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
-                          width={1.88}
+                          width={1.0}
                           height={50}
                           displayValue={false}
                           fontSize={5}
