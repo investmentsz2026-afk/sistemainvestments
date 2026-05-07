@@ -316,6 +316,40 @@ export class ProductsService {
       }
     }
 
+    // 1.2. Fallback: Buscar por OP en productos
+    if (!product) {
+      product = await this.prisma.product.findFirst({
+        where: { op: sku },
+        include: { variants: true }
+      });
+    }
+
+    // 1.3. Fallback: Buscar por Barcode en Muestras (si el producto aún no existe)
+    if (!product) {
+      const sample = await this.prisma.productSample.findFirst({
+        where: { 
+          OR: [
+            { barcode: sku },
+            { op: sku }
+          ]
+        }
+      });
+
+      if (sample) {
+        // Simular un objeto "product" desde la muestra para mostrar costos acumulados
+        product = {
+          id: 'sample-' + sample.id,
+          name: sample.name,
+          sku: (sample.barcode || sample.op) as string,
+          op: sample.op,
+          category: 'Muestra / Lote',
+          sellingPrice: 0,
+          purchasePrice: 0,
+          variants: []
+        } as any;
+      }
+    }
+
     if (!product) {
       throw new NotFoundException('Producto o variante no encontrado');
     }
@@ -393,6 +427,48 @@ export class ProductsService {
       };
       materials.push(costItem);
       totalMaterialCost += costItem.total;
+    });
+    
+    // 5. Jalar costos de Auditoría de Procesos (NUEVO)
+    const processAudits = await (this.prisma as any).processAudit.findMany({
+      where: { op: product.op },
+    });
+
+    processAudits.forEach((pa: any) => {
+      const history = Array.isArray(pa.processHistory) ? pa.processHistory : [];
+      
+      history.forEach((step: any, idx: number) => {
+        if (step.servicePrice > 0) {
+          const costItem = {
+            id: `${pa.id}-${idx}`,
+            name: step.process || pa.process,
+            category: 'Servicio Producción',
+            quantity: pa.totalQuantity || 1,
+            price: step.servicePrice,
+            total: (pa.totalQuantity || 1) * step.servicePrice,
+            supplier: step.externalCompany || pa.externalCompany || 'Taller Interno',
+            date: step.date || pa.auditDate
+          };
+          services.push(costItem);
+          totalServiceCost += costItem.total;
+        }
+      });
+
+      // Fallback: Si no hay historial pero hay precio en el registro principal
+      if (history.length === 0 && pa.servicePrice > 0) {
+        const costItem = {
+          id: pa.id,
+          name: pa.process,
+          category: 'Servicio Producción',
+          quantity: pa.totalQuantity || 1,
+          price: pa.servicePrice,
+          total: (pa.totalQuantity || 1) * pa.servicePrice,
+          supplier: pa.externalCompany || 'Taller Interno',
+          date: pa.auditDate
+        };
+        services.push(costItem);
+        totalServiceCost += costItem.total;
+      }
     });
 
     return {

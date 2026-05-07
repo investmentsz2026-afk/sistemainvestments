@@ -118,7 +118,9 @@ export default function CostBankPage() {
     }, [])
   ] : [];
 
-  const margin = breakdown ? ((breakdown.product.sellingPrice - breakdown.totalCost) / breakdown.product.sellingPrice * 100).toFixed(1) : '0';
+  const margin = breakdown && breakdown.product.sellingPrice > 0 
+    ? ((breakdown.product.sellingPrice - breakdown.totalCost) / breakdown.product.sellingPrice * 100).toFixed(1) 
+    : '0';
 
   return (
     <Layout>
@@ -212,6 +214,9 @@ export default function CostBankPage() {
                     <div>
                       <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
                         <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">{breakdown.product.category}</span>
+                        {breakdown.product.id.startsWith('sample-') && (
+                          <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-black uppercase tracking-widest">En Producción / Auditoría</span>
+                        )}
                         {breakdown.op && (
                           <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest">OP: {breakdown.op}</span>
                         )}

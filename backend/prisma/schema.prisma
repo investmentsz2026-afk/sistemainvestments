@@ -195,6 +195,7 @@ model ProcessAudit {
   op              String         // Lote de producción u OP
   process         String         // Corte, Confección, Lavado, Acabados
   externalCompany String?        @map("external_company") // Empresa externa que realiza el proceso
+  servicePrice    Float?         @map("service_price") @default(0)
   inspectorId     String         @map("inspector_id")
   inspector       User           @relation(fields: [inspectorId], references: [id])
   auditDate       DateTime       @default(now()) @map("audit_date")
@@ -223,7 +224,8 @@ model ProcessAudit {
   logisticsStatus String         @default("PENDIENTE") @map("logistics_status") // PENDIENTE, RECIBIDO
   receivedAt      DateTime?      @map("received_at")
 
-  processHistory  Json?          @map("process_history") // Array of history steps
+  processHistory  Json?          @map("process_history")
+  qualitySizeData Json?          @map("quality_size_data") // Breakdown of good/process/second per size
 
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
@@ -437,6 +439,7 @@ model ProductSample {
   recommendations String?          @db.Text // Recomendaciones de comercial
   
   op              String?          // Orden de Producción asignada por comercial
+  barcode         String?          // Código de barras generado para la OP
   productionQuantity Float?        @map("production_quantity") // Cantidad total
   productionColor    String?       @map("production_color")
   productionSizeData Json?         @map("production_size_data") // e.g. { "S": 10, "M": 20 }

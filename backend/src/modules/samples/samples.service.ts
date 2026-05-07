@@ -100,7 +100,7 @@ export class SamplesService {
   }
 
   async updateReview(id: string, commercialId: string, data: any) {
-    const { status, observations, recommendations, materials, op, productionQuantity, productionColor, productionSizeData } = data;
+    const { status, observations, recommendations, materials, op, barcode, productionQuantity, productionColor, productionSizeData } = data;
 
     const existingSample = await this.findOne(id);
 
@@ -113,6 +113,7 @@ export class SamplesService {
           observations,
           recommendations,
           op: status === 'APROBADO' ? (op || null) : null,
+          barcode: status === 'APROBADO' ? (barcode || null) : null,
           productionQuantity: status === 'APROBADO' ? (productionQuantity || null) : null,
           productionColor: status === 'APROBADO' ? (productionColor || null) : null,
           productionSizeData: status === 'APROBADO' ? (productionSizeData || null) : null,

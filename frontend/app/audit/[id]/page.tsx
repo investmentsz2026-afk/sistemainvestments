@@ -28,11 +28,16 @@ import {
     Flag,
     ListTodo,
     History,
-    MoreHorizontal
+    MoreHorizontal,
+    Barcode,
+    Printer,
+    DollarSign,
+    X
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { OPBarcodeModal } from '../../../components/samples/OPBarcodeModal';
 
 const PROCESS_INFO: Record<string, { color: string; icon: any }> = {
     'Corte': { color: 'bg-orange-100 text-orange-700', icon: Box },
@@ -61,6 +66,15 @@ export default function AuditDetailPage() {
     const [adminNotes, setAdminNotes] = useState('');
     const [showAdminReviewModal, setShowAdminReviewModal] = useState(false);
     const [adminReviewStatus, setAdminReviewStatus] = useState<'APROBADO' | 'RECHAZADO' | null>(null);
+    const [sizeBreakdown, setSizeBreakdown] = useState<any[]>([]);
+    const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+    
+    // Process change cost modal
+    const [showCostModal, setShowCostModal] = useState(false);
+    const [pendingProcess, setPendingProcess] = useState('');
+    const [newProcessCost, setNewProcessCost] = useState<number>(0);
+    const [newExternalCompany, setNewExternalCompany] = useState('');
+    const [showBarcode, setShowBarcode] = useState(false);
 
     useEffect(() => {
         fetchAudit();
@@ -75,6 +89,20 @@ export default function AuditDetailPage() {
             setQProcess(a.quantityProcess || 0);
             setQSecond(a.quantitySecond || 0);
             setEditObs(a.observations || '');
+
+            // Initialize size breakdown
+            if (a.qualitySizeData) {
+                setSizeBreakdown(a.qualitySizeData);
+            } else if (a.sample?.productionSizeData) {
+                setSizeBreakdown(a.sample.productionSizeData.map((sz: any) => ({
+                    size: sz.size,
+                    color: sz.color || 'ÚNICO',
+                    qGood: sz.quantity || 0, // Default all to good
+                    qProcess: 0,
+                    qSecond: 0,
+                    total: sz.quantity || 0
+                })));
+            }
         } catch (error) {
             console.error('Error fetching audit:', error);
         } finally {
@@ -82,7 +110,15 @@ export default function AuditDetailPage() {
         }
     };
 
-    const handleUpdateProgress = async (nextProcess?: string) => {
+    const handleUpdateProgress = async (nextProcess?: string, cost?: number, company?: string) => {
+        // Enforce cost on process change
+        if (nextProcess && nextProcess !== audit.process && !cost && !showCostModal) {
+            setPendingProcess(nextProcess);
+            setNewExternalCompany(audit.externalCompany || '');
+            setShowCostModal(true);
+            return;
+        }
+
         setIsSaving(true);
         try {
             await api.patch(`/process-audits/${auditId}/progress`, {
@@ -91,9 +127,15 @@ export default function AuditDetailPage() {
                 quantitySecond: qSecond,
                 observations: editObs,
                 nextProcess: nextProcess || audit.process,
-                stepNotes: nextProcess ? `Pasó de ${audit.process} a ${nextProcess}` : undefined
+                servicePrice: cost !== undefined ? cost : undefined,
+                externalCompany: company !== undefined ? company : undefined,
+                stepNotes: nextProcess && nextProcess !== audit.process 
+                    ? `Pasó de ${audit.process} a ${nextProcess}${cost ? ` (Costo: S/. ${cost})` : ''}` 
+                    : undefined
             });
-            toast.success(nextProcess ? `Paso a ${nextProcess} registrado` : 'Avance guardado');
+            toast.success(nextProcess && nextProcess !== audit.process ? `Paso a ${nextProcess} registrado` : 'Avance guardado');
+            setShowCostModal(false);
+            setNewProcessCost(0);
             fetchAudit();
         } catch (error: any) {
             console.error('Error updating progress:', error);
@@ -104,6 +146,12 @@ export default function AuditDetailPage() {
     };
 
     const handleFinalize = async () => {
+        const totalAudited = qGood + qProcess + qSecond;
+        if (totalAudited !== audit.totalQuantity) {
+            toast.error(`Debes asignar el estado a la totalidad del lote (${audit.totalQuantity} uds.) antes de finalizar. Actualmente tienes ${totalAudited} uds.`);
+            return;
+        }
+
         setIsUpdating(true);
         try {
             const result = qGood > 0 && qSecond === 0 ? 'CONFORME' : qSecond > 0 ? 'OBSERVACION' : 'PENDIENTE';
@@ -111,6 +159,7 @@ export default function AuditDetailPage() {
                 quantityGood: qGood,
                 quantityProcess: qProcess,
                 quantitySecond: qSecond,
+                qualitySizeData: sizeBreakdown,
                 observations: editObs,
                 result,
             });
@@ -187,13 +236,31 @@ export default function AuditDetailPage() {
     }
 
     const { text, color, bg, dot } = getStatusLabel(audit.result);
-    const isFinalized = audit.status === 'FINALIZADO';
+    const isFinalized = audit.status === 'FINALIZADO' && audit.adminStatus !== 'RECHAZADO';
     const proc = PROCESS_INFO[audit.process] || { color: 'bg-gray-100 text-gray-700', icon: Box };
     const ProcIcon = proc.icon;
 
     return (
         <Layout>
             <div className="max-w-6xl mx-auto pb-20">
+                {/* BANNER DE RECHAZO */}
+                {audit.adminStatus === 'RECHAZADO' && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8 p-6 bg-red-50 border-2 border-red-100 rounded-[2rem] flex items-center gap-4 shadow-xl shadow-red-200/20"
+                    >
+                        <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center shrink-0">
+                            <XCircle className="w-8 h-8 text-red-600" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-black text-red-900 uppercase tracking-tight">Auditoría Rechazada por Admin</h3>
+                            <p className="text-red-700 font-medium">Motivo: <span className="font-bold italic">"{audit.adminNotes || 'Sin notas adicionales'}"</span></p>
+                            <p className="text-xs text-red-500 font-bold uppercase tracking-widest mt-1">Por favor, corrige los datos y finaliza nuevamente.</p>
+                        </div>
+                    </motion.div>
+                )}
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                     <div className="flex items-center gap-4">
                         <button 
@@ -216,11 +283,21 @@ export default function AuditDetailPage() {
                                 <Truck className="w-4 h-4 text-indigo-500" />
                                 {audit.process} • OP: {audit.op} • {audit.sample?.name || 'N/A'}
                                 {audit.externalCompany && <span className="text-gray-400">• Empresa: {audit.externalCompany}</span>}
+                                {audit.servicePrice > 0 && <span className="text-emerald-500 font-bold ml-2">• S/. {audit.servicePrice.toFixed(2)} / ud.</span>}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
+                        {/* BARCODE BUTTON */}
+                        {audit.sample?.barcode && (
+                            <button 
+                                onClick={() => setShowBarcode(true)}
+                                className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-gray-900 rounded-2xl font-bold hover:bg-gray-50 transition shadow-sm"
+                            >
+                                <Barcode className="w-5 h-5 text-indigo-500" /> Etiquetas OP
+                            </button>
+                        )}
                         {/* ADMIN REVIEW BUTTONS */}
                         {user?.role === 'ADMIN' && isFinalized && audit.adminStatus === 'PENDIENTE' && (
                             <div className="flex items-center gap-2">
@@ -480,6 +557,49 @@ export default function AuditDetailPage() {
                             )}
                         </div>
 
+                        {/* SIZE BREAKDOWN DISPLAY (IF FINALIZED) */}
+                        {isFinalized && audit.qualitySizeData && (
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20">
+                                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+                                    <ListTodo className="w-5 h-5 text-emerald-500" /> Desglose por Talla
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-50">
+                                                <th className="py-3 font-black text-[10px] text-gray-400 uppercase tracking-widest">Talla</th>
+                                                <th className="py-3 font-black text-[10px] text-emerald-600 uppercase tracking-widest">1ra Calidad</th>
+                                                <th className="py-3 font-black text-[10px] text-amber-600 uppercase tracking-widest">En Proceso</th>
+                                                <th className="py-3 font-black text-[10px] text-red-600 uppercase tracking-widest">2da Calidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {(Array.isArray(audit.qualitySizeData) ? audit.qualitySizeData : []).map((sz: any, i: number) => (
+                                                <tr key={i}>
+                                                    <td className="py-4 font-black text-gray-900">{sz.size}</td>
+                                                    <td className="py-4">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-black ${sz.qGood > 0 ? 'bg-emerald-50 text-emerald-700' : 'text-gray-300'}`}>
+                                                            {sz.qGood} uds.
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-black ${sz.qProcess > 0 ? 'bg-amber-50 text-amber-700' : 'text-gray-300'}`}>
+                                                            {sz.qProcess} uds.
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-black ${sz.qSecond > 0 ? 'bg-red-50 text-red-700' : 'text-gray-300'}`}>
+                                                            {sz.qSecond} uds.
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
                         {/* OBSERVACIONES */}
                         <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20">
                             <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center gap-2">
@@ -506,12 +626,30 @@ export default function AuditDetailPage() {
 
                         {/* FINALIZE BUTTON */}
                         {!isFinalized && (
-                            <button
-                                onClick={() => setShowFinalizeModal(true)}
-                                className="w-full py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl hover:bg-black transition active:scale-95"
-                            >
-                                <Flag className="w-6 h-6" /> Finalizar Auditoría
-                            </button>
+                            <div className="space-y-4">
+                                {(qGood + qProcess + qSecond) !== audit.totalQuantity && (
+                                    <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-700 text-sm font-bold">
+                                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                        <span>Debes asignar las {audit.totalQuantity} unidades del lote antes de finalizar. (Auditado: {qGood + qProcess + qSecond})</span>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        if ((qGood + qProcess + qSecond) !== audit.totalQuantity) {
+                                            toast.error(`Debes completar las ${audit.totalQuantity} unidades del lote.`);
+                                            return;
+                                        }
+                                        setShowFinalizeModal(true);
+                                    }}
+                                    className={`w-full py-6 rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl transition active:scale-95 ${
+                                        (qGood + qProcess + qSecond) === audit.totalQuantity 
+                                        ? 'bg-gray-900 text-white hover:bg-black' 
+                                        : 'bg-gray-200 text-gray-400'
+                                    }`}
+                                >
+                                    <Flag className="w-6 h-6" /> Finalizar Auditoría
+                                </button>
+                            </div>
                         )}
 
                         {/* PROCESS HISTORY (TIMELINE) */}
@@ -623,50 +761,152 @@ export default function AuditDetailPage() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
                         onClick={() => setShowFinalizeModal(false)}
                     >
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl"
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[2.5rem] p-8 max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="text-center">
-                                <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <AlertTriangle className="w-10 h-10 text-amber-500" />
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center">
+                                        <AlertTriangle className="w-6 h-6 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Finalizar Auditoría</h3>
+                                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Desglose final de unidades por talla</p>
+                                    </div>
                                 </div>
-                                <h3 className="text-2xl font-black text-gray-900 mb-2">¿Finalizar Auditoría?</h3>
-                                <p className="text-gray-500 font-medium mb-6">
-                                    Al finalizar, la información se enviará a <strong>Logística</strong> para actualizar el inventario. 
-                                    Esta acción <strong>no se puede deshacer</strong>.
-                                </p>
-                                
-                                <div className="bg-gray-50 p-4 rounded-2xl mb-6 text-left space-y-2">
-                                    <div className="flex justify-between text-sm"><span className="text-gray-500 font-bold">1ra Calidad:</span><span className="font-black text-emerald-600">{qGood} uds.</span></div>
-                                    <div className="flex justify-between text-sm"><span className="text-gray-500 font-bold">En Proceso:</span><span className="font-black text-amber-600">{qProcess} uds.</span></div>
-                                    <div className="flex justify-between text-sm"><span className="text-gray-500 font-bold">2da Calidad:</span><span className="font-black text-red-600">{qSecond} uds.</span></div>
-                                    <div className="flex justify-between text-sm pt-2 border-t border-gray-100"><span className="text-gray-700 font-black">Total:</span><span className="font-black text-gray-900">{qGood + qProcess + qSecond} uds.</span></div>
+                                <button onClick={() => setShowFinalizeModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition"><X className="w-6 h-6 text-gray-400" /></button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Total 1ra</p>
+                                        <p className="text-xl font-black text-emerald-900">{sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0)}</p>
+                                    </div>
+                                    <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
+                                        <p className="text-[10px] font-black text-amber-600 uppercase mb-1">Total Proceso</p>
+                                        <p className="text-xl font-black text-amber-900">{sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0)}</p>
+                                    </div>
+                                    <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-center">
+                                        <p className="text-[10px] font-black text-rose-600 uppercase mb-1">Total 2da</p>
+                                        <p className="text-xl font-black text-rose-900">{sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0)}</p>
+                                    </div>
                                 </div>
 
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setShowFinalizeModal(false)}
-                                        className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={handleFinalize}
-                                        disabled={isUpdating}
-                                        className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        <Flag className="w-5 h-5" />
-                                        {isUpdating ? 'Finalizando...' : 'Confirmar'}
-                                    </button>
+                                <div className="bg-gray-50 rounded-3xl overflow-hidden border border-gray-100">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-gray-100/50">
+                                            <tr>
+                                                <th className="px-4 py-3 font-black text-gray-500 uppercase text-[10px]">Talla</th>
+                                                <th className="px-4 py-3 font-black text-emerald-600 uppercase text-[10px]">1ra Calidad</th>
+                                                <th className="px-4 py-3 font-black text-amber-600 uppercase text-[10px]">En Proceso</th>
+                                                <th className="px-4 py-3 font-black text-rose-600 uppercase text-[10px]">2da Calidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {sizeBreakdown.map((sz, idx) => (
+                                                <tr key={idx} className="hover:bg-white transition-colors">
+                                                    <td className="px-4 py-3 font-black text-gray-900">{sz.size}</td>
+                                                    <td className="px-2 py-3">
+                                                        <div className="w-full px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl font-black text-emerald-700 text-center">
+                                                            {sz.qGood}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-2 py-3">
+                                                        <input 
+                                                            type="number" 
+                                                            min="0"
+                                                            max={sz.total - sz.qSecond}
+                                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl font-bold text-amber-700 focus:ring-2 focus:ring-amber-500 outline-none transition"
+                                                            value={sz.qProcess}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(0, Number(e.target.value));
+                                                                const newB = [...sizeBreakdown];
+                                                                const row = newB[idx];
+                                                                
+                                                                // Ensure we don't exceed total
+                                                                const finalProcess = Math.min(val, row.total - row.qSecond);
+                                                                row.qProcess = finalProcess;
+                                                                row.qGood = row.total - finalProcess - row.qSecond;
+                                                                
+                                                                setSizeBreakdown(newB);
+                                                                setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
+                                                                setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
+                                                                setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-3">
+                                                        <input 
+                                                            type="number" 
+                                                            min="0"
+                                                            max={sz.total - sz.qProcess}
+                                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl font-bold text-rose-700 focus:ring-2 focus:ring-rose-500 outline-none transition"
+                                                            value={sz.qSecond}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(0, Number(e.target.value));
+                                                                const newB = [...sizeBreakdown];
+                                                                const row = newB[idx];
+                                                                
+                                                                // Ensure we don't exceed total
+                                                                const finalSecond = Math.min(val, row.total - row.qProcess);
+                                                                row.qSecond = finalSecond;
+                                                                row.qGood = row.total - row.qProcess - finalSecond;
+                                                                
+                                                                setSizeBreakdown(newB);
+                                                                setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
+                                                                setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
+                                                                setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
+                                                            }}
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Observaciones Finales</label>
+                                    <textarea 
+                                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-medium text-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none transition resize-none"
+                                        rows={3}
+                                        placeholder="Escribe aquí cualquier observación sobre el estado del lote..."
+                                        value={editObs}
+                                        onChange={(e) => setEditObs(e.target.value)}
+                                    />
                                 </div>
                             </div>
+
+                            <div className="pt-6 border-t border-gray-100 mt-6 flex gap-3">
+                                <button
+                                    onClick={() => setShowFinalizeModal(false)}
+                                    className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-[1.5rem] font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition active:scale-95"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleFinalize}
+                                    disabled={isUpdating || (qGood + qProcess + qSecond) !== audit.totalQuantity}
+                                    className="flex-1 py-4 bg-gray-900 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-xs hover:bg-black transition shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
+                                >
+                                    <Flag className="w-5 h-5" />
+                                    {isUpdating ? 'Finalizando...' : 'Confirmar Auditoría'}
+                                </button>
+                            </div>
+                            
+                            {(qGood + qProcess + qSecond) !== audit.totalQuantity && (
+                                <p className="text-center text-[10px] text-red-500 font-bold mt-3 uppercase tracking-tight">
+                                    ⚠️ La suma de unidades ({qGood + qProcess + qSecond}) debe ser igual al total del lote ({audit.totalQuantity})
+                                </p>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}
@@ -720,6 +960,90 @@ export default function AuditDetailPage() {
                             </div>
                         </motion.div>
                     </motion.div>
+                )}
+                {/* COST CHANGE MODAL */}
+                {showCostModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+                        onClick={() => setShowCostModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl relative overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
+                                <DollarSign className="w-32 h-32 text-gray-900" />
+                            </div>
+
+                            <div className="relative z-10">
+                                <h3 className="text-3xl font-black text-gray-900 mb-2 leading-tight">Costo de {pendingProcess}</h3>
+                                <p className="text-gray-500 font-medium mb-8">
+                                    Antes de cambiar a <strong>{pendingProcess}</strong>, debes ingresar el costo del servicio y la empresa responsable.
+                                </p>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                            <Building2 className="w-3.5 h-3.5" /> Empresa del Proceso
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nombre del taller o empresa..."
+                                            className="w-full px-6 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 transition shadow-inner"
+                                            value={newExternalCompany}
+                                            onChange={(e) => setNewExternalCompany(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                            <span className="text-emerald-500 font-black">S/.</span> Costo Unitario (por prenda)
+                                        </label>
+                                        <input 
+                                            type="number" 
+                                            step="0.01"
+                                            placeholder="Ej: 2.50"
+                                            className="w-full px-6 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-black text-gray-900 text-2xl transition shadow-inner"
+                                            value={newProcessCost || ''}
+                                            onChange={(e) => setNewProcessCost(parseFloat(e.target.value) || 0)}
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-10">
+                                    <button
+                                        onClick={() => setShowCostModal(false)}
+                                        className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition"
+                                    >
+                                        Atrás
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateProgress(pendingProcess, newProcessCost, newExternalCompany)}
+                                        disabled={!newProcessCost || isSaving}
+                                        className="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition shadow-xl shadow-gray-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        <Check className="w-5 h-5" />
+                                        {isSaving ? 'Actualizando...' : 'Confirmar Cambio'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* BARCODE MODAL */}
+                {showBarcode && audit.sample && (
+                    <OPBarcodeModal 
+                        onClose={() => setShowBarcode(false)}
+                        sample={audit.sample}
+                    />
                 )}
             </AnimatePresence>
         </Layout>

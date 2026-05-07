@@ -22,11 +22,14 @@ import {
     AlertTriangle,
     FileText,
     Edit,
-    Send
+    Send,
+    Printer
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { ProductBarcode } from '../../../components/products/Barcode';
+import { OPBarcodeModal } from '../../../components/samples/OPBarcodeModal';
 
 export default function SampleDetailPage() {
     const { id } = useParams();
@@ -48,6 +51,7 @@ export default function SampleDetailPage() {
     const [bomViewSize, setBomViewSize] = useState<string | null>(null);
     const [showSalesPriceModal, setShowSalesPriceModal] = useState(false);
     const [salesPrices, setSalesPrices] = useState<{ [size: string]: { price: number, secondPrice: number } }>({});
+    const [generatedBarcode, setGeneratedBarcode] = useState('');
 
     // Edit State (UDP)
     const [isEditing, setIsEditing] = useState(false);
@@ -103,6 +107,7 @@ export default function SampleDetailPage() {
     const [selectedType, setSelectedType] = useState('');
     const [reqSearch, setReqSearch] = useState('');
     const [reqModalMode, setReqModalMode] = useState<'EDIT' | 'VIEW'>('EDIT');
+    const [showOPPrintModal, setShowOPPrintModal] = useState(false);
 
     const inventoryTypes = useMemo(() => {
         const types = new Set(products.map(p => p.inventoryType || p.category));
@@ -188,6 +193,30 @@ export default function SampleDetailPage() {
             setTargetQuantity(qty);
         }
     }, [prodQuantity]);
+
+    // Generate Barcode when OP changes
+    useEffect(() => {
+        if (opName && reviewStatus === 'APROBADO') {
+            // Extract numbers from OP (e.g., OP-050 -> 050)
+            const opNumbers = opName.replace(/\D/g, '');
+            if (opNumbers) {
+                // Create a 12-digit barcode: Prefix(3) + Random + OP_Numbers
+                const prefix = '775';
+                const suffix = opNumbers; // Use all numbers from OP
+                const randomLength = Math.max(0, 12 - prefix.length - suffix.length);
+                const randomPart = Math.floor(Math.random() * Math.pow(10, randomLength)).toString().padStart(randomLength, '0');
+                
+                // If the total exceeds 12 digits, we'll just keep the OP part as the main identity
+                const finalCode = (prefix + randomPart + suffix).slice(-12);
+                setGeneratedBarcode(finalCode);
+            } else {
+                // If no numbers in OP, just use the OP text for CODE128
+                setGeneratedBarcode(opName.toUpperCase());
+            }
+        } else {
+            setGeneratedBarcode('');
+        }
+    }, [opName, reviewStatus]);
 
     useEffect(() => {
         fetchData();
@@ -404,6 +433,7 @@ export default function SampleDetailPage() {
                 observations,
                 recommendations,
                 op: reviewStatus === 'APROBADO' ? opName : undefined,
+                barcode: reviewStatus === 'APROBADO' ? generatedBarcode : undefined,
                 productionQuantity: reviewStatus === 'APROBADO' ? parseFloat(prodQuantity) : undefined,
                 productionSizeData: reviewStatus === 'APROBADO' ? enrichedProductionDetail : undefined,
                 materials: reviewStatus === 'APROBADO' ? activeBom : []
@@ -445,6 +475,87 @@ export default function SampleDetailPage() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handlePrintBarcode = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const barcodeValue = sample.barcode;
+        const productName = sample.name.toUpperCase();
+        const opLabel = `OP: ${sample.op}`;
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Imprimir Etiqueta de Lote</title>
+                    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+                    <style>
+                        @page {
+                            size: 40mm 30mm;
+                            margin: 0;
+                        }
+                        body {
+                            margin: 0;
+                            padding: 1mm;
+                            font-family: 'Arial', sans-serif;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            text-align: center;
+                        }
+                        .name {
+                            font-size: 8pt;
+                            font-weight: 900;
+                            margin-bottom: 0.5mm;
+                            text-transform: uppercase;
+                        }
+                        .op {
+                            font-size: 7pt;
+                            font-weight: 700;
+                            margin-bottom: 1mm;
+                            color: #333;
+                        }
+                        #barcode {
+                            max-width: 35mm;
+                        }
+                        .barcode-text {
+                            font-size: 7pt;
+                            margin-top: 0.5mm;
+                            font-family: 'Courier New', monospace;
+                            font-weight: bold;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="name">${productName}</div>
+                    <div class="op">${opLabel}</div>
+                    <svg id="barcode"></svg>
+                    <div class="barcode-text">${barcodeValue}</div>
+                    <script>
+                        try {
+                            JsBarcode("#barcode", "${barcodeValue}", {
+                                format: "CODE128",
+                                width: 1.5,
+                                height: 50,
+                                displayValue: false,
+                                margin: 0
+                            });
+                        } catch (e) { console.error(e); }
+                        
+                        window.onload = function() {
+                            setTimeout(() => {
+                                window.print();
+                                window.close();
+                            }, 300);
+                        };
+                    </script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
     };
 
     // Calculations
@@ -871,6 +982,16 @@ export default function SampleDetailPage() {
                                                     </div>
                                                 </div>
 
+                                                {generatedBarcode && (
+                                                    <div className="flex flex-col items-center justify-center p-4 bg-white rounded-3xl border border-emerald-100 shadow-sm animate-in fade-in zoom-in duration-300">
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Código de Barras Generado para OP</p>
+                                                        <div className="bg-white p-4 rounded-xl border border-gray-50">
+                                                            <ProductBarcode value={generatedBarcode} width={1.2} height={60} displayValue={true} />
+                                                        </div>
+                                                        <p className="mt-2 font-mono font-bold text-gray-900">{generatedBarcode}</p>
+                                                    </div>
+                                                )}
+
                                                 <div className="pt-2 border-t border-emerald-100/30">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Desglose de Producción (Talla, Color, Cantidad) *</label>
@@ -995,16 +1116,32 @@ export default function SampleDetailPage() {
                                         </h4>
                                         <p className="text-gray-700 font-bold mt-2 text-sm italic">"{sample.observations || 'Sin observaciones registradas.'}"</p>
                                         {sample.status === 'APROBADO' && sample.op && (
-                                            <div className="mt-4 pt-4 border-t border-emerald-100/50 grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Orden Prod. (OP)</p>
-                                                    <p className="font-black text-emerald-900 text-lg font-mono">{sample.op}</p>
+                                            <>
+                                                <div className="mt-4 pt-4 border-t border-emerald-100/50 grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Orden Prod. (OP)</p>
+                                                        <p className="font-black text-emerald-900 text-lg font-mono">{sample.op}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cantidad a Producir</p>
+                                                        <p className="font-black text-emerald-900 text-lg">{sample.productionQuantity} prendas</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cantidad a Producir</p>
-                                                    <p className="font-black text-emerald-900 text-lg">{sample.productionQuantity} prendas</p>
-                                                </div>
-                                            </div>
+                                                {sample.barcode && (
+                                                    <div className="mt-4 flex flex-col items-center bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm relative group/barcode">
+                                                        <ProductBarcode value={sample.barcode} width={1.2} height={50} displayValue={true} />
+                                                        <p className="mt-2 font-mono font-bold text-[10px] text-gray-400 uppercase tracking-widest">{sample.barcode}</p>
+                                                        
+                                                        <button
+                                                            onClick={() => setShowOPPrintModal(true)}
+                                                            className="absolute top-2 right-2 p-2 bg-emerald-50 text-emerald-600 rounded-xl opacity-0 group-hover/barcode:opacity-100 transition-all hover:bg-emerald-600 hover:text-white shadow-sm"
+                                                            title="Opciones de Impresión"
+                                                        >
+                                                            <Printer className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                     {sample.recommendations && (
@@ -1754,6 +1891,13 @@ export default function SampleDetailPage() {
                     </div>
                 )}
             </AnimatePresence>
+            {/* OP PRINT MODAL */}
+            {showOPPrintModal && (
+                <OPBarcodeModal 
+                    sample={sample} 
+                    onClose={() => setShowOPPrintModal(false)} 
+                />
+            )}
         </Layout>
     );
 }

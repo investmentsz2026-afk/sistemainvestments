@@ -65,7 +65,18 @@ export default function NewProductPage() {
 
   useEffect(() => {
     if (showAuditModal) fetchFinalizedAudits();
+    
+    // Load savedAuditItems from localStorage
+    const saved = localStorage.getItem('saved_audit_items');
+    if (saved) setSavedAuditItems(JSON.parse(saved));
   }, [showAuditModal]);
+
+  // Sync savedAuditItems to localStorage
+  useEffect(() => {
+    if (savedAuditItems.length > 0) {
+      localStorage.setItem('saved_audit_items', JSON.stringify(savedAuditItems));
+    }
+  }, [savedAuditItems]);
 
   const handleImportItem = (purchase: any, item: any) => {
     let invType = 'TERMINADOS';
@@ -101,36 +112,30 @@ export default function NewProductPage() {
     if (type === '1RA') {
       nameSuffix = sizeToUse ? ` (Talla ${sizeToUse})` : '';
       invType = 'TERMINADOS';
-      if (audit.productionSizeData) {
-        const sizeData = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
-        sizeData.forEach((item: any) => {
-          if (item.quantity > 0 && (!sizeToUse || item.size === sizeToUse)) {
-            variants.push({ size: item.size, color: item.color || 'ÚNICO', initialStock: item.quantity });
-          }
-        });
+      let qty = audit.quantityGood;
+      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
+        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
+        if (sz) qty = sz.qGood || 0;
       }
-      if (variants.length === 0 && audit.quantityGood > 0 && !sizeToUse) {
-        variants.push({ size: 'ESTÁNDAR', color: audit.productionColor || '1RA CALIDAD', initialStock: audit.quantityGood });
-      }
+      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: audit.productionColor || '1RA CALIDAD', initialStock: qty });
     } else if (type === '2DA') {
       nameSuffix = ' - 2DA CALIDAD' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
       invType = 'SEGUNDA';
-      // Try to find quantity for specific size in productionSizeData if available (planned)
       let qty = audit.quantitySecond;
-      if (sizeToUse && Array.isArray(audit.productionSizeData)) {
-        const sz = audit.productionSizeData.find((s: any) => s.size === sizeToUse);
-        if (sz) qty = sz.quantity || 0; // Better than nothing, often 2da is small fraction but user can adjust
+      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
+        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
+        if (sz) qty = sz.qSecond || 0;
       }
-      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: '2DA CALIDAD', initialStock: qty > 0 ? qty : 0 });
+      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: '2DA CALIDAD', initialStock: qty });
     } else if (type === 'PROCESO') {
       nameSuffix = ' - EN PROCESO' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
       invType = 'PROCESO';
       let qty = audit.quantityProcess;
-      if (sizeToUse && Array.isArray(audit.productionSizeData)) {
-        const sz = audit.productionSizeData.find((s: any) => s.size === sizeToUse);
-        if (sz) qty = sz.quantity;
+      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
+        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
+        if (sz) qty = sz.qProcess || 0;
       }
-      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: 'EN PROCESO', initialStock: qty > 0 ? qty : 0 });
+      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: 'EN PROCESO', initialStock: qty });
     }
 
     if (variants.length === 0) {
@@ -162,7 +167,7 @@ export default function NewProductPage() {
       name: (audit.sampleName || 'Producto') + nameSuffix,
       category: 'Prendas',
       inventoryType: invType,
-      sku: audit.op + (type === '1RA' ? '' : `-${type}`),
+      sku: audit.barcode || (audit.op + (type === '1RA' ? '' : `-${type}`)),
       op: audit.op,
       description: `Importado de Auditoría ${audit.process} • OP: ${audit.op}. Categoría: ${type}${sizeToUse ? ` • Ref. Talla: ${sizeToUse}` : ''}.`,
       purchasePrice: pPrice || 0.1,
@@ -193,6 +198,12 @@ export default function NewProductPage() {
     try {
       await api.patch(`/process-audits/${selectedAudit.id}/logistics-receive`);
       toast.success('Auditoría finalizada y cerrada con éxito.');
+      
+      // Clear persistence for this audit
+      const newSaved = savedAuditItems.filter(item => !item.startsWith(`${selectedAudit.id}-`));
+      setSavedAuditItems(newSaved);
+      localStorage.setItem('saved_audit_items', JSON.stringify(newSaved));
+
       setShowFinalConfirmModal(false);
       setShowAuditDetailModal(false);
       setSelectedAudit(null);
@@ -603,20 +614,30 @@ export default function NewProductPage() {
                 </div>
 
                 {/* ACTION BUTTONS */}
-                <div className="space-y-3">
-                  <div className="bg-white border-2 border-emerald-500 rounded-3xl overflow-hidden">
-                    <div className="p-6 bg-emerald-50/30 flex items-center justify-between border-b border-emerald-100">
-                      <div className="flex items-center gap-4 text-left">
-                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-emerald-500 shadow-lg shadow-emerald-200"><Package className="w-5 h-5" /></div>
-                        <div>
-                          <h4 className="font-black text-gray-900 text-sm">Subir Productos Terminados (1ra)</h4>
-                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
+                <div className="space-y-4">
+                  {selectedAudit.quantityGood > 0 && (
+                    <div className="bg-white border-2 border-emerald-500 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="p-6 bg-emerald-50/30 flex items-center justify-between border-b border-emerald-100">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-emerald-500 shadow-lg shadow-emerald-200"><Package className="w-5 h-5" /></div>
+                          <div>
+                            <h4 className="font-black text-gray-900 text-sm">Subir Productos Terminados (1ra)</h4>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
                         const isSaved = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
+                        // Get exact quantity for this size from breakdown
+                        let exactQty = sz.quantity;
+                        if (Array.isArray(selectedAudit.qualitySizeData)) {
+                          const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                          if (bsz) exactQty = bsz.qGood;
+                        }
+
+                        if (exactQty <= 0) return null; // No hay de esta talla
+
                         return (
                           <button
                             key={sz.size}
@@ -626,28 +647,38 @@ export default function NewProductPage() {
                               isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-emerald-500">Talla</span>
-                            <span className="text-sm font-black text-gray-900 uppercase">{sz.size}</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-emerald-500">Talla {sz.size}</span>
+                            <span className="text-sm font-black text-gray-900 uppercase">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-emerald-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.salePrice || '?' }`}</span>
                           </button>
                         );
                       })}
-                    </div>
-                  </div>
-
-                  <div className="bg-white border-2 border-rose-500 rounded-3xl overflow-hidden">
-                    <div className="p-6 bg-rose-50/30 flex items-center justify-between border-b border-rose-100">
-                      <div className="flex items-center gap-4 text-left">
-                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-rose-500 shadow-lg shadow-rose-200"><AlertCircle className="w-5 h-5" /></div>
-                        <div>
-                          <h4 className="font-black text-gray-900 text-sm">Subir Productos de Segunda</h4>
-                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
-                        </div>
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  )}
+
+                  {selectedAudit.quantitySecond > 0 && (
+                    <div className="bg-white border-2 border-rose-500 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="p-6 bg-rose-50/30 flex items-center justify-between border-b border-rose-100">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-rose-500 shadow-lg shadow-rose-200"><AlertCircle className="w-5 h-5" /></div>
+                          <div>
+                            <h4 className="font-black text-gray-900 text-sm">Subir Productos de Segunda</h4>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
                         const isSaved = savedAuditItems.includes(`${selectedAudit.id}-2DA-${sz.size}`);
+                        let exactQty = 0;
+                        if (Array.isArray(selectedAudit.qualitySizeData)) {
+                          const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                          if (bsz) exactQty = bsz.qSecond;
+                        }
+
+                        if (exactQty <= 0) return null;
+
                         return (
                           <button
                             key={sz.size}
@@ -657,28 +688,38 @@ export default function NewProductPage() {
                               isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-rose-500 hover:bg-rose-50 hover:shadow-md'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-rose-500">Talla</span>
-                            <span className="text-sm font-black text-gray-900 uppercase">{sz.size}</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-rose-500">Talla {sz.size}</span>
+                            <span className="text-sm font-black text-gray-900 uppercase">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-rose-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.secondSalePrice || '?' }`}</span>
                           </button>
                         );
                       })}
-                    </div>
-                  </div>
-
-                  <div className="bg-white border-2 border-amber-500 rounded-3xl overflow-hidden">
-                    <div className="p-6 bg-amber-50/30 flex items-center justify-between border-b border-amber-100">
-                      <div className="flex items-center gap-4 text-left">
-                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-amber-500 shadow-lg shadow-amber-200"><Clock className="w-5 h-5" /></div>
-                        <div>
-                          <h4 className="font-black text-gray-900 text-sm italic uppercase">Subir Productos en Proceso</h4>
-                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de costos</p>
-                        </div>
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  )}
+
+                  {selectedAudit.quantityProcess > 0 && (
+                    <div className="bg-white border-2 border-amber-500 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="p-6 bg-amber-50/30 flex items-center justify-between border-b border-amber-100">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-amber-500 shadow-lg shadow-amber-200"><Clock className="w-5 h-5" /></div>
+                          <div>
+                            <h4 className="font-black text-gray-900 text-sm italic uppercase">Subir Productos en Proceso</h4>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de costos</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
                         const isSaved = savedAuditItems.includes(`${selectedAudit.id}-PROCESO-${sz.size}`);
+                        let exactQty = 0;
+                        if (Array.isArray(selectedAudit.qualitySizeData)) {
+                          const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                          if (bsz) exactQty = bsz.qProcess;
+                        }
+
+                        if (exactQty <= 0) return null;
+
                         return (
                           <button
                             key={sz.size}
@@ -688,14 +729,15 @@ export default function NewProductPage() {
                               isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-amber-500 hover:bg-amber-50 hover:shadow-md'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-amber-500 font-mono italic">Talla</span>
-                            <span className="text-sm font-black text-gray-900 uppercase italic">{sz.size}</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-amber-500 font-mono italic">Talla {sz.size}</span>
+                            <span className="text-sm font-black text-gray-900 uppercase italic">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-amber-600 mt-1">{isSaved ? 'AGREGADO' : ''}</span>
                           </button>
                         );
                       })}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="pt-8 border-t border-gray-100">

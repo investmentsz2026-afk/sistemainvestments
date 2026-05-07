@@ -41,6 +41,7 @@ export default function NewAuditPage() {
     const [observations, setObservations] = useState('');
     const [evidences, setEvidences] = useState<string[]>([]);
     const [totalQuantity, setTotalQuantity] = useState(0);
+    const [servicePrice, setServicePrice] = useState<number>(0);
 
     // UI Helpers
     const [showProductSearch, setShowProductSearch] = useState(false);
@@ -97,6 +98,7 @@ export default function NewAuditPage() {
                 op,
                 process,
                 externalCompany: externalCompany || null,
+                servicePrice: Number(servicePrice) || 0,
                 totalQuantity,
                 observations,
                 evidences
@@ -269,18 +271,33 @@ export default function NewAuditPage() {
                                 </div>
                             </div>
 
-                            {/* EMPRESA EXTERNA */}
-                            <div className="mt-8 space-y-2 pt-6 border-t border-gray-50">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                                    <Building2 className="w-3.5 h-3.5" /> Empresa Externa (opcional)
-                                </label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Ej: Lavandería San Martín, Taller Textil Lima..."
-                                    className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 transition"
-                                    value={externalCompany}
-                                    onChange={(e) => setExternalCompany(e.target.value)}
-                                />
+                            {/* EMPRESA EXTERNA Y COSTO */}
+                            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-50">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                        <Building2 className="w-3.5 h-3.5" /> Empresa Externa (opcional)
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Ej: Lavandería San Martín, Taller Textil Lima..."
+                                        className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 transition"
+                                        value={externalCompany}
+                                        onChange={(e) => setExternalCompany(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                        <span className="text-emerald-500 font-black">S/.</span> Costo del Servicio
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        placeholder="Costo por unidad o proceso..."
+                                        className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 transition"
+                                        value={servicePrice || ''}
+                                        onChange={(e) => setServicePrice(parseFloat(e.target.value) || 0)}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -317,6 +334,12 @@ export default function NewAuditPage() {
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500 font-bold">Empresa:</span>
                                                 <span className="font-black text-gray-900">{externalCompany}</span>
+                                            </div>
+                                        )}
+                                        {servicePrice > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-500 font-bold">Costo:</span>
+                                                <span className="font-black text-emerald-600">S/. {servicePrice.toFixed(2)}</span>
                                             </div>
                                         )}
                                     </div>
