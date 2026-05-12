@@ -42,7 +42,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const commonStyles = `
     @page {
-      size: 100mm 280mm;
+      size: 100mm 40mm;
       margin: 0;
     }
     * {
@@ -62,7 +62,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       background: #fff;
       color: #000;
       width: 100mm !important;
-      min-width: 100mm !important;
+      height: auto !important;
       overflow: visible !important;
     }
     body {
