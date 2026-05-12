@@ -64,11 +64,19 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .barcode-row {
       display: grid !important;
       grid-template-columns: repeat(3, 30.2mm) !important;
       gap: 0mm !important;
       justify-content: start !important;
       align-content: start !important;
+      page-break-after: always;
+      width: 90.6mm;
+      height: 40mm;
+      overflow: hidden;
     }
     .barcode-label {
       width: 30.2mm;
@@ -220,7 +228,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    const allStickers = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -246,7 +254,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    // Agrupar en filas de 3 para el rollo 3-up
+    let items = '';
+    for (let i = 0; i < allStickers.length; i += 3) {
+      const row = allStickers.slice(i, i + 3).join('');
+      items += `<div class="barcode-row">${row}</div>`;
+    }
 
     printWindow.document.write(`
       <html>
@@ -287,7 +302,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = product.variants.flatMap((variant: any) =>
+    const allStickers = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -314,7 +329,14 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    ).join('');
+    );
+
+    // Agrupar en filas de 3 para el rollo 3-up
+    let items = '';
+    for (let i = 0; i < allStickers.length; i += 3) {
+      const row = allStickers.slice(i, i + 3).join('');
+      items += `<div class="barcode-row">${row}</div>`;
+    }
 
     printWindow.document.write(`
       <html>
