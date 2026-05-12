@@ -232,7 +232,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const COLS_PER_BLOCK = 3;
     const BLOCK_SIZE = ROWS_PER_BLOCK * COLS_PER_BLOCK;
 
-    const reorderedItems = [];
+    const reorderedItems: any[] = [];
     const totalItems = quantity;
     
     for (let b = 0; b < totalItems; b += BLOCK_SIZE) {
@@ -325,7 +325,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const COLS_PER_BLOCK = 3;
     const BLOCK_SIZE = ROWS_PER_BLOCK * COLS_PER_BLOCK;
 
-    const reorderedAll = [];
+    const reorderedAll: any[] = [];
     for (let b = 0; b < allVariantsFlat.length; b += BLOCK_SIZE) {
       const block = allVariantsFlat.slice(b, b + BLOCK_SIZE);
       for (let r = 0; r < ROWS_PER_BLOCK; r++) {
