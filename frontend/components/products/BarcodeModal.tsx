@@ -185,6 +185,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       max-width: 100%;
       height: auto;
       image-rendering: crisp-edges;
+      shape-rendering: crispEdges;
+    }
+    .barcode-svg * {
+      stroke: none !important;
     }
     .size-text {
       font-size: 18pt;
