@@ -62,6 +62,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       background: #fff;
       color: #000;
       width: 100mm !important;
+      min-width: 100mm !important;
+      overflow: visible !important;
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
@@ -70,7 +72,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       gap: 3mm !important;
       justify-content: start !important;
       align-content: start !important;
-      padding: 2mm !important;
     }
     .barcode-label {
       width: 30.2mm;
