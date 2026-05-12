@@ -224,8 +224,30 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
-      const variant = selectedVariant;
+    const ROWS_PER_BLOCK = 7;
+    const COLS_PER_BLOCK = 3;
+    const BLOCK_SIZE = ROWS_PER_BLOCK * COLS_PER_BLOCK;
+
+    const reorderedItems = [];
+    const totalItems = quantity;
+    
+    for (let b = 0; b < totalItems; b += BLOCK_SIZE) {
+      const remainingInBlock = Math.min(BLOCK_SIZE, totalItems - b);
+      for (let r = 0; r < ROWS_PER_BLOCK; r++) {
+        for (let c = 0; c < COLS_PER_BLOCK; c++) {
+          const indexInBlock = c * ROWS_PER_BLOCK + r;
+          if (indexInBlock < remainingInBlock) {
+            reorderedItems.push({ variant: selectedVariant, index: b + indexInBlock });
+          } else {
+            reorderedItems.push(null);
+          }
+        }
+      }
+    }
+
+    const items = reorderedItems.map((item, i) => {
+      if (!item) return '<div class="barcode-label" style="visibility: hidden;"></div>';
+      const { variant, index } = item;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
       const hasPrice = parseFloat(product.sellingPrice) > 0;
@@ -291,34 +313,57 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = product.variants.flatMap((variant: any) =>
-      Array(quantity).fill(0).map((_, index) => {
-        const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
-        const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
-        const hasPrice = parseFloat(product.sellingPrice) > 0;
+    const allVariantsFlat = product.variants.flatMap((variant: any) =>
+      Array(quantity).fill(0).map((_, index) => ({ variant, originalIndex: index }))
+    );
 
-        return `
-          <div class="barcode-label">
-            <div class="label-inner">
-              <div class="label-header">
-                <div class="brand">AMERICAN COLT</div>
-                <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
-                <div class="model">${modelDisplay}</div>
-                <div class="color-text">COLOR: ${variant.color}</div>
-              </div>
-              <div class="barcode-section">
-                <div class="barcode-wrapper">
-                  <svg id="barcode-${variant.id}-${index}" class="barcode-svg"></svg>
-                  <div class="sku-text">${variant.variantSku}</div>
-                </div>
-                ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
-              </div>
-              ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
+    const ROWS_PER_BLOCK = 7;
+    const COLS_PER_BLOCK = 3;
+    const BLOCK_SIZE = ROWS_PER_BLOCK * COLS_PER_BLOCK;
+
+    const reorderedAll = [];
+    for (let b = 0; b < allVariantsFlat.length; b += BLOCK_SIZE) {
+      const block = allVariantsFlat.slice(b, b + BLOCK_SIZE);
+      for (let r = 0; r < ROWS_PER_BLOCK; r++) {
+        for (let c = 0; c < COLS_PER_BLOCK; c++) {
+          const indexInBlock = c * ROWS_PER_BLOCK + r;
+          if (indexInBlock < block.length) {
+            reorderedAll.push(block[indexInBlock]);
+          } else {
+            reorderedAll.push(null);
+          }
+        }
+      }
+    }
+
+    const items = reorderedAll.map((item, i) => {
+      if (!item) return '<div class="barcode-label" style="visibility: hidden;"></div>';
+      const { variant, originalIndex } = item;
+      const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
+      const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
+      const hasPrice = parseFloat(product.sellingPrice) > 0;
+
+      return `
+        <div class="barcode-label">
+          <div class="label-inner">
+            <div class="label-header">
+              <div class="brand">AMERICAN COLT</div>
+              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+              <div class="model">${modelDisplay}</div>
+              <div class="color-text">COLOR: ${variant.color}</div>
             </div>
+            <div class="barcode-section">
+              <div class="barcode-wrapper">
+                <svg id="barcode-${variant.id}-${originalIndex}-${i}" class="barcode-svg"></svg>
+                <div class="sku-text">${variant.variantSku}</div>
+              </div>
+              ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
+            </div>
+            ${hasPrice ? `<div class="price-text">PRECIO SUG. : S/. ${parseFloat(product.sellingPrice).toFixed(2)}</div>` : ''}
           </div>
-        `;
-      })
-    ).join('');
+        </div>
+      `;
+    }).join('');
 
     printWindow.document.write(`
       <html>
