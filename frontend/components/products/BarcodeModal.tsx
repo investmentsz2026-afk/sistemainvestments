@@ -91,7 +91,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 0mm 1mm;
+      padding: 0.5mm 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -200,7 +200,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       font-weight: 900;
       width: 100%;
       text-align: left;
-      padding-left: 2mm;
+      padding-left: 1.5mm;
+      white-space: nowrap;
       margin-top: 0mm;
       padding-top: 0mm;
       letter-spacing: 0.1mm;
@@ -444,7 +445,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-start pt-0 px-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                  <div className="flex flex-col items-center justify-start pt-[0.5mm] px-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '5.7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '5.7pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
@@ -471,7 +472,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     </div>
                     
                     {parseFloat(product.sellingPrice) > 0 && (
-                      <div style={{ fontSize: '5.4pt' }} className="font-black w-full text-left pl-[2mm] mt-0 pt-0">
+                      <div style={{ fontSize: '5.4pt' }} className="font-black w-full text-left pl-[1.5mm] mt-0 pt-0 whitespace-nowrap">
                         PRECIO SUG. : S/. {parseFloat(product.sellingPrice).toFixed(2)}
                       </div>
                     )}
