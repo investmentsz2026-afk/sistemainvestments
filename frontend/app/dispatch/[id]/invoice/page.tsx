@@ -69,11 +69,6 @@ export default function InvoicePage() {
     };
 
     const handleCompleteOrder = async () => {
-        if (!docNumber) {
-            toast.error('Por favor ingresa el número de comprobante');
-            return;
-        }
-
         setShowConfirmModal(true);
     };
 
@@ -115,9 +110,9 @@ export default function InvoicePage() {
         order?.items?.some((it: any) => (it[sf.dispField] || 0) > 0)
     );
 
-    const subtotal = order?.items?.reduce((acc: number, it: any) => acc + (it.dispQuantity * it.unitPrice), 0) || 0;
-    const igvAmount = subtotal * (igv / 100);
-    const total = subtotal + igvAmount;
+    const total = order?.items?.reduce((acc: number, it: any) => acc + (it.dispQuantity * it.unitPrice), 0) || 0;
+    const subtotal = total / (1 + (igv / 100));
+    const igvAmount = total - subtotal;
 
     const handlePrint = () => {
         if (!order) return;
@@ -244,19 +239,19 @@ export default function InvoicePage() {
         <div style="padding:20px 28px;border:1px solid #e5e7eb;border-top:none;background:#fafafa;">
             <table style="width:280px;margin-left:auto;border-collapse:collapse;">
                 <tr>
-                    <td style="padding:6px 0;font-size:12px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;">Subtotal</td>
-                    <td style="padding:6px 0;text-align:right;font-size:14px;font-weight:800;color:#333;">S/ ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td style="padding:6px 0;font-size:12px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;">TOTAL</td>
+                    <td style="padding:6px 0;text-align:right;font-size:18px;font-weight:900;color:#111;">S/ ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
                 <tr>
-                    <td style="padding:6px 0;font-size:12px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;">IGV (${igv}%)</td>
-                    <td style="padding:6px 0;text-align:right;font-size:14px;font-weight:800;color:#333;">S/ ${igvAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td colspan="2" style="padding:4px 0;"><div style="height:1px;background:#eee;"></div></td>
                 </tr>
                 <tr>
-                    <td colspan="2" style="padding:4px 0;"><div style="height:2px;background:#111;"></div></td>
+                    <td style="padding:6px 0;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;">SUBTOTAL</td>
+                    <td style="padding:6px 0;text-align:right;font-size:12px;font-weight:700;color:#444;">S/ ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
                 <tr>
-                    <td style="padding:8px 0;font-size:16px;font-weight:900;color:#111;text-transform:uppercase;">TOTAL</td>
-                    <td style="padding:8px 0;text-align:right;font-size:22px;font-weight:900;color:#111;">S/ ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td style="padding:6px 0;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;">IGV (${igv}%)</td>
+                    <td style="padding:6px 0;text-align:right;font-size:12px;font-weight:700;color:#444;">S/ ${igvAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
             </table>
         </div>
@@ -378,14 +373,18 @@ export default function InvoicePage() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nro. Comprobante</label>
+                            <div className="flex justify-between items-center ml-1">
+                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Nro. Comprobante</label>
+                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Opcional: Auto-generar</span>
+                            </div>
                             <input
                                 type="text"
                                 value={docNumber}
                                 onChange={(e) => setDocNumber(e.target.value)}
-                                placeholder="Ej: B001-00001"
+                                placeholder="Vacio = Siguiente oficial"
                                 className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700"
                             />
+                            <p className="text-[10px] text-gray-400 font-medium italic ml-1">Si lo dejas vacío, el sistema asignará el correlativo legal.</p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Método de Pago</label>
@@ -538,17 +537,17 @@ export default function InvoicePage() {
                         <div className="flex justify-end">
                             <div className="w-72 space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Subtotal</span>
-                                    <span className="text-sm font-black text-gray-700">S/ {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">IGV ({igv}%)</span>
-                                    <span className="text-sm font-black text-gray-700">S/ {igvAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                </div>
-                                <div className="h-px bg-gray-900"></div>
-                                <div className="flex justify-between items-center pt-1">
                                     <span className="text-base font-black text-gray-900 uppercase">Total</span>
-                                    <span className="text-2xl font-black text-gray-900">S/ {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    <span className="text-2xl font-black text-indigo-600">S/ {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="h-px bg-gray-200"></div>
+                                <div className="flex justify-between items-center opacity-60">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Subtotal</span>
+                                    <span className="text-xs font-black text-gray-700">S/ {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center opacity-60">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">IGV ({igv}%)</span>
+                                    <span className="text-xs font-black text-gray-700">S/ {igvAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         </div>

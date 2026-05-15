@@ -399,6 +399,17 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                     >
                                         <FileText className="w-4 h-4" /> Descargar PDF
                                     </button>
+
+                                    {sale.sunatPdfUrl && (
+                                        <a
+                                            href={sale.sunatPdfUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-3 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition active:scale-95"
+                                        >
+                                            <ShieldCheck className="w-4 h-4" /> Ver Factura Oficial
+                                        </a>
+                                    )}
                                 </div>
 
                                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/20 w-full md:w-80">

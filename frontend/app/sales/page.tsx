@@ -18,11 +18,12 @@ import {
     Download,
     CreditCard
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Eye, Wallet, FileSpreadsheet, FileText, Send } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import SaleDetailsModal from '../../components/sales/SaleDetailsModal';
 import SalePaymentsModal from '../../components/sales/SalePaymentsModal';
-import { Eye, Wallet, FileSpreadsheet, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -73,6 +74,18 @@ export default function SalesPage() {
             console.error('Error fetching sales:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+    
+    const handleSendToSunat = async (id: string) => {
+        try {
+            toast.loading('Enviando a SUNAT...', { id: 'sunat' });
+            await api.post(`/sales/${id}/sunat`);
+            toast.success('¡Enviado a SUNAT correctamente!', { id: 'sunat' });
+            fetchSales();
+        } catch (error: any) {
+            console.error('Error sending to SUNAT:', error);
+            toast.error(error.response?.data?.message || 'Error al enviar a SUNAT', { id: 'sunat' });
         }
     };
 
@@ -430,18 +443,37 @@ export default function SalesPage() {
                                                 </span>
                                             </td>
                                             <td className="px-8 py-6">
-                                                {sale.invoiceNumber ? (
-                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                        sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600' :
-                                                        sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'
-                                                    }`}>
-                                                        {sale.sunatStatus || 'PENDIENTE'}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                                                        N/A
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-3">
+                                                    {sale.invoiceNumber ? (
+                                                        <>
+                                                            <span 
+                                                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest cursor-help ${
+                                                                    sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600' :
+                                                                    sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'
+                                                                }`}
+                                                                title={sale.sunatResponse || (sale.sunatStatus === 'ERROR' ? 'Error desconocido' : '')}
+                                                            >
+                                                                {sale.sunatStatus || 'PENDIENTE'}
+                                                            </span>
+                                                            {(sale.sunatStatus === 'PENDIENTE' || sale.sunatStatus === 'ERROR' || !sale.sunatStatus) && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleSendToSunat(sale.id);
+                                                                    }}
+                                                                    className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+                                                                    title="Enviar a SUNAT"
+                                                                >
+                                                                    <Send className="w-3 h-3" />
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                                                            N/A
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">

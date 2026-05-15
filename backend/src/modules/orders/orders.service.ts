@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SalesService } from '../commercial/sales.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
-    private notifications: NotificationsService
+    private notifications: NotificationsService,
+    private salesService: SalesService
   ) {}
 
   async create(user: any, data: any) {
@@ -381,23 +383,34 @@ export class OrdersService {
       }
     }
 
-    // Create the Sale record with the REAL dispatched total (Including IGV)
-    const finalTotalWithTax = actualTotalAmount * (1 + igvRate);
+    // Create the Sale record with the REAL dispatched total (Price already includes IGV)
+    const finalTotalWithTax = actualTotalAmount;
 
-    await this.prisma.sale.create({
+    // Auto-generate docNumber if missing
+    let finalDocNumber = docNumber;
+    if (!finalDocNumber) {
+        const type = docType === 'FACTURA' ? 'FACTURA' : 'BOLETA';
+        finalDocNumber = await this.salesService.getNextInvoiceNumber(type);
+    }
+
+    const sale = await this.prisma.sale.create({
       data: {
-        invoiceNumber: docNumber || `REF-${order.orderNumber || order.id.slice(-6)}`,
+        invoiceNumber: finalDocNumber,
         clientId: order.clientId,
-        totalAmount: finalTotalWithTax, // Ahora incluye el IGV tal como sale en la boleta
+        totalAmount: finalTotalWithTax, 
         paymentMethod: paymentMethod || 'CREDITO',
         status: 'COMPLETADO',
         sellerId: order.sellerId,
-        notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'} (DESPACHO PARCIAL)`,
+        notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'}. (Precios Inc. IGV)`,
+        sunatStatus: 'PENDIENTE',
         items: {
           create: saleItems
         }
       }
     });
+
+    // Trigger SUNAT asynchronously
+    this.salesService.sendToSunat(sale.id).catch(err => console.error('Auto SUNAT from Order failed:', err));
 
     // Notify Comercial and Seller
     await this.notifications.create({

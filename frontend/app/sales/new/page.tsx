@@ -130,12 +130,27 @@ export default function NewSalePage() {
         }
 
         setIsSaving(true);
+        if (invoiceNumber) {
+            const invoiceRegex = /^[FB][A-Z0-9]{3}-\d+$/;
+            if (!invoiceRegex.test(invoiceNumber)) {
+                alert('Formato de comprobante inválido. Debe ser como F001-1 o B001-1');
+                setIsSaving(false);
+                return;
+            }
+
+            if (invoiceNumber.startsWith('F') && (!selectedClientId || !selectedClient?.documentNumber || selectedClient.documentType !== 'RUC')) {
+                alert('Para emitir una FACTURA es obligatorio seleccionar un cliente con RUC');
+                setIsSaving(false);
+                return;
+            }
+        }
+
         try {
-            await api.post('/sales', {
+            const response = await api.post('/sales', {
                 clientId: selectedClientId || null,
                 items: cart,
                 paymentMethod,
-                invoiceNumber,
+                invoiceNumber: invoiceNumber || null,
                 notes
             });
             setShowSuccess(true);
@@ -373,6 +388,21 @@ export default function NewSalePage() {
                                         <span className="text-xl font-black uppercase">Total a Pagar</span>
                                         <span className="text-4xl font-black text-emerald-400">S/ {total.toLocaleString()}</span>
                                     </div>
+                                </div>
+                                
+                                <div className="space-y-2 mb-8">
+                                    <div className="flex justify-between items-center ml-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Número de Comprobante</label>
+                                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Opcional: Auto-generar</span>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="F001-1 / B001-1 (Vacio = Siguiente)"
+                                        className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                        value={invoiceNumber}
+                                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                                    />
+                                    <p className="text-[9px] text-gray-500 font-medium italic">Facturas (F) requieren RUC. Boletas (B) son para DNI/Varios.</p>
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-3 mb-8">

@@ -7,16 +7,61 @@ export class SalesService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService
-  ) { }
+  ) {
+    this.ensureInvoiceConfigs();
+  }
+
+  async ensureInvoiceConfigs() {
+    const configs = [
+      { type: 'FACTURA', series: 'F001' },
+      { type: 'BOLETA', series: 'B001' }
+    ];
+
+    for (const config of configs) {
+      await this.prisma.invoiceConfig.upsert({
+        where: { type: config.type },
+        update: {},
+        create: { ...config, nextNumber: 1 }
+      });
+    }
+  }
+
+  async getNextInvoiceNumber(type: 'FACTURA' | 'BOLETA') {
+    return await this.prisma.$transaction(async (tx) => {
+      const config = await tx.invoiceConfig.findUnique({
+        where: { type }
+      });
+
+      if (!config) throw new BadRequestException(`Configuración no encontrada para ${type}`);
+
+      const number = config.nextNumber;
+      const formattedNumber = `${config.series}-${number.toString().padStart(6, '0')}`;
+
+      await tx.invoiceConfig.update({
+        where: { type },
+        data: { nextNumber: number + 1 }
+      });
+
+      return formattedNumber;
+    });
+  }
 
   async createSale(userId: string, data: any) {
-    const { clientId, items, paymentMethod, notes, invoiceNumber } = data;
+    const { clientId, items, paymentMethod, notes } = data;
+    let { invoiceNumber } = data;
 
     if (!items || items.length === 0) {
       throw new BadRequestException('La venta debe tener al menos un producto');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
+    // Auto-generate invoiceNumber if not provided
+    if (!invoiceNumber) {
+      const client = clientId ? await this.prisma.client.findUnique({ where: { id: clientId } }) : null;
+      const type = client?.documentType === 'RUC' ? 'FACTURA' : 'BOLETA';
+      invoiceNumber = await this.getNextInvoiceNumber(type);
+    }
+
+    const sale = await this.prisma.$transaction(async (tx) => {
       let totalAmount = 0;
 
       // 1. Validate stock and calculate total
@@ -39,7 +84,7 @@ export class SalesService {
       }
 
       // 2. Create Sale
-      const sale = await tx.sale.create({
+      const newSale = await tx.sale.create({
         data: {
           invoiceNumber,
           clientId,
@@ -47,7 +92,7 @@ export class SalesService {
           totalAmount,
           notes,
           sellerId: userId,
-          sunatStatus: invoiceNumber ? 'PENDIENTE' : null,
+          sunatStatus: 'PENDIENTE',
           items: {
             create: items.map((item: any) => ({
               variantId: item.variantId,
@@ -75,8 +120,8 @@ export class SalesService {
           data: {
             type: 'EXIT',
             quantity: item.quantity,
-            reason: `VENTA - Ref: ${sale.id}`,
-            reference: sale.invoiceNumber || sale.id,
+            reason: `VENTA - Ref: ${newSale.id}`,
+            reference: newSale.invoiceNumber || newSale.id,
             previousStock: variant.stock + item.quantity,
             newStock: variant.stock,
             variantId: item.variantId,
@@ -85,8 +130,13 @@ export class SalesService {
         });
       }
 
-      return sale;
+      return newSale;
     });
+
+    // 4. Trigger SUNAT asynchronously
+    this.sendToSunat(sale.id).catch(err => console.error('Auto SUNAT failed:', err));
+
+    return sale;
   }
 
   async findAll(user: any, query: any) {
@@ -236,54 +286,110 @@ export class SalesService {
       }
     });
 
-    if (!sale || !sale.invoiceNumber) return;
+    if (!sale || !sale.invoiceNumber) return { success: false, message: 'La venta no tiene un número de comprobante' };
 
-    // This is where we call the Invoicing API (e.g. Nubefact, ApisPeru, Greenter)
-    // Recommended: Nubefact because it is very easy to use with JSON.
-    
     const API_TOKEN = process.env.SUNAT_INVOICING_TOKEN;
     const API_URL = process.env.SUNAT_INVOICING_URL;
 
     if (!API_TOKEN || !API_URL) {
       return {
         success: false,
-        message: 'API de Facturación no configurada (.env)'
+        message: 'API de Facturación no configurada en el servidor'
       };
     }
 
     try {
-      // Mocking the payload for Nubefact
+      // Price already includes IGV
+      const total = parseFloat(sale.totalAmount.toFixed(2));
+      const subtotal = parseFloat((total / 1.18).toFixed(2));
+      const igv = parseFloat((total - subtotal).toFixed(2));
+
+      // Split invoiceNumber (expected format: F001-123)
+      const parts = sale.invoiceNumber.split('-');
+      const serie = parts[0];
+      const numero = parseInt(parts[1]);
+
       const payload = {
         operacion: "generar_comprobante",
-        tipo_de_comprobante: sale.invoiceNumber.startsWith('F') ? 1 : 2, // 1: Factura, 2: Boleta
-        serie: sale.invoiceNumber.split('-')[0],
-        numero: sale.invoiceNumber.split('-')[1],
-        cliente_tipo_de_documento: sale.client?.documentType === 'RUC' ? 6 : 1,
-        cliente_numero_de_documento: sale.client?.documentNumber,
-        cliente_denominacion: sale.client?.name,
-        cliente_direccion: sale.client?.address,
-        total: sale.totalAmount,
-        items: sale.items.map(item => ({
-          descripcion: item.variant.product.name,
-          cantidad: item.quantity,
-          valor_unitario: item.unitPrice / 1.18,
-          precio_unitario: item.unitPrice,
-          total: item.totalPrice
-        }))
+        tipo_de_comprobante: sale.invoiceNumber.startsWith('F') ? 1 : 2,
+        serie: serie,
+        numero: numero,
+        sunat_transaction: 1,
+        cliente_tipo_de_documento: sale.client?.documentType === 'RUC' ? 6 : (sale.client?.documentType === 'DNI' ? 1 : "-"),
+        cliente_numero_de_documento: sale.client?.documentNumber || "00000000",
+        cliente_denominacion: sale.client?.name || "PÚBLICO GENERAL",
+        cliente_direccion: sale.client?.address || "",
+        cliente_email: sale.client?.email || "",
+        fecha_de_emision: new Date(sale.createdAt).toLocaleDateString('es-PE').split('/').join('-'),
+        moneda: 1, // Soles
+        tipo_de_cambio: null,
+        porcentaje_de_igv: 18.0,
+        total_descuento: null,
+        total_anticipo: null,
+        total_gravada: parseFloat(subtotal.toFixed(2)),
+        total_inafecta: null,
+        total_exonerada: null,
+        total_gratuita: null,
+        total_otros_cargos: null,
+        total_igv: parseFloat(igv.toFixed(2)),
+        total_pago_otros: null,
+        total_pago_con_monto_fijo_por_item: null,
+        total: parseFloat(sale.totalAmount.toFixed(2)),
+        enviar_a_sunat: true,
+        items: sale.items.map(item => {
+          const itemSubtotal = item.totalPrice / 1.18;
+          const itemIgv = item.totalPrice - itemSubtotal;
+          return {
+            unidad_de_medida: "NIU",
+            codigo: item.variant.variantSku,
+            descripcion: `${item.variant.product.name} (${item.variant.size}/${item.variant.color})`,
+            cantidad: item.quantity,
+            valor_unitario: parseFloat((item.unitPrice / 1.18).toFixed(2)),
+            precio_unitario: parseFloat(item.unitPrice.toFixed(2)),
+            subtotal: parseFloat(itemSubtotal.toFixed(2)),
+            tipo_de_igv: 1,
+            igv: parseFloat(itemIgv.toFixed(2)),
+            total: parseFloat(item.totalPrice.toFixed(2)),
+            anticipo_regularizacion: false,
+            anticipo_documento_serie: null,
+            anticipo_documento_numero: null
+          };
+        })
       };
 
-      // Here you would do: await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload), headers: { Authorization: API_TOKEN } })
-      
-      // Update sale status
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': API_TOKEN
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(result.errors);
+      }
+
+      // Update sale with SUNAT info
       await this.prisma.sale.update({
         where: { id: saleId },
         data: {
-          sunatStatus: 'ENVIADO', // In real life this would depend on the response
-          sunatResponse: 'Documento enviado a SUNAT (Demostración)'
+          sunatStatus: result.aceptada_por_sunat ? 'ACEPTADO' : 'ENVIADO',
+          sunatResponse: result.sunat_description || 'Comprobante generado correctamente',
+          sunatXmlUrl: result.enlace_del_xml,
+          sunatPdfUrl: result.enlace_del_pdf,
+          sunatCdrUrl: result.enlace_del_cdr,
         }
       });
 
-      return { success: true, message: 'Documento enviado a SUNAT' };
+      return { 
+        success: true, 
+        message: 'Comprobante enviado a Nubefact/SUNAT correctamente',
+        data: result
+      };
+
     } catch (error) {
       console.error('Error sending to SUNAT:', error);
       await this.prisma.sale.update({
@@ -293,7 +399,7 @@ export class SalesService {
           sunatResponse: error.message
         }
       });
-      return { success: false, message: error.message };
+      return { success: false, message: 'Error al enviar a Nubefact: ' + error.message };
     }
   }
 

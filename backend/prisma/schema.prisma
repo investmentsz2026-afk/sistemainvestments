@@ -507,3 +507,12 @@ model Agency {
 
   @@map("agencies")
 }
+
+model InvoiceConfig {
+  id              String   @id @default(cuid())
+  type            String   @unique // FACTURA, BOLETA
+  series          String   // e.g. F001, B001
+  nextNumber      Int      @default(1)
+  
+  @@map("invoice_configs")
+}
