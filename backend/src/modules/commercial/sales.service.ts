@@ -519,12 +519,15 @@ export class SalesService {
     }
 
     try {
-      const url = `${BASE_URL}${docType.toLowerCase()}/${docNum}`;
+      // Ensure docType is lowercase for the API (ruc/dni)
+      const type = docType.toLowerCase();
+      const url = `${BASE_URL}${type}/${docNum}?token=${API_TOKEN}`;
       
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${API_TOKEN}`,
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'User-Agent': 'InvestmentsSystem/1.0'
         }
       });
       
