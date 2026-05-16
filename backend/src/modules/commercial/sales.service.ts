@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import axios from 'axios';
 
 @Injectable()
 export class SalesService {
@@ -522,27 +523,21 @@ export class SalesService {
       const type = docType.toLowerCase();
       const url = `${BASE_URL}${type}/${docNum}`;
       
-      const response = await fetch(url, {
+      const response = await axios.get(url, {
         headers: {
           'Authorization': `Bearer ${API_TOKEN}`,
           'Accept': 'application/json'
-        }
+        },
+        timeout: 10000 // 10 seconds timeout
       });
       
-      const result = await response.json();
-      
-      if (!response.ok) {
-        const errorMsg = result.message || JSON.stringify(result);
-        throw new Error(`ApisPeru dice: ${errorMsg}`);
-      }
+      const result = response.data;
 
       // Mapping Apis Perú v3 response to our format
-      // RUC returns razonSocial, direccion, etc.
-      // DNI returns nombres, apellidoPaterno, apellidoMaterno
       let name = '';
       let address = '';
 
-      if (docType === 'RUC') {
+      if (type === 'ruc') {
         name = result.razonSocial;
         address = result.direccion;
       } else {
@@ -561,9 +556,10 @@ export class SalesService {
           ubigeo: result.ubigeo
         }
       };
-    } catch (error) {
-      console.error('Error in ApisPeru lookup:', error);
-      throw new BadRequestException('Error al consultar el documento: ' + error.message);
+    } catch (error: any) {
+      console.error('Error in ApisPeru lookup:', error.message);
+      const errorDetail = error.response?.data?.message || error.message;
+      throw new BadRequestException(`ApisPeru dice: ${errorDetail}`);
     }
   }
 }
