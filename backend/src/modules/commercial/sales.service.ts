@@ -519,22 +519,21 @@ export class SalesService {
     }
 
     try {
-      // Ensure docType is lowercase for the API (ruc/dni)
       const type = docType.toLowerCase();
-      const url = `${BASE_URL}${type}/${docNum}?token=${API_TOKEN}`;
+      const url = `${BASE_URL}${type}/${docNum}`;
       
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${API_TOKEN}`,
-          'Accept': 'application/json',
-          'User-Agent': 'InvestmentsSystem/1.0'
+          'Accept': 'application/json'
         }
       });
       
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.message || 'Error en la consulta a Apis Perú');
+        // We throw the actual message from Apis Peru to see what's wrong
+        throw new Error(result.message || JSON.stringify(result) || 'Error desconocido en Apis Perú');
       }
 
       // Mapping Apis Perú v3 response to our format
