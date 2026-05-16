@@ -511,55 +511,56 @@ export class SalesService {
   }
 
   async lookupDocument(docType: string, docNum: string) {
-    // This is a proxy to an external SUNAT/RENIEC API
-    // Recommended: https://apisperu.com/ or https://peruconsultas.com/
-    
-    // For now, we use a placeholder or a mock implementation if no token is provided
-    const API_TOKEN = process.env.SUNAT_API_TOKEN;
+    const API_TOKEN = process.env.APIS_PERU_TOKEN;
+    const BASE_URL = process.env.APIS_PERU_URL || 'https://api.apisperu.net/v3/';
     
     if (!API_TOKEN) {
-      // If no token, we return a mock or inform the user
-      // throw new BadRequestException('SUNAT API Token not configured');
-      
-      // Let's return a friendly message for now so the user knows they need a token
-      return {
-        success: false,
-        message: 'Para usar esta función necesitas configurar un Token de API (apisperu.com o similar)',
-        mockData: true,
-        data: {
-          name: 'CLIENTE DE PRUEBA S.A.C.',
-          address: 'AV. LAS FLORES 123 - LIMA',
-          documentNumber: docNum,
-          documentType: docType
-        }
-      };
+      throw new BadRequestException('El Token de Apis Perú no está configurado en el servidor.');
     }
 
     try {
-      // Example implementation for ApisPeru
-      const url = docType === 'RUC' 
-        ? `https://api.apisperu.com/v1/ruc/${docNum}?token=${API_TOKEN}`
-        : `https://api.apisperu.com/v1/dni/${docNum}?token=${API_TOKEN}`;
+      const url = `${BASE_URL}${docType.toLowerCase()}?numero=${docNum}`;
       
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      });
+      
       const result = await response.json();
       
-      if (!response.ok) throw new Error(result.message || 'Error en la consulta');
+      if (!response.ok) {
+        throw new Error(result.message || 'Error en la consulta a Apis Perú');
+      }
+
+      // Mapping Apis Perú v3 response to our format
+      // RUC returns razonSocial, direccion, etc.
+      // DNI returns nombres, apellidoPaterno, apellidoMaterno
+      let name = '';
+      let address = '';
+
+      if (docType === 'RUC') {
+        name = result.razonSocial;
+        address = result.direccion;
+      } else {
+        name = `${result.nombres} ${result.apellidoPaterno} ${result.apellidoMaterno}`;
+      }
 
       return {
         success: true,
         data: {
-          name: result.razonSocial || result.nombreCompleto || result.nombres,
-          address: result.direccion || '',
+          name: name.trim(),
+          address: address || '',
           documentNumber: docNum,
           documentType: docType,
-          ubigeo: result.ubigeo,
-          condition: result.condicion,
-          status: result.estado
+          status: result.estado || 'ACTIVO',
+          condition: result.condicion || 'HABIDO',
+          ubigeo: result.ubigeo
         }
       };
     } catch (error) {
-      console.error('Error in SUNAT lookup:', error);
+      console.error('Error in ApisPeru lookup:', error);
       throw new BadRequestException('Error al consultar el documento: ' + error.message);
     }
   }
