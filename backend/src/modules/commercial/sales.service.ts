@@ -530,7 +530,9 @@ export class SalesService {
           'Authorization': `Bearer ${API_TOKEN}`,
           'Accept': 'application/json'
         },
-        timeout: 10000 // 10 seconds timeout
+        timeout: 15000, // increased to 15 seconds
+        // Force IPv4 to solve ENOTFOUND issues in cloud environments like Railway
+        family: 4
       });
       
       const result = response.data;
