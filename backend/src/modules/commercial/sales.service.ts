@@ -521,7 +521,9 @@ export class SalesService {
 
     try {
       const type = docType.toLowerCase();
-      const url = `${BASE_URL}${type}/${docNum}`;
+      // Sanitize BASE_URL to avoid double slashes
+      const sanitizedBaseUrl = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+      const url = `${sanitizedBaseUrl}/${type}/${docNum}`;
       
       const response = await axios.get(url, {
         headers: {
