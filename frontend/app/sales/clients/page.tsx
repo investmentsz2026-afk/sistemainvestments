@@ -138,9 +138,10 @@ export default function ClientsPage() {
             } else {
                 toast.error('No se encontraron datos para este documento');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error in lookup:', error);
-            toast.error('Error al consultar el documento');
+            const msg = error.response?.data?.message || 'Error al consultar el documento';
+            toast.error(msg);
         } finally {
             setIsSearching(false);
         }

@@ -532,8 +532,8 @@ export class SalesService {
       const result = await response.json();
       
       if (!response.ok) {
-        // We throw the actual message from Apis Peru to see what's wrong
-        throw new Error(result.message || JSON.stringify(result) || 'Error desconocido en Apis Perú');
+        const errorMsg = result.message || JSON.stringify(result);
+        throw new Error(`ApisPeru dice: ${errorMsg}`);
       }
 
       // Mapping Apis Perú v3 response to our format
