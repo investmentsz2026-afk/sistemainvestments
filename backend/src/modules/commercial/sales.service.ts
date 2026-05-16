@@ -513,57 +513,61 @@ export class SalesService {
 
   async lookupDocument(docType: string, docNum: string) {
     const API_TOKEN = process.env.APIS_PERU_TOKEN;
-    const BASE_URL = process.env.APIS_PERU_URL || 'https://api.apisperu.net/v3/';
+    const type = docType.toLowerCase();
     
     if (!API_TOKEN) {
-      throw new BadRequestException('El Token de Apis Perú no está configurado en el servidor.');
+      throw new BadRequestException('El Token de Apis Perú no está configurado.');
     }
 
-    try {
-      const type = docType.toLowerCase();
-      // Sanitize BASE_URL to avoid double slashes
-      const sanitizedBaseUrl = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
-      const url = `${sanitizedBaseUrl}/${type}/${docNum}`;
-      
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
-          'Accept': 'application/json'
-        },
-        timeout: 15000, // increased to 15 seconds
-        // Force IPv4 to solve ENOTFOUND issues in cloud environments like Railway
-        family: 4
-      });
-      
-      const result = response.data;
+    // Lista de URLs para intentar en orden (Respaldo automático)
+    const urls = [
+      `https://api.apisperu.com/v3/${type}/${docNum}`,
+      `https://api.apisperu.net/v3/${type}/${docNum}`,
+      `https://api.peruconsultas.com/api/v1/${type}/${docNum}`
+    ];
 
-      // Mapping Apis Perú v3 response to our format
-      let name = '';
-      let address = '';
+    let lastError = '';
 
-      if (type === 'ruc') {
-        name = result.razonSocial;
-        address = result.direccion;
-      } else {
-        name = `${result.nombres} ${result.apellidoPaterno} ${result.apellidoMaterno}`;
-      }
+    for (const url of urls) {
+      try {
+        const response = await axios.get(url, {
+          headers: {
+            'Authorization': `Bearer ${API_TOKEN}`,
+            'Accept': 'application/json'
+          },
+          timeout: 8000,
+          family: 4
+        });
+        
+        const result = response.data;
+        let name = '';
+        let address = '';
 
-      return {
-        success: true,
-        data: {
-          name: name.trim(),
-          address: address || '',
-          documentNumber: docNum,
-          documentType: docType,
-          status: result.estado || 'ACTIVO',
-          condition: result.condicion || 'HABIDO',
-          ubigeo: result.ubigeo
+        if (type === 'ruc') {
+          name = result.razonSocial || result.nombre;
+          address = result.direccion || '';
+        } else {
+          name = result.nombre || `${result.nombres} ${result.apellidoPaterno} ${result.apellidoMaterno}`;
         }
-      };
-    } catch (error: any) {
-      console.error('Error in ApisPeru lookup:', error.message);
-      const errorDetail = error.response?.data?.message || error.message;
-      throw new BadRequestException(`ApisPeru dice: ${errorDetail}`);
+
+        return {
+          success: true,
+          data: {
+            name: name.trim(),
+            address: address || '',
+            documentNumber: docNum,
+            documentType: docType,
+            status: result.estado || 'ACTIVO',
+            condition: result.condicion || 'HABIDO'
+          }
+        };
+      } catch (error: any) {
+        lastError = error.response?.data?.message || error.message;
+        console.warn(`Fallo consulta en ${url}, intentando siguiente...`);
+        continue; // Intenta con la siguiente URL
+      }
     }
+
+    throw new BadRequestException(`No se pudo conectar con ningún servidor de validación. Error: ${lastError}`);
   }
 }
