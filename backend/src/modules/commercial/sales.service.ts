@@ -519,7 +519,7 @@ export class SalesService {
     }
 
     try {
-      const url = `${BASE_URL}${docType.toLowerCase()}?numero=${docNum}`;
+      const url = `${BASE_URL}${docType.toLowerCase()}/${docNum}`;
       
       const response = await fetch(url, {
         headers: {
