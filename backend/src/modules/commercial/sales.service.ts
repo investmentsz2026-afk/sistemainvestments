@@ -516,11 +516,11 @@ export class SalesService {
     const API_TOKEN = process.env.APIS_PERU_TOKEN || "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6IklOVkVTVDA2MDUiLCJjb21wYW55IjoiMjA2MTExODg3MTUiLCJpYXQiOjE3Nzg4OTMzNjAsImV4cCI6ODA4NjA5MzM2MH0.bTn_5EBr8b1FSz4IO9C93RodjDIYlM_04WdkcfUxFGmUfhHtIsqlBLywKfuIpTa0cIDXSLlmyjYMlBzC3M7it3xKIKtcF2gvgIA4mxUXPojMekM8RHviqWKdo5LOlb16eHKWzyQz9r6zIho5X5ZBSgmVfzLzRVgND-HWUjefHC7Mbn9aNMycLjpQhtKTShKYgNtdgTqngPbT10hIR9QrwPeLgrdGFutND0sjXoP4avDY32TmKc_fL9SGzkd8Jk705nfnlupoVG8ub66QZEx5Wb0fuNDjRq0zuuTgz-mz8pwxDX546C_k01OIMkvosJ83bHsDTjHJb--ezc7kGVceSUiJnrt8bx3Hrn9O36dglGImWsQ4XwMHbN1EsTH3nXn8syoDyF7EJBB5cWU7kO3Y3JO7M_Ufgrpws-qC3m78q-M7YDRHcM2zT_hfBuw6XMZAH5t7lnUSyNjrE5EYtR864C_4hnSN1KZc0f6FuhUmd1OfwgYqBAvkMXryvN1dkUV7xXszQATMt9eWGK-sqrCpE4JHQqqyKcgWsPIoDvlHBKfRRR_-9-kgmb5EYOlHLJZuuUip9nCkoGQTPEifB6CBZTHxIDeMwtRmHIsk1ducsBByu-0tjRXC1OKRFw9elIa27AyedvgbzsqULbOouVPzTAhPLnL_Pzmy4L_Z85QBZb0";
     const type = docType.toLowerCase();
 
-    // Lista de URLs para intentar en orden (Respaldo automático)
+    // Nuevas URLs oficiales (2025) encontradas en la documentación
     const urls = [
-      `https://api.apisperu.com/v3/${type}/${docNum}`,
-      `https://api.apisperu.net/v3/${type}/${docNum}`,
-      `https://api.peruconsultas.com/api/v1/${type}/${docNum}`
+      `https://dniruc.apisperu.com/api/v1/${type}/${docNum}?token=${API_TOKEN}`,
+      `https://apiperu.dev/api/${type}/${docNum}`,
+      `https://api.apisperu.com/api/v1/${type}/${docNum}?token=${API_TOKEN}`
     ];
 
     let lastError = '';
