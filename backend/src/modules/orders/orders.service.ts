@@ -55,9 +55,19 @@ export class OrdersService {
       user.role === 'VENDEDOR_ORIENTE' ? 'ORIENTE' : 'OFICINA'
     );
 
+    // Automatic order number generation if not provided or to avoid duplicates
+    let finalOrderNumber = orderNumber;
+    if (!finalOrderNumber || finalOrderNumber === 'AUTOGENERADO') {
+      const lastOrder = await (this.prisma as any).order.findFirst({
+        orderBy: { orderNumber: 'desc' },
+      });
+      const nextNumber = lastOrder ? parseInt(lastOrder.orderNumber) + 1 : 1;
+      finalOrderNumber = nextNumber.toString().padStart(6, '0');
+    }
+
     const order = await (this.prisma as any).order.create({
       data: {
-        orderNumber, 
+        orderNumber: finalOrderNumber, 
         clientId,
         condition,
         agency,
