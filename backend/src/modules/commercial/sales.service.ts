@@ -385,8 +385,8 @@ export class SalesService {
         }
       });
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Comprobante enviado a Nubefact/SUNAT correctamente',
         data: result
       };
@@ -513,7 +513,7 @@ export class SalesService {
 
   async lookupDocument(docType: string, docNum: string) {
     // Usamos el token del .env o el token oficial proporcionado por el jefe como respaldo directo
-    const API_TOKEN = process.env.APIS_PERU_TOKEN || "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6IklOVkVTVDA2MDUiLCJjb21wYW55IjoiMjA2MTExODg3MTUiLCJpYXQiOjE3Nzg4OTMzNjAsImV4cCI6ODA4NjA5MzM2MH0.bTn_5EBr8b1FSz4IO9C93RodjDIYlM_04WdkcfUxFGmUfhHtIsqlBLywKfuIpTa0cIDXSLlmyjYMlBzC3M7it3xKIKtcF2gvgIA4mxUXPojMekM8RHviqWKdo5LOlb16eHKWzyQz9r6zIho5X5ZBSgmVfzLzRVgND-HWUjefHC7Mbn9aNMycLjpQhtKTShKYgNtdgTqngPbT10hIR9QrwPeLgrdGFutND0sjXoP4avDY32TmKc_fL9SGzkd8Jk705nfnlupoVG8ub66QZEx5Wb0fuNDjRq0zuuTgz-mz8pwxDX546C_k01OIMkvosJ83bHsDTjHJb--ezc7kGVceSUiJnrt8bx3Hrn9O36dglGImWsQ4XwMHbN1EsTH3nXn8syoDyF7EJBB5cWU7kO3Y3JO7M_Ufgrpws-qC3m78q-M7YDRHcM2zT_hfBuw6XMZAH5t7lnUSyNjrE5EYtR864C_4hnSN1KZc0f6FuhUmd1OfwgYqBAvkMXryvN1dkUV7xXszQATMt9eWGK-sqrCpE4JHQqqyKcgWsPIoDvlHBKfRRR_-9-kgmb5EYOlHLJZuuUip9nCkoGQTPEifB6CBZTHxIDeMwtRmHIsk1ducsBByu-0tjRXC1OKRFw9elIa27AyedvgbzsqULbOouVPzTAhPLnL_Pzmy4L_Z85QBZb0";
+    const API_TOKEN = process.env.APIS_PERU_TOKEN || "d4949d37eff99d46de8c01ddc3f09d18ae054b0dde439c00e09874e47b689fba";
     const type = docType.toLowerCase();
 
     // Lista de endpoints actualizados (2025)
@@ -542,7 +542,7 @@ export class SalesService {
         } else {
           response = await axios.get(endpoint.url, config);
         }
-        
+
         const result = response.data.data || response.data;
         let name = '';
         let address = '';
