@@ -513,7 +513,7 @@ export class SalesService {
 
   async lookupDocument(docType: string, docNum: string) {
     // Usamos el token del .env o el token oficial proporcionado por el jefe como respaldo directo
-    const API_TOKEN = process.env.APIS_PERU_TOKEN || "d4949d37eff99d46de8c01ddc3f09d18ae054b0dde439c00e09874e47b689fba";
+    const API_TOKEN = process.env.APIS_PERU_TOKEN || "3c15657df04155b7e39e9037867db9f325408192dbf9c792164c198b8dadaeba";
     const type = docType.toLowerCase();
 
     // Lista de endpoints actualizados (2025)
@@ -548,10 +548,10 @@ export class SalesService {
         let address = '';
 
         if (type === 'ruc') {
-          name = result.razonSocial || result.nombre || result.razon_social;
+          name = result.razonSocial || result.nombre_o_razon_social || result.razon_social || result.nombre || '';
           address = result.direccion || result.direccion_fiscal || '';
         } else {
-          name = result.nombre || `${result.nombres} ${result.apellidoPaterno} ${result.apellidoMaterno}`;
+          name = result.nombre_completo || result.nombre || `${result.nombres || ''} ${result.apellidoPaterno || result.apellido_paterno || ''} ${result.apellidoMaterno || result.apellido_materno || ''}`;
         }
 
         return {
