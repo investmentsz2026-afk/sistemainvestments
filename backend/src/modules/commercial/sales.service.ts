@@ -514,6 +514,7 @@ export class SalesService {
   async lookupDocument(docType: string, docNum: string) {
     // Usamos el token del .env o el token oficial proporcionado por el jefe como respaldo directo
     const API_TOKEN = process.env.APIS_PERU_TOKEN || "3c15657df04155b7e39e9037867db9f325408192dbf9c792164c198b8dadaeba";
+    const BACKEND_URL = process.env.BACKEND_URL || "https://americancolt-system-production.up.railway.app";
     const type = docType.toLowerCase();
 
     // Lista de endpoints actualizados (2025)
@@ -530,7 +531,9 @@ export class SalesService {
           headers: {
             'Authorization': `Bearer ${API_TOKEN}`,
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Referer': BACKEND_URL,
+            'Origin': BACKEND_URL
           },
           timeout: 10000,
           family: 4
