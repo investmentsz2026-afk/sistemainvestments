@@ -6,9 +6,10 @@ import { useAuth } from '../../../hooks/useAuth';
 import { agenciesService, Agency } from '../../../services/agencies.service';
 import {
     MapPin, Plus, Search, Edit2, Trash2, X, AlertTriangle, Building2,
-    Phone, CheckCircle, XCircle, Info, FileText, Filter, User
+    Phone, CheckCircle, XCircle, Info, FileText, Filter, User, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from '../../../lib/axios';
 
 export default function AgenciesPage() {
     const { user } = useAuth();
@@ -29,6 +30,51 @@ export default function AgenciesPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handleLookup = async () => {
+        const docNum = formData.ruc?.trim();
+        if (!docNum || docNum.length < 8) {
+            showToast('Ingresa un número de documento válido (8 o 11 dígitos)', 'error');
+            return;
+        }
+
+        let docType = '';
+        if (docNum.length === 8) {
+            docType = 'DNI';
+        } else if (docNum.length === 11) {
+            docType = 'RUC';
+        } else {
+            showToast('El documento debe tener 8 dígitos (DNI) o 11 dígitos (RUC)', 'error');
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const resp = await api.get(`/sales/clients/lookup/${docType}/${docNum}`);
+            if (resp.data.data) {
+                const { name, address } = resp.data.data;
+                setFormData(prev => ({
+                    ...prev,
+                    name: name || prev.name,
+                    address: address || prev.address
+                }));
+                if (resp.data.mockData) {
+                    showToast(resp.data.message, 'error');
+                } else {
+                    showToast('Datos recuperados de SUNAT/RENIEC', 'success');
+                }
+            } else {
+                showToast('No se encontraron datos para este documento', 'error');
+            }
+        } catch (error: any) {
+            console.error('Error in lookup:', error);
+            const msg = error.response?.data?.message || 'Error al consultar el documento';
+            showToast(msg, 'error');
+        } finally {
+            setIsSearching(false);
+        }
+    };
 
     // Form
     const [formData, setFormData] = useState({
@@ -345,8 +391,22 @@ export default function AgenciesPage() {
                                             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                                 <FileText className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
                                             </div>
-                                            <input type="text" className="w-full pl-14 pr-6 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-mono font-bold"
-                                                placeholder="RUC de la empresa" value={formData.ruc} onChange={e => setFormData({ ...formData, ruc: e.target.value })} />
+                                            <input 
+                                                type="text" 
+                                                className="w-full pl-14 pr-16 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-mono font-bold"
+                                                placeholder="RUC o DNI de la agencia" 
+                                                value={formData.ruc} 
+                                                onChange={e => setFormData({ ...formData, ruc: e.target.value })} 
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleLookup}
+                                                disabled={isSearching}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition disabled:opacity-50"
+                                                title="Consultar SUNAT/RENIEC"
+                                            >
+                                                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                                            </button>
                                         </div>
                                     </div>
 
