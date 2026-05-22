@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/axios';
 import {
     Users, Plus, Search, Edit2, Trash2, X, AlertTriangle, Building2,
-    Mail, Phone, MapPin, CheckCircle, XCircle, Info, FileText
+    Mail, Phone, MapPin, CheckCircle, XCircle, Info, FileText, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,6 +15,47 @@ export default function SuppliersPage() {
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handleLookup = async () => {
+        const docNum = formData.documentNumber?.trim();
+        if (!docNum || docNum.length < 8) {
+            showToast('Ingresa un número de documento válido (8 o 11 dígitos)', 'error');
+            return;
+        }
+
+        const docType = formData.documentType;
+        if (docType !== 'RUC' && docType !== 'DNI') {
+            showToast('Solo se pueden consultar documentos RUC o DNI en la SUNAT/RENIEC', 'error');
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const resp = await api.get(`/sales/clients/lookup/${docType}/${docNum}`);
+            if (resp.data.data) {
+                const { name, address } = resp.data.data;
+                setFormData(prev => ({
+                    ...prev,
+                    name: name || prev.name,
+                    address: address || prev.address
+                }));
+                if (resp.data.mockData) {
+                    showToast(resp.data.message, 'error');
+                } else {
+                    showToast('Datos recuperados de SUNAT/RENIEC', 'success');
+                }
+            } else {
+                showToast('No se encontraron datos para este documento', 'error');
+            }
+        } catch (error: any) {
+            console.error('Error in lookup:', error);
+            const msg = error.response?.data?.message || 'Error al consultar el documento';
+            showToast(msg, 'error');
+        } finally {
+            setIsSearching(false);
+        }
+    };
 
     // Toast
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -299,8 +340,25 @@ export default function SuppliersPage() {
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Nro. Documento</label>
                                         <div className="relative">
                                             <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                            <input required type="text" className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-mono"
-                                                placeholder="Ej: 20123456789" value={formData.documentNumber} onChange={e => setFormData({ ...formData, documentNumber: e.target.value })} />
+                                            <input 
+                                                required 
+                                                type="text" 
+                                                className="w-full pl-10 pr-14 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition font-mono"
+                                                placeholder="Ej: 20123456789" 
+                                                value={formData.documentNumber} 
+                                                onChange={e => setFormData({ ...formData, documentNumber: e.target.value })} 
+                                            />
+                                            {(formData.documentType === 'RUC' || formData.documentType === 'DNI') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLookup}
+                                                    disabled={isSearching}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition disabled:opacity-50"
+                                                    title="Consultar SUNAT/RENIEC"
+                                                >
+                                                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
