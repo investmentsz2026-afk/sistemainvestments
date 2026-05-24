@@ -11,10 +11,12 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../../lib/axios';
 import toast from 'react-hot-toast';
+import { useQueryClient } from 'react-query';
 
 export default function NewProductPage() {
   const router = useRouter();
   const { createProduct, isCreating } = useProducts();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
   // Import from Purchases logic
@@ -35,6 +37,47 @@ export default function NewProductPage() {
   const [loadingAudits, setLoadingAudits] = useState(false);
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
   const [savedAuditItems, setSavedAuditItems] = useState<string[]>([]); // auditId-type-size
+  const [selectedImportSizes, setSelectedImportSizes] = useState<Record<string, boolean>>({});
+
+  // Whenever selectedAudit is set, initialize checked sizes
+  useEffect(() => {
+    if (selectedAudit) {
+      const initialChecked: Record<string, boolean> = {};
+      const auditSizes = Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : [];
+      const qualitySizeData = Array.isArray(selectedAudit.qualitySizeData) ? selectedAudit.qualitySizeData : [];
+
+      auditSizes.forEach((sz: any) => {
+        // 1RA
+        let qGood = sz.quantity;
+        const bsz = qualitySizeData.find((b: any) => b.size === sz.size);
+        if (bsz) qGood = bsz.qGood;
+        const isSaved1RA = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
+        if (qGood > 0 && !isSaved1RA) {
+          initialChecked[`1RA-${sz.size}`] = true;
+        }
+
+        // 2DA
+        let qSecond = 0;
+        if (bsz) qSecond = bsz.qSecond;
+        const isSaved2DA = savedAuditItems.includes(`${selectedAudit.id}-2DA-${sz.size}`);
+        if (qSecond > 0 && !isSaved2DA) {
+          initialChecked[`2DA-${sz.size}`] = true;
+        }
+
+        // PROCESO
+        let qProcess = 0;
+        if (bsz) qProcess = bsz.qProcess;
+        const isSavedProceso = savedAuditItems.includes(`${selectedAudit.id}-PROCESO-${sz.size}`);
+        if (qProcess > 0 && !isSavedProceso) {
+          initialChecked[`PROCESO-${sz.size}`] = true;
+        }
+      });
+
+      setSelectedImportSizes(initialChecked);
+    } else {
+      setSelectedImportSizes({});
+    }
+  }, [selectedAudit, savedAuditItems]);
 
   const fetchPurchases = async () => {    try {
       setLoadingPurchases(true);
@@ -63,19 +106,19 @@ export default function NewProductPage() {
     if (showImportModal) fetchPurchases();
   }, [showImportModal]);
 
+  // Load savedAuditItems on mount
   useEffect(() => {
-    if (showAuditModal) fetchFinalizedAudits();
-    
-    // Load savedAuditItems from localStorage
     const saved = localStorage.getItem('saved_audit_items');
     if (saved) setSavedAuditItems(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    if (showAuditModal) fetchFinalizedAudits();
   }, [showAuditModal]);
 
   // Sync savedAuditItems to localStorage
   useEffect(() => {
-    if (savedAuditItems.length > 0) {
-      localStorage.setItem('saved_audit_items', JSON.stringify(savedAuditItems));
-    }
+    localStorage.setItem('saved_audit_items', JSON.stringify(savedAuditItems));
   }, [savedAuditItems]);
 
   const handleImportItem = (purchase: any, item: any) => {
@@ -102,62 +145,67 @@ export default function NewProductPage() {
     setShowImportModal(false);
   };
 
-  const handleImportAudit = (audit: any, type: '1RA' | '2DA' | 'PROCESO') => {
+  const handleImportAudit = (audit: any, type: '1RA' | '2DA' | 'PROCESO', selectedSizes: string[]) => {
     const variants: any[] = [];
+    const importedItems: Array<{ size: string; quantity: number }> = [];
     let nameSuffix = '';
     let invType = 'TERMINADOS';
-    const auditSizes = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
-    const sizeToUse = (audit as any)._selectedSize || (auditSizes[0]?.size);
 
     if (type === '1RA') {
-      nameSuffix = sizeToUse ? ` (Talla ${sizeToUse})` : '';
+      nameSuffix = '';
       invType = 'TERMINADOS';
-      let qty = audit.quantityGood;
-      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
-        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
-        if (sz) qty = sz.qGood || 0;
-      }
-      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: audit.productionColor || '1RA CALIDAD', initialStock: qty });
     } else if (type === '2DA') {
-      nameSuffix = ' - 2DA CALIDAD' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
+      nameSuffix = ' - 2DA CALIDAD';
       invType = 'SEGUNDA';
-      let qty = audit.quantitySecond;
-      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
-        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
-        if (sz) qty = sz.qSecond || 0;
-      }
-      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: '2DA CALIDAD', initialStock: qty });
     } else if (type === 'PROCESO') {
-      nameSuffix = ' - EN PROCESO' + (sizeToUse ? ` (Talla ${sizeToUse})` : '');
+      nameSuffix = ' - EN PROCESO';
       invType = 'PROCESO';
-      let qty = audit.quantityProcess;
-      if (sizeToUse && Array.isArray(audit.qualitySizeData)) {
-        const sz = audit.qualitySizeData.find((s: any) => s.size === sizeToUse);
-        if (sz) qty = sz.qProcess || 0;
-      }
-      variants.push({ size: sizeToUse || 'ESTÁNDAR', color: 'EN PROCESO', initialStock: qty });
     }
+
+    selectedSizes.forEach(size => {
+      let qty = 0;
+      if (Array.isArray(audit.qualitySizeData)) {
+        const sz = audit.qualitySizeData.find((s: any) => s.size === size);
+        if (sz) {
+          if (type === '1RA') qty = sz.qGood || 0;
+          else if (type === '2DA') qty = sz.qSecond || 0;
+          else if (type === 'PROCESO') qty = sz.qProcess || 0;
+        }
+      } else {
+        const sz = (audit.productionSizeData || []).find((s: any) => s.size === size);
+        if (sz) qty = sz.quantity || 0;
+      }
+      
+      importedItems.push({ size, quantity: qty });
+      
+      const defaultColor = type === '1RA' ? (audit.productionColor || '1RA CALIDAD') : type === '2DA' ? '2DA CALIDAD' : 'EN PROCESO';
+      variants.push({
+        size,
+        color: defaultColor,
+        initialStock: qty
+      });
+    });
 
     if (variants.length === 0) {
       toast.error('No se encontraron cantidades para esta selección');
       return;
     }
 
-    // Set prices based on specific size if possible, or first available
+    // Set prices based on first selected size
+    const firstSize = selectedSizes[0];
     let pPrice = 0.1;
     let sPrice = 0.1;
 
-    if (sizeToUse) {
-      // Cost from UDP requirements
+    if (firstSize) {
+      const auditSizes = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
       if (audit.udpRequirements?.sizes) {
-        const sizeReq = audit.udpRequirements.sizes.find((s: any) => s.size === sizeToUse);
+        const sizeReq = audit.udpRequirements.sizes.find((s: any) => s.size === firstSize);
         if (sizeReq) {
           pPrice = sizeReq.items.reduce((acc: number, item: any) => acc + ((item.price || 0) * (item.consumption || 0)), 0);
         }
       }
 
-      // Selling price from Commercial review
-      const sizeSaleData = auditSizes.find((s: any) => s.size === sizeToUse);
+      const sizeSaleData = auditSizes.find((s: any) => s.size === firstSize);
       if (sizeSaleData) {
         sPrice = type === '1RA' ? (sizeSaleData.salePrice || 0) : (sizeSaleData.secondSalePrice || 0);
       }
@@ -167,13 +215,25 @@ export default function NewProductPage() {
       name: (audit.sampleName || 'Producto') + nameSuffix,
       category: 'Prendas',
       inventoryType: invType,
-      sku: audit.barcode || (audit.op + (type === '1RA' ? '' : `-${type}`)),
+      sku: (() => {
+        const cleanOp = audit.op.replace(/\D/g, '');
+        const opLen = cleanOp.length;
+        const neededRandom = Math.max(0, 12 - opLen);
+        let randomPart = '';
+        for (let i = 0; i < neededRandom; i++) {
+          randomPart += Math.floor(Math.random() * 10).toString();
+        }
+        return (randomPart + cleanOp).slice(-12);
+      })(),
       op: audit.op,
-      description: `Importado de Auditoría ${audit.process} • OP: ${audit.op}. Categoría: ${type}${sizeToUse ? ` • Ref. Talla: ${sizeToUse}` : ''}.`,
+      description: `Importado de OP: ${audit.op}. Calidad: ${type}. Tallas: ${selectedSizes.join(', ')}.`,
       purchasePrice: pPrice || 0.1,
       sellingPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
       minStock: 5,
-      variants: variants
+      sizes: selectedSizes,
+      colors: [type === '1RA' ? (audit.productionColor || 'Negro') : type === '2DA' ? '2da Calidad' : 'En Proceso'],
+      importedItems,
+      importedQuality: type
     };
 
     setInitialData(importedData);
@@ -217,14 +277,76 @@ export default function NewProductPage() {
   const handleSubmit = async (data: any) => {
     try {
       setError(null);
-      await createProduct(data);
-      toast.success('Producto guardado correctamente');
       
+      const { opVariants, importedStockQuantities, ...cleanData } = data;
+      let createdProduct: any = null;
+
+      if (data.op && data.opVariants) {
+        // Build variants array based on the OP configuration
+        const finalVariants: any[] = [];
+        Object.entries(data.opVariants).forEach(([size, colors]: [string, any]) => {
+          colors.forEach((color: string) => {
+            const initialStock = data.importedStockQuantities?.[size]?.[color] || 0;
+            finalVariants.push({
+              size,
+              color,
+              initialStock
+            });
+          });
+        });
+
+        const productPayload = {
+          ...cleanData,
+          variants: finalVariants
+        };
+
+        // Post product creation directly
+        const resp = await api.post('/products', productPayload);
+        createdProduct = resp.data;
+        queryClient.invalidateQueries('products');
+        toast.success('Producto e inventario base registrados correctamente');
+      } else {
+        // Normal creation flow
+        const resp = await api.post('/products', cleanData);
+        createdProduct = resp.data;
+        queryClient.invalidateQueries('products');
+        toast.success('Producto creado exitosamente');
+      }
+
+      // If we have OP variants and created the product, register the OP
+      if (data.op && data.opVariants && createdProduct) {
+        const variantsPayload = Object.entries(data.opVariants)
+          .map(([size, colors]: [string, any]) => ({ size, colors }))
+          .filter(v => v.colors.length > 0);
+
+        try {
+          await api.post('/production-orders', {
+            opNumber: data.op.trim(),
+            productId: createdProduct.id,
+            variants: variantsPayload
+          });
+          toast.success('Orden de Producción vinculada y SKUs generados exitosamente');
+          queryClient.invalidateQueries('products');
+        } catch (opErr: any) {
+          console.error('Error creating OP after product:', opErr);
+          toast.error('Producto creado, pero hubo un error al registrar la OP');
+        }
+      }
+
       if (selectedAudit) {
-        const type = data.inventoryType === 'TERMINADOS' ? '1RA' : data.inventoryType === 'SEGUNDA' ? '2DA' : 'PROCESO';
-        const size = data.variants?.[0]?.size || 'ESTÁNDAR';
-        setSavedAuditItems(prev => [...prev, `${selectedAudit.id}-${type}-${size}`]);
-        
+        const type = initialData?.importedQuality || (data.inventoryType === 'TERMINADOS' ? '1RA' : data.inventoryType === 'SEGUNDA' ? '2DA' : 'PROCESO');
+        const importedSizes = initialData?.importedItems?.map((item: any) => item.size) || [];
+        setSavedAuditItems(prev => {
+          const nextSaved = [...prev];
+          importedSizes.forEach((size: string) => {
+            const itemKey = `${selectedAudit.id}-${type}-${size}`;
+            if (!nextSaved.includes(itemKey)) {
+              nextSaved.push(itemKey);
+            }
+          });
+          return nextSaved;
+        });
+
         // If we are importing from an audit, return to the modal and reset form for next category
         setInitialData(null);
         setFormKey(prev => prev + 1);
@@ -233,7 +355,8 @@ export default function NewProductPage() {
         router.push('/products');
       }
     } catch (err: any) {
-      setError(err.message || 'Error al crear el producto');
+      console.error('Error in handleSubmit:', err);
+      setError(err.response?.data?.message || err.message || 'Error al crear el producto');
       toast.error('Error al guardar el producto');
     }
   };
@@ -622,14 +745,13 @@ export default function NewProductPage() {
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-emerald-500 shadow-lg shadow-emerald-200"><Package className="w-5 h-5" /></div>
                           <div>
                             <h4 className="font-black text-gray-900 text-sm">Subir Productos Terminados (1ra)</h4>
-                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Selecciona las tallas a importar juntas</p>
                           </div>
                         </div>
                       </div>
                       <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
                         const isSaved = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
-                        // Get exact quantity for this size from breakdown
                         let exactQty = sz.quantity;
                         if (Array.isArray(selectedAudit.qualitySizeData)) {
                           const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
@@ -638,22 +760,73 @@ export default function NewProductPage() {
 
                         if (exactQty <= 0) return null; // No hay de esta talla
 
+                        const isChecked = !isSaved && !!selectedImportSizes[`1RA-${sz.size}`];
+
                         return (
-                          <button
+                          <div
                             key={sz.size}
-                            disabled={isSaved}
-                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, '1RA')}
-                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
-                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md'
+                            onClick={() => {
+                              if (isSaved) return;
+                              setSelectedImportSizes(prev => ({
+                                ...prev,
+                                [`1RA-${sz.size}`]: !prev[`1RA-${sz.size}`]
+                              }));
+                            }}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none relative ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' :
+                              isChecked ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-white border-gray-100 hover:border-emerald-300'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-emerald-500">Talla {sz.size}</span>
+                            {!isSaved && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="absolute top-2 right-2 rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 pointer-events-none"
+                              />
+                            )}
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Talla {sz.size}</span>
                             <span className="text-sm font-black text-gray-900 uppercase">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-emerald-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.salePrice || '?' }`}</span>
-                          </button>
+                          </div>
                         );
                       })}
                       </div>
+
+                      {(() => {
+                        const activeSizes = (Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : [])
+                          .filter((sz: any) => {
+                            let exactQty = sz.quantity;
+                            if (Array.isArray(selectedAudit.qualitySizeData)) {
+                              const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                              if (bsz) exactQty = bsz.qGood;
+                            }
+                            const isSaved = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
+                            return exactQty > 0 && !isSaved && !!selectedImportSizes[`1RA-${sz.size}`];
+                          });
+                        
+                        if (activeSizes.length === 0) return null;
+
+                        const totalUnits = activeSizes.reduce((sum: number, sz: any) => {
+                          let exactQty = sz.quantity;
+                          if (Array.isArray(selectedAudit.qualitySizeData)) {
+                            const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                            if (bsz) exactQty = bsz.qGood;
+                          }
+                          return sum + exactQty;
+                        }, 0);
+
+                        return (
+                          <div className="p-4 bg-emerald-50/20 border-t border-emerald-100 flex justify-end">
+                            <button
+                              onClick={() => handleImportAudit(selectedAudit, '1RA', activeSizes.map(s => s.size))}
+                              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 transition active:scale-95"
+                            >
+                              <Plus className="w-4 h-4" /> Importar {activeSizes.length} Tallas ({totalUnits} uds.)
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -664,7 +837,7 @@ export default function NewProductPage() {
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-rose-500 shadow-lg shadow-rose-200"><AlertCircle className="w-5 h-5" /></div>
                           <div>
                             <h4 className="font-black text-gray-900 text-sm">Subir Productos de Segunda</h4>
-                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de precios</p>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Selecciona las tallas a importar juntas</p>
                           </div>
                         </div>
                       </div>
@@ -679,22 +852,73 @@ export default function NewProductPage() {
 
                         if (exactQty <= 0) return null;
 
+                        const isChecked = !isSaved && !!selectedImportSizes[`2DA-${sz.size}`];
+
                         return (
-                          <button
+                          <div
                             key={sz.size}
-                            disabled={isSaved}
-                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, '2DA')}
-                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
-                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-rose-500 hover:bg-rose-50 hover:shadow-md'
+                            onClick={() => {
+                              if (isSaved) return;
+                              setSelectedImportSizes(prev => ({
+                                ...prev,
+                                [`2DA-${sz.size}`]: !prev[`2DA-${sz.size}`]
+                              }));
+                            }}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none relative ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' :
+                              isChecked ? 'bg-rose-50/50 border-rose-500 shadow-sm' : 'bg-white border-gray-100 hover:border-rose-300'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-rose-500">Talla {sz.size}</span>
+                            {!isSaved && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="absolute top-2 right-2 rounded text-rose-600 focus:ring-rose-500 w-3.5 h-3.5 pointer-events-none"
+                              />
+                            )}
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Talla {sz.size}</span>
                             <span className="text-sm font-black text-gray-900 uppercase">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-rose-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.secondSalePrice || '?' }`}</span>
-                          </button>
+                          </div>
                         );
                       })}
                       </div>
+
+                      {(() => {
+                        const activeSizes = (Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : [])
+                          .filter((sz: any) => {
+                            let exactQty = 0;
+                            if (Array.isArray(selectedAudit.qualitySizeData)) {
+                              const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                              if (bsz) exactQty = bsz.qSecond;
+                            }
+                            const isSaved = savedAuditItems.includes(`${selectedAudit.id}-2DA-${sz.size}`);
+                            return exactQty > 0 && !isSaved && !!selectedImportSizes[`2DA-${sz.size}`];
+                          });
+                        
+                        if (activeSizes.length === 0) return null;
+
+                        const totalUnits = activeSizes.reduce((sum: number, sz: any) => {
+                          let exactQty = 0;
+                          if (Array.isArray(selectedAudit.qualitySizeData)) {
+                            const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                            if (bsz) exactQty = bsz.qSecond;
+                          }
+                          return sum + exactQty;
+                        }, 0);
+
+                        return (
+                          <div className="p-4 bg-rose-50/20 border-t border-rose-100 flex justify-end">
+                            <button
+                              onClick={() => handleImportAudit(selectedAudit, '2DA', activeSizes.map(s => s.size))}
+                              className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 transition active:scale-95"
+                            >
+                              <Plus className="w-4 h-4" /> Importar {activeSizes.length} Tallas ({totalUnits} uds.)
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -705,7 +929,7 @@ export default function NewProductPage() {
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-amber-500 shadow-lg shadow-amber-200"><Clock className="w-5 h-5" /></div>
                           <div>
                             <h4 className="font-black text-gray-900 text-sm italic uppercase">Subir Productos en Proceso</h4>
-                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Escoja una talla para referencia de costos</p>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Selecciona las tallas a importar juntas</p>
                           </div>
                         </div>
                       </div>
@@ -720,22 +944,73 @@ export default function NewProductPage() {
 
                         if (exactQty <= 0) return null;
 
+                        const isChecked = !isSaved && !!selectedImportSizes[`PROCESO-${sz.size}`];
+
                         return (
-                          <button
+                          <div
                             key={sz.size}
-                            disabled={isSaved}
-                            onClick={() => handleImportAudit({...selectedAudit, _selectedSize: sz.size}, 'PROCESO')}
-                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all group ${
-                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' : 'bg-white border-gray-100 hover:border-amber-500 hover:bg-amber-50 hover:shadow-md'
+                            onClick={() => {
+                              if (isSaved) return;
+                              setSelectedImportSizes(prev => ({
+                                ...prev,
+                                [`PROCESO-${sz.size}`]: !prev[`PROCESO-${sz.size}`]
+                              }));
+                            }}
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none relative ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' :
+                              isChecked ? 'bg-amber-50/50 border-amber-500 shadow-sm' : 'bg-white border-gray-100 hover:border-amber-300'
                             }`}
                           >
-                            <span className="text-[10px] font-black text-gray-400 uppercase group-hover:text-amber-500 font-mono italic">Talla {sz.size}</span>
+                            {!isSaved && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="absolute top-2 right-2 rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 pointer-events-none"
+                              />
+                            )}
+                            <span className="text-[10px] font-black text-gray-400 uppercase font-mono italic">Talla {sz.size}</span>
                             <span className="text-sm font-black text-gray-900 uppercase italic">{exactQty} uds.</span>
                             <span className="text-[9px] font-bold text-amber-600 mt-1">{isSaved ? 'AGREGADO' : ''}</span>
-                          </button>
+                          </div>
                         );
                       })}
                       </div>
+
+                      {(() => {
+                        const activeSizes = (Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : [])
+                          .filter((sz: any) => {
+                            let exactQty = 0;
+                            if (Array.isArray(selectedAudit.qualitySizeData)) {
+                              const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                              if (bsz) exactQty = bsz.qProcess;
+                            }
+                            const isSaved = savedAuditItems.includes(`${selectedAudit.id}-PROCESO-${sz.size}`);
+                            return exactQty > 0 && !isSaved && !!selectedImportSizes[`PROCESO-${sz.size}`];
+                          });
+                        
+                        if (activeSizes.length === 0) return null;
+
+                        const totalUnits = activeSizes.reduce((sum: number, sz: any) => {
+                          let exactQty = 0;
+                          if (Array.isArray(selectedAudit.qualitySizeData)) {
+                            const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
+                            if (bsz) exactQty = bsz.qProcess;
+                          }
+                          return sum + exactQty;
+                        }, 0);
+
+                        return (
+                          <div className="p-4 bg-amber-50/20 border-t border-amber-100 flex justify-end">
+                            <button
+                              onClick={() => handleImportAudit(selectedAudit, 'PROCESO', activeSizes.map(s => s.size))}
+                              className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-2 transition active:scale-95"
+                            >
+                              <Plus className="w-4 h-4" /> Importar {activeSizes.length} Tallas ({totalUnits} uds.)
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

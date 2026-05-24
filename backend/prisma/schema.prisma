@@ -43,23 +43,26 @@ model Role {
 }
 
 model Product {
-  id               String        @id @default(cuid())
-  sku              String        @unique
+  id               String            @id @default(cuid())
+  sku              String            @unique
   name             String
   category         String
-  inventoryType    String        @default("TERMINADOS") @map("inventory_type")
-  description      String?       @db.Text
-  purchasePrice    Float         @map("purchase_price")
-  sellingPrice     Float         @map("selling_price")
-  minStock         Float         @default(5) @map("min_stock")
+  inventoryType    String            @default("TERMINADOS") @map("inventory_type")
+  description      String?           @db.Text
+  purchasePrice    Float             @map("purchase_price")
+  sellingPrice     Float             @map("selling_price")
+  minStock         Float             @default(5) @map("min_stock")
   op               String?
-  isActive         Boolean       @default(true) @map("is_active")
+  isActive         Boolean           @default(true) @map("is_active")
+  sizes            String[]          @default([])
+  colors           String[]          @default([])
   variants         ProductVariant[]
   purchaseItems    PurchaseItem[]
   processAudits    ProcessAudit[]
   sampleUsage      SampleMaterial[]
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  productionOrders ProductionOrder[]
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
 
   @@map("products")
 }
@@ -72,6 +75,7 @@ model ProductVariant {
   color            String
   stock            Float         @default(0)
   variantSku       String        @unique @map("variant_sku")
+  op               String?       @map("op")
   movements        Movement[]
   purchaseItems    PurchaseItem[]
   saleItems        SaleItem[]
@@ -81,6 +85,17 @@ model ProductVariant {
   @@unique([productId, size, color])
   @@index([variantSku])
   @@map("product_variants")
+}
+
+model ProductionOrder {
+  id               String        @id @default(cuid())
+  opNumber         String        @unique @map("op_number")
+  productId        String        @map("product_id")
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  @@map("production_orders")
 }
 
 model Movement {

@@ -44,6 +44,8 @@ export class ProductsService {
         purchasePrice: createProductDto.purchasePrice,
         sellingPrice: createProductDto.sellingPrice,
         minStock: createProductDto.minStock || 5,
+        sizes: createProductDto.sizes || [],
+        colors: createProductDto.colors || [],
       },
     });
 

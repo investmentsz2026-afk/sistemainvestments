@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useProducts } from '../../../hooks/useProducts';
 import { useInventory } from '../../../hooks/useInventory';
 import { Layout } from '../../../components/common/Layout';
+import api from '../../../lib/axios';
+import toast from 'react-hot-toast';
 import { ProductBarcode } from '../../../components/products/Barcode';
 import { 
   ArrowLeft,
@@ -30,9 +32,10 @@ import { BarcodeModal } from '../../../components/products/BarcodeModal';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { products, deleteProduct, isDeleting } = useProducts();
+  const { deleteProduct, isDeleting } = useProducts();
   const { registerMovement } = useInventory();
   const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -43,14 +46,21 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [variantForBarcode, setVariantForBarcode] = useState<any>(null);
 
-  useEffect(() => {
-    if (products) {
-      const found = products.find(p => p.id === params.id);
-      if (found) {
-        setProduct(found);
-      }
+  const fetchProductDetail = async () => {
+    try {
+      const resp = await api.get(`/products/${params.id}`);
+      setProduct(resp.data);
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+      toast.error('Error al cargar detalles del producto');
+    } finally {
+      setLoading(false);
     }
-  }, [products, params.id]);
+  };
+
+  useEffect(() => {
+    fetchProductDetail();
+  }, [params.id]);
 
   const handleDelete = async () => {
     try {
@@ -80,14 +90,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       setReference('');
       
       // Actualizar producto
-      const updated = products?.find(p => p.id === params.id);
-      if (updated) setProduct(updated);
+      fetchProductDetail();
     } catch (error) {
       console.error('Error al registrar movimiento:', error);
     }
   };
 
-  if (!product) {
+  if (loading || !product) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-96">

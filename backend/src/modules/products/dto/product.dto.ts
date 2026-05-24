@@ -60,6 +60,16 @@ export class CreateProductDto {
   purchaseItemId?: string;
 
   @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  sizes?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  colors?: string[];
+
+  @IsArray()
   @IsOptional()
   @Type(() => CreateVariantDto)
   variants?: CreateVariantDto[];
@@ -108,6 +118,16 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  sizes?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  colors?: string[];
 
   @IsArray()
   @IsOptional()

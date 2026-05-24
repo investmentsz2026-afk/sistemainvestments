@@ -16,6 +16,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { OrdersModule } from './modules/orders/orders.module';
 import { AgenciesModule } from './modules/agencies/agencies.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { ProductionOrdersModule } from './modules/production-orders/production-orders.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -39,6 +40,7 @@ import { AppController } from './app.controller';
     OrdersModule,
     AgenciesModule,
     UploadsModule,
+    ProductionOrdersModule,
   ],
   controllers: [AppController],
   providers: [],

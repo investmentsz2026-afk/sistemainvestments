@@ -68,6 +68,117 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     const [productSearch, setProductSearch] = useState<{ index: number; query: string } | null>(null);
     const [colorSearch, setColorSearch] = useState<{ index: number; query: string } | null>(null);
 
+    const [activeClientIndex, setActiveClientIndex] = useState(-1);
+    const [activeProductIndex, setActiveProductIndex] = useState(-1);
+    const [activeColorIndex, setActiveColorIndex] = useState(-1);
+    const [activeAgencyIndex, setActiveAgencyIndex] = useState(-1);
+
+    const mapSizeToField = (size: string): string | null => {
+        const cleanSize = size.trim().toUpperCase();
+        if (cleanSize === '28' || cleanSize === 'S') return 's28';
+        if (cleanSize === '30' || cleanSize === 'M') return 'm30';
+        if (cleanSize === '32' || cleanSize === 'L') return 'l32';
+        if (cleanSize === '34' || cleanSize === 'XL') return 'xl34';
+        if (cleanSize === '36' || cleanSize === 'XXL') return 'xxl36';
+        if (cleanSize === '38') return 'size38';
+        if (cleanSize === '40') return 'size40';
+        if (cleanSize === '42') return 'size42';
+        if (cleanSize === '44') return 'size44';
+        if (cleanSize === '46') return 'size46';
+        return null;
+    };
+
+    const getProductSizes = (productId: string): string[] => {
+        const prod = products?.find(p => p.id === productId);
+        if (!prod) return [];
+        return prod.sizes || [];
+    };
+
+    const getRowActiveFields = (rowIndex: number) => {
+        const item = items[rowIndex];
+        const defaultFields = ['modelName', 'color', 's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'unitPrice'];
+        if (!item || !item.productId) return defaultFields;
+        
+        const prodSizes = getProductSizes(item.productId);
+        if (!prodSizes || prodSizes.length === 0) return defaultFields;
+        
+        const activeSizeFields: string[] = [];
+        prodSizes.forEach(size => {
+            const fieldName = mapSizeToField(size);
+            if (fieldName) {
+                activeSizeFields.push(fieldName);
+            }
+        });
+        
+        const defaultSizesOrder = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'];
+        activeSizeFields.sort((a, b) => defaultSizesOrder.indexOf(a) - defaultSizesOrder.indexOf(b));
+        
+        return ['modelName', 'color', ...activeSizeFields, 'unitPrice'];
+    };
+
+    const isFieldDisabled = (rowIndex: number, field: string): boolean => {
+        if (readOnly) return true;
+        const item = items[rowIndex];
+        if (!item || !item.productId) return false;
+        
+        const prodSizes = getProductSizes(item.productId);
+        if (!prodSizes || prodSizes.length === 0) return false;
+        
+        const cleanSizes = prodSizes.map(s => s.trim().toUpperCase());
+        const fieldSizeMap: { [key: string]: string[] } = {
+            s28: ['28', 'S'],
+            m30: ['30', 'M'],
+            l32: ['32', 'L'],
+            xl34: ['34', 'XL'],
+            xxl36: ['36', 'XXL'],
+            size38: ['38'],
+            size40: ['40'],
+            size42: ['42'],
+            size44: ['44'],
+            size46: ['46']
+        };
+        
+        const allowedSizes = fieldSizeMap[field];
+        if (!allowedSizes) return false;
+        
+        return !allowedSizes.some(size => cleanSizes.includes(size));
+    };
+
+    const getFilteredProducts = (query: string) => {
+        return (products || [])
+            .filter(p => 
+                p.inventoryType === 'TERMINADOS' && (
+                    p.name.toLowerCase().includes(query.toLowerCase()) || 
+                    p.sku.toLowerCase().includes(query.toLowerCase()) ||
+                    (p.op && p.op.toLowerCase().includes(query.toLowerCase()))
+                )
+            )
+            .slice(0, 10);
+    };
+
+    const getColorOptions = (productId: string, query: string) => {
+        const prod = products?.find(p => p.id === productId);
+        if (!prod || !prod.variants) return [];
+        return Array.from(new Set(
+            prod.variants
+                .map((v: any) => v.color)
+                .filter((c: any) => c.toLowerCase().includes(query.toLowerCase()))
+        ));
+    };
+
+    const focusFirstAvailableSize = (rowIndex: number) => {
+        setTimeout(() => {
+            const activeFields = getRowActiveFields(rowIndex);
+            const firstSizeField = activeFields.find(field => 
+                !['modelName', 'color', 'unitPrice'].includes(field)
+            );
+            
+            const fieldToFocus = firstSizeField || 'unitPrice';
+            const el = document.querySelector(`[data-row="${rowIndex}"][data-col="${fieldToFocus}"]`) as HTMLElement;
+            if (el) el.focus();
+        }, 50);
+    };
+
     // Derive display zone
     const displayZone = user?.zone || (
         user?.role === 'VENDEDOR_LIMA' ? 'LIMA' :
@@ -109,6 +220,35 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             }
         }
     }, [isOpen, initialOrder]);
+
+    // Scroll active items into view
+    useEffect(() => {
+        if (activeClientIndex >= 0) {
+            const el = document.querySelector(`.client-item-${activeClientIndex}`);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [activeClientIndex]);
+
+    useEffect(() => {
+        if (activeAgencyIndex >= 0) {
+            const el = document.querySelector(`.agency-item-${activeAgencyIndex}`);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [activeAgencyIndex]);
+
+    useEffect(() => {
+        if (activeProductIndex >= 0) {
+            const el = document.querySelector(`.product-item-${activeProductIndex}`);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [activeProductIndex]);
+
+    useEffect(() => {
+        if (activeColorIndex >= 0) {
+            const el = document.querySelector(`.color-item-${activeColorIndex}`);
+            el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }, [activeColorIndex]);
 
     const fetchClients = async () => {
         try {
@@ -348,10 +488,6 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colKey: string) => {
         if (readOnly) return;
 
-        // Navigation Keys
-        const fieldsOrder = ['modelName', 'color', 's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'unitPrice'];
-        const currentCol = fieldsOrder.indexOf(colKey);
-
         const focusElement = (r: number, c: string) => {
             setTimeout(() => {
                 const el = document.querySelector(`[data-row="${r}"][data-col="${c}"]`) as HTMLElement;
@@ -359,20 +495,93 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             }, 10);
         };
 
+        const item = items[rowIndex];
+
+        // 1. Intercept dropdown search lists keyboard navigation
+        if (colKey === 'modelName' && productSearch?.index === rowIndex) {
+            const filteredProds = getFilteredProducts(productSearch.query);
+            if (filteredProds.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setActiveProductIndex(prev => (prev + 1) % filteredProds.length);
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setActiveProductIndex(prev => (prev - 1 + filteredProds.length) % filteredProds.length);
+                    return;
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (activeProductIndex >= 0 && activeProductIndex < filteredProds.length) {
+                        const selectedProd = filteredProds[activeProductIndex];
+                        handleRowChange(rowIndex, 'productSelection', selectedProd);
+                    } else if (filteredProds.length > 0) {
+                        handleRowChange(rowIndex, 'productSelection', filteredProds[0]);
+                    }
+                    setProductSearch(null);
+                    focusElement(rowIndex, 'color');
+                    return;
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setProductSearch(null);
+                    return;
+                }
+            }
+        }
+
+        if (colKey === 'color' && colorSearch?.index === rowIndex) {
+            const options = getColorOptions(item.productId, colorSearch.query);
+            if (options.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setActiveColorIndex(prev => (prev + 1) % options.length);
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setActiveColorIndex(prev => (prev - 1 + options.length) % options.length);
+                    return;
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    let finalColor = item.color;
+                    if (activeColorIndex >= 0 && activeColorIndex < options.length) {
+                        finalColor = options[activeColorIndex];
+                    } else if (options.length > 0) {
+                        finalColor = options[0];
+                    } else if (colorSearch.query) {
+                        finalColor = colorSearch.query;
+                    }
+                    handleRowChange(rowIndex, 'color', finalColor.toUpperCase());
+                    setColorSearch(null);
+                    focusFirstAvailableSize(rowIndex);
+                    return;
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setColorSearch(null);
+                    return;
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const finalColor = colorSearch.query || item.color;
+                handleRowChange(rowIndex, 'color', finalColor.toUpperCase());
+                setColorSearch(null);
+                focusFirstAvailableSize(rowIndex);
+                return;
+            }
+        }
+
+        // 2. Normal cell navigation based on active size fields
+        const activeFields = getRowActiveFields(rowIndex);
+        const currentCol = activeFields.indexOf(colKey);
+
         if (e.key === 'Enter') {
             e.preventDefault();
-            // Selection components handle ENTER themselves for selecting, but we handle the jump if selection is not active
-            if (colKey === 'modelName' && productSearch?.index === rowIndex) return;
-            if (colKey === 'color' && colorSearch?.index === rowIndex) return;
-
-            if (currentCol < fieldsOrder.length - 1) {
-                // Next field same row
-                focusElement(rowIndex, fieldsOrder[currentCol + 1]);
+            if (currentCol !== -1 && currentCol < activeFields.length - 1) {
+                // Next active field same row
+                focusElement(rowIndex, activeFields[currentCol + 1]);
             } else {
                 // Next row first field - Copy model information to the next row
-                const currentModel = items[rowIndex].modelName;
-                const currentProductId = items[rowIndex].productId;
-                const currentUnitPrice = items[rowIndex].unitPrice;
+                const currentModel = item.modelName;
+                const currentProductId = item.productId;
+                const currentUnitPrice = item.unitPrice;
 
                 if (rowIndex < items.length - 1) {
                     const newItems = [...items];
@@ -383,7 +592,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                         unitPrice: currentUnitPrice
                     };
                     setItems(newItems);
-                    focusElement(rowIndex + 1, fieldsOrder[0]);
+                    focusElement(rowIndex + 1, activeFields[0]);
                 } else {
                     setItems([...items, {
                         modelName: currentModel,
@@ -393,7 +602,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                         size38: 0, size40: 0, size42: 0, size44: 0, size46: 0,
                         quantity: 0, totalPrice: 0
                     }]);
-                    focusElement(rowIndex + 1, fieldsOrder[0]);
+                    focusElement(rowIndex + 1, activeFields[0]);
                 }
             }
         } else if (e.key === 'ArrowDown') {
@@ -408,30 +617,29 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             }
         } else if (e.key === 'ArrowRight') {
             const input = e.target as HTMLInputElement;
-            // Only move if cursor is at the end or it's a number/selection input
             if (input.selectionEnd === input.value.length || input.type === 'number') {
-                if (currentCol < fieldsOrder.length - 1) {
+                if (currentCol !== -1 && currentCol < activeFields.length - 1) {
                     e.preventDefault();
-                    focusElement(rowIndex, fieldsOrder[currentCol + 1]);
+                    focusElement(rowIndex, activeFields[currentCol + 1]);
                 }
             }
         } else if (e.key === 'ArrowLeft') {
             const input = e.target as HTMLInputElement;
             if (input.selectionStart === 0 || input.type === 'number') {
-                if (currentCol > 0) {
+                if (currentCol !== -1 && currentCol > 0) {
                     e.preventDefault();
-                    focusElement(rowIndex, fieldsOrder[currentCol - 1]);
+                    focusElement(rowIndex, activeFields[currentCol - 1]);
                 }
             }
         }
     };
 
     const sizeHeaders = [
-        { label: 'S', sub: '28' },
-        { label: 'M', sub: '30' },
-        { label: 'L', sub: '32' },
-        { label: 'XL', sub: '34' },
-        { label: 'XXL', sub: '36' },
+        { label: '28', sub: 'S' },
+        { label: '30', sub: 'M' },
+        { label: '32', sub: 'L' },
+        { label: '34', sub: 'XL' },
+        { label: '36', sub: 'XXL' },
         { label: '38', sub: '' },
         { label: '40', sub: '' },
         { label: '42', sub: '' },
@@ -498,10 +706,39 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                 onChange={(e) => {
                                                     setClientSearch(e.target.value);
                                                     setShowClientPicker(true);
+                                                    setActiveClientIndex(-1);
                                                 }}
                                                 onFocus={() => {
                                                     setClientSearch('');
                                                     setShowClientPicker(true);
+                                                    setActiveClientIndex(-1);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (readOnly) return;
+                                                    if (!showClientPicker || filteredClients.length === 0) return;
+                                                    
+                                                    if (e.key === 'ArrowDown') {
+                                                        e.preventDefault();
+                                                        setActiveClientIndex(prev => (prev + 1) % filteredClients.length);
+                                                    } else if (e.key === 'ArrowUp') {
+                                                        e.preventDefault();
+                                                        setActiveClientIndex(prev => (prev - 1 + filteredClients.length) % filteredClients.length);
+                                                    } else if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        if (activeClientIndex >= 0 && activeClientIndex < filteredClients.length) {
+                                                            const client = filteredClients[activeClientIndex];
+                                                            handleClientChange(client.id);
+                                                            setClientSearch(client.name);
+                                                            setShowClientPicker(false);
+                                                        } else if (filteredClients.length > 0) {
+                                                            const client = filteredClients[0];
+                                                            handleClientChange(client.id);
+                                                            setClientSearch(client.name);
+                                                            setShowClientPicker(false);
+                                                        }
+                                                    } else if (e.key === 'Escape') {
+                                                        setShowClientPicker(false);
+                                                    }
                                                 }}
                                                 placeholder="BUSCAR CLIENTE..."
                                             />
@@ -523,11 +760,13 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No se encontraron clientes</p>
                                                                 </div>
                                                             ) : (
-                                                                filteredClients.map(c => (
+                                                                filteredClients.map((c, idx) => (
                                                                     <button
                                                                         key={c.id}
                                                                         type="button"
-                                                                        className="w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors group border-b border-slate-50 last:border-0"
+                                                                        className={`w-full text-left px-5 py-3 transition-colors group border-b border-slate-50 last:border-0 client-item-${idx} ${
+                                                                            idx === activeClientIndex ? 'bg-blue-800 text-white font-black shadow-lg' : 'hover:bg-indigo-50'
+                                                                        }`}
                                                                         onClick={() => {
                                                                             handleClientChange(c.id);
                                                                             setClientSearch(c.name);
@@ -536,14 +775,20 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                     >
                                                                         <div className="flex items-center justify-between gap-4">
                                                                             <div>
-                                                                                <div className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase truncate">
+                                                                                <div className={`text-sm font-black transition-colors uppercase truncate ${
+                                                                                    idx === activeClientIndex ? 'text-white' : 'text-slate-900 group-hover:text-indigo-600'
+                                                                                }`}>
                                                                                     {c.name}
                                                                                 </div>
-                                                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">
+                                                                                <div className={`text-[10px] font-bold uppercase tracking-tighter mt-0.5 ${
+                                                                                    idx === activeClientIndex ? 'text-blue-200' : 'text-slate-400'
+                                                                                }`}>
                                                                                     {c.documentType}: {c.documentNumber} • {c.zone}
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="shrink-0 w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                                            <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                                                                idx === activeClientIndex ? 'bg-blue-700 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white'
+                                                                            }`}>
                                                                                 <CheckCircle className="w-4 h-4" />
                                                                             </div>
                                                                         </div>
@@ -609,13 +854,42 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                         setFormData({ ...formData, agency: e.target.value });
                                                         setAgencySearch(e.target.value);
                                                         setShowAgencyPicker(true);
+                                                        setActiveAgencyIndex(-1);
                                                     }}
-                                                    onFocus={() => setShowAgencyPicker(true)}
+                                                    onFocus={() => {
+                                                        setShowAgencyPicker(true);
+                                                        setActiveAgencyIndex(-1);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                                                        if (readOnly) return;
+                                                                                        if (!showAgencyPicker || filteredAgencies.length === 0) return;
+                                                                                        
+                                                                                        if (e.key === 'ArrowDown') {
+                                                                                            e.preventDefault();
+                                                                                            setActiveAgencyIndex(prev => (prev + 1) % filteredAgencies.length);
+                                                                                        } else if (e.key === 'ArrowUp') {
+                                                                                            e.preventDefault();
+                                                                                            setActiveAgencyIndex(prev => (prev - 1 + filteredAgencies.length) % filteredAgencies.length);
+                                                                                        } else if (e.key === 'Enter') {
+                                                                                            e.preventDefault();
+                                                                                            if (activeAgencyIndex >= 0 && activeAgencyIndex < filteredAgencies.length) {
+                                                                                                const agency = filteredAgencies[activeAgencyIndex];
+                                                                                                setFormData({ ...formData, agency: agency.name });
+                                                                                                setShowAgencyPicker(false);
+                                                                                            } else if (filteredAgencies.length > 0) {
+                                                                                                const agency = filteredAgencies[0];
+                                                                                                setFormData({ ...formData, agency: agency.name });
+                                                                                                setShowAgencyPicker(false);
+                                                                                            }
+                                                                                        } else if (e.key === 'Escape') {
+                                                                                            setShowAgencyPicker(false);
+                                                                                        }
+                                                                                    }}
                                                     placeholder="Buscar agencia..."
                                                 />
                                                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 group-focus-within:rotate-180 transition-transform" />
                                             </div>
-
+ 
                                             {/* Agency Dropdown */}
                                             <AnimatePresence>
                                                 {!readOnly && showAgencyPicker && (
@@ -628,14 +902,20 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                             <div className="p-1.5">
                                                                 {filteredAgencies.length === 0 ? (
                                                                     <div className="p-4 text-center text-slate-400 text-[10px] font-bold">No hay resultados</div>
-                                                                ) : filteredAgencies.map(a => (
+                                                                ) : filteredAgencies.map((a, idx) => (
                                                                     <button
                                                                         key={a.id} type="button"
-                                                                        className="w-full text-left px-3 py-2.5 hover:bg-slate-50 rounded-lg transition-colors group"
+                                                                        className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors group agency-item-${idx} ${
+                                                                            idx === activeAgencyIndex ? 'bg-blue-800 text-white font-black shadow-md' : 'hover:bg-slate-50'
+                                                                        }`}
                                                                         onClick={() => { setFormData({ ...formData, agency: a.name }); setShowAgencyPicker(false); }}
                                                                     >
-                                                                        <div className="text-[11px] font-black text-slate-900 group-hover:text-indigo-600">{a.name}</div>
-                                                                        <div className="text-[9px] text-slate-400 truncate font-bold uppercase">{a.zone} • {a.address || 'Sin dirección'}</div>
+                                                                        <div className={`text-[11px] font-black transition-colors ${
+                                                                            idx === activeAgencyIndex ? 'text-white' : 'text-slate-900 group-hover:text-indigo-600'
+                                                                        }`}>{a.name}</div>
+                                                                        <div className={`text-[9px] truncate font-bold uppercase ${
+                                                                            idx === activeAgencyIndex ? 'text-blue-200' : 'text-slate-400'
+                                                                        }`}>{a.zone} • {a.address || 'Sin dirección'}</div>
                                                                     </button>
                                                                 ))}
                                                             </div>
@@ -684,7 +964,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                             {sizeHeaders.map(s => (
                                                 <th key={s.label} className="px-1 py-3 text-[10px] font-black uppercase tracking-tighter w-12 border-r border-slate-800">
                                                     <div>{s.label}</div>
-                                                    <div className="text-[8px] opacity-40 font-bold -mt-0.5">{s.sub}</div>
+                                                    <div className="text-[8px] text-slate-400 font-bold -mt-0.5">{s.sub}</div>
                                                 </th>
                                             ))}
                                             <th className="px-2 py-3 text-[10px] font-black uppercase tracking-wider w-14 border-r border-slate-700 text-center">Cant.</th>
@@ -703,8 +983,14 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                             data-row={index} data-col="modelName"
                                                             className="w-full px-4 py-3.5 bg-transparent border-none outline-none font-bold text-slate-900 text-[10px] uppercase focus:bg-white transition-all placeholder:text-slate-300"
                                                             value={productSearch?.index === index ? productSearch.query : item.modelName}
-                                                            onChange={(e) => setProductSearch({ index, query: e.target.value })}
-                                                            onFocus={() => setProductSearch({ index, query: item.modelName || '' })}
+                                                            onChange={(e) => {
+                                                                setProductSearch({ index, query: e.target.value });
+                                                                setActiveProductIndex(-1);
+                                                            }}
+                                                            onFocus={() => {
+                                                                setProductSearch({ index, query: item.modelName || '' });
+                                                                setActiveProductIndex(-1);
+                                                            }}
                                                             onKeyDown={(e) => handleKeyDown(e, index, 'modelName')}
                                                             placeholder="BUSCAR MODELO..."
                                                         />
@@ -717,23 +1003,24 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                         className="absolute left-0 w-[250px] top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[70] max-h-60 overflow-y-auto overflow-x-hidden"
                                                                     >
                                                                         <div className="p-1">
-                                                                            {(products || [])
-                                                                                .filter(p => 
-                                                                                    p.inventoryType === 'TERMINADOS' && (
-                                                                                        p.name.toLowerCase().includes(productSearch.query.toLowerCase()) || 
-                                                                                        p.sku.toLowerCase().includes(productSearch.query.toLowerCase()) ||
-                                                                                        (p.op && p.op.toLowerCase().includes(productSearch.query.toLowerCase()))
-                                                                                    )
-                                                                                )
-                                                                                .slice(0, 10)
-                                                                                .map(p => (
+                                                                            {getFilteredProducts(productSearch.query)
+                                                                                .map((p, idx) => (
                                                                                     <button
                                                                                         key={p.id} type="button"
-                                                                                        className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded-lg transition-colors group flex flex-col"
-                                                                                        onClick={() => handleRowChange(index, 'productSelection', p)}
+                                                                                        className={`w-full text-left px-3 py-2 rounded-lg transition-colors group flex flex-col product-item-${idx} ${
+                                                                                            idx === activeProductIndex ? 'bg-blue-800 text-white font-black shadow-md' : 'hover:bg-indigo-50'
+                                                                                        }`}
+                                                                                        onClick={() => {
+                                                                                            handleRowChange(index, 'productSelection', p);
+                                                                                            setProductSearch(null);
+                                                                                        }}
                                                                                     >
-                                                                                        <span className="text-[10px] font-black text-slate-900 group-hover:text-indigo-600 truncate">{p.name}</span>
-                                                                                        <span className="text-[8px] text-slate-400 font-bold">{p.sku} {p.op ? `• OP:${p.op}` : ''}</span>
+                                                                                        <span className={`text-[10px] font-black truncate ${
+                                                                                            idx === activeProductIndex ? 'text-white' : 'text-slate-900 group-hover:text-indigo-600'
+                                                                                        }`}>{p.name}</span>
+                                                                                        <span className={`text-[8px] font-bold ${
+                                                                                            idx === activeProductIndex ? 'text-blue-200' : 'text-slate-400'
+                                                                                        }`}>{p.sku} {p.op ? `• OP:${p.op}` : ''}</span>
                                                                                     </button>
                                                                                 ))
                                                                             }
@@ -751,8 +1038,16 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                             data-row={index} data-col="color"
                                                             className="w-full px-4 py-3.5 bg-transparent border-none outline-none font-bold text-slate-900 text-[10px] uppercase focus:bg-white transition-all placeholder:text-slate-300 disabled:opacity-30"
                                                             value={colorSearch?.index === index ? colorSearch.query : item.color}
-                                                            onChange={(e) => setColorSearch({ index, query: e.target.value })}
-                                                            onFocus={() => item.productId && setColorSearch({ index, query: item.color || '' })}
+                                                            onChange={(e) => {
+                                                                setColorSearch({ index, query: e.target.value });
+                                                                setActiveColorIndex(-1);
+                                                            }}
+                                                            onFocus={() => {
+                                                                if (item.productId) {
+                                                                    setColorSearch({ index, query: item.color || '' });
+                                                                    setActiveColorIndex(-1);
+                                                                }
+                                                            }}
                                                             onKeyDown={(e) => handleKeyDown(e, index, 'color')}
                                                             placeholder="COLOR..."
                                                         />
@@ -765,20 +1060,21 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                         className="absolute left-0 w-full top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[70] max-h-60 overflow-y-auto"
                                                                     >
                                                                         <div className="p-1">
-                                                                            {Array.from(new Set(
-                                                                                (products?.find(p => p.id === item.productId)?.variants || [])
-                                                                                    .map(v => v.color)
-                                                                                    .filter(c => c.toLowerCase().includes(colorSearch.query.toLowerCase()))
-                                                                            )).map(color => (
+                                                                            {getColorOptions(item.productId, colorSearch.query).map((color, idx) => (
                                                                                 <button
                                                                                     key={color} type="button"
-                                                                                    className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors"
+                                                                                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors color-item-${idx} ${
+                                                                                        idx === activeColorIndex ? 'bg-blue-800 text-white font-black shadow-md' : 'hover:bg-slate-50'
+                                                                                    }`}
                                                                                     onClick={() => {
                                                                                         handleRowChange(index, 'color', color.toUpperCase());
                                                                                         setColorSearch(null);
+                                                                                        focusFirstAvailableSize(index);
                                                                                     }}
                                                                                 >
-                                                                                    <span className="text-[10px] font-black text-slate-900 uppercase">{color}</span>
+                                                                                    <span className={`text-[10px] font-black uppercase ${
+                                                                                        idx === activeColorIndex ? 'text-white' : 'text-slate-900'
+                                                                                    }`}>{color}</span>
                                                                                 </button>
                                                                             ))}
                                                                         </div>
@@ -788,19 +1084,27 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                         </AnimatePresence>
                                                     </div>
                                                 </td>
-                                                {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'].map(field => (
-                                                    <td key={field} className="p-0 border-r border-slate-900 bg-white">
-                                                        <input
-                                                            type="number" disabled={readOnly} min="0"
-                                                            data-row={index} data-col={field}
-                                                            className="w-full p-2 bg-transparent border-none outline-none text-center text-[11px] font-black text-slate-900 focus:text-indigo-600 focus:bg-indigo-50 transition-all"
-                                                            value={item[field] || ''}
-                                                            onChange={(e) => handleRowChange(index, field, e.target.value)}
-                                                            onKeyDown={(e) => handleKeyDown(e, index, field)}
-                                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                                                        />
-                                                    </td>
-                                                ))}
+                                                {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'].map(field => {
+                                                    const isDisabled = isFieldDisabled(index, field);
+                                                    return (
+                                                        <td key={field} className={`p-0 border-r border-slate-900 ${isDisabled ? 'bg-slate-100/70' : 'bg-white'}`}>
+                                                            <input
+                                                                type="number" 
+                                                                disabled={isDisabled} 
+                                                                min="0"
+                                                                data-row={index} 
+                                                                data-col={field}
+                                                                className={`w-full p-2 bg-transparent border-none outline-none text-center text-[11px] font-black text-slate-900 focus:text-indigo-600 focus:bg-indigo-50 transition-all ${
+                                                                    isDisabled ? 'opacity-30 cursor-not-allowed' : ''
+                                                                }`}
+                                                                value={item[field] || ''}
+                                                                onChange={(e) => handleRowChange(index, field, e.target.value)}
+                                                                onKeyDown={(e) => handleKeyDown(e, index, field)}
+                                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                                                            />
+                                                        </td>
+                                                    );
+                                                })}
                                                 <td className="px-2 py-3 border-r border-slate-900 bg-slate-50 text-center">
                                                     <span className="font-black text-slate-900 text-[11px]">{item.quantity}</span>
                                                 </td>

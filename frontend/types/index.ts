@@ -19,6 +19,8 @@ export interface Product {
   minStock: number;
   isActive: boolean;
   variants: ProductVariant[];
+  sizes?: string[];
+  colors?: string[];
   createdAt: string;
   updatedAt: string;
 }
