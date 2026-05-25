@@ -8,16 +8,6 @@ export class OPVariantSelectionDto {
   @IsArray()
   @IsString({ each: true })
   colors: string[];
-
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  price?: number;
-
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  cost?: number;
 }
 
 export class CreateProductionOrderDto {
@@ -31,4 +21,14 @@ export class CreateProductionOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OPVariantSelectionDto)
   variants: OPVariantSelectionDto[];
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  price?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  cost?: number;
 }

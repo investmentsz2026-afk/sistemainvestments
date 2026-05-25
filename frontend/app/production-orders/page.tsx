@@ -37,8 +37,8 @@ export default function ProductionOrdersPage() {
   // Selected Combinations for OP
   // Format: { [size]: string[] } (array of colors checked for this size)
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string[]>>({});
-  const [sizePrices, setSizePrices] = useState<Record<string, number>>({});
-  const [sizeCosts, setSizeCosts] = useState<Record<string, number>>({});
+  const [opPrice, setOpPrice] = useState<number>(0);
+  const [opCost, setOpCost] = useState<number>(0);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -99,18 +99,19 @@ export default function ProductionOrdersPage() {
     
     // Initialize variant selection mapping
     const initialMap: Record<string, string[]> = {};
-    const initialPrices: Record<string, number> = {};
-    const initialCosts: Record<string, number> = {};
     if (product.sizes && product.sizes.length > 0) {
       product.sizes.forEach((size: string) => {
         initialMap[size] = []; // Start with no colors selected
-        initialPrices[size] = product.sellingPrice || 0;
-        initialCosts[size] = product.purchasePrice || 0;
       });
     }
     setSelectedVariants(initialMap);
-    setSizePrices(initialPrices);
-    setSizeCosts(initialCosts);
+    if (product.op) {
+      setOpPrice(0);
+      setOpCost(0);
+    } else {
+      setOpPrice(product.sellingPrice || 0);
+      setOpCost(product.purchasePrice || 0);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -162,8 +163,8 @@ export default function ProductionOrdersPage() {
     setSelectedProduct(null);
     setProductsFound([]);
     setSelectedVariants({});
-    setSizePrices({});
-    setSizeCosts({});
+    setOpPrice(0);
+    setOpCost(0);
     setShowDropdown(false);
     setActiveSearchIndex(-1);
   };
@@ -179,14 +180,9 @@ export default function ProductionOrdersPage() {
       return;
     }
 
-    // Map variants into payload including price and cost for each size
+    // Map variants into payload
     const variantsPayload = Object.entries(selectedVariants)
-      .map(([size, colors]) => ({
-        size,
-        colors,
-        price: sizePrices[size] || 0,
-        cost: sizeCosts[size] || 0
-      }))
+      .map(([size, colors]) => ({ size, colors }))
       .filter(v => v.colors.length > 0);
 
     if (variantsPayload.length === 0) {
@@ -199,7 +195,9 @@ export default function ProductionOrdersPage() {
       await api.post('/production-orders', {
         opNumber: opNumber.trim(),
         productId: selectedProduct.id,
-        variants: variantsPayload
+        variants: variantsPayload,
+        price: opPrice,
+        cost: opCost
       });
       toast.success('Orden de Producción registrada y variantes generadas exitosamente');
       queryClient.invalidateQueries('products');
@@ -406,6 +404,46 @@ export default function ProductionOrdersPage() {
                   </div>
                 </div>
 
+                {/* Cost and Selling Price for the OP */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
+                      Costo de Prod. (S/)
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-bold text-gray-900"
+                      placeholder="0.00"
+                      value={opCost || ''}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setOpCost(isNaN(val) ? 0 : val);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
+                      Precio de Venta (S/)
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-bold text-gray-900"
+                      placeholder="0.00"
+                      value={opPrice || ''}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setOpPrice(isNaN(val) ? 0 : val);
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Product Autocomplete Search */}
                 <div className="relative" ref={dropdownRef}>
                   <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
@@ -507,50 +545,6 @@ export default function ProductionOrdersPage() {
                                     </button>
                                   );
                                 })}
-                              </div>
-
-                              {/* Custom Prices and Costs Inputs for this Size */}
-                              <div className="grid grid-cols-2 gap-4 mt-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                                <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                                    Costo de Prod. (S/)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={sizeCosts[size] ?? ''}
-                                    onChange={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      setSizeCosts(prev => ({
-                                        ...prev,
-                                        [size]: isNaN(val) ? 0 : val
-                                      }));
-                                    }}
-                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-gray-50/35 transition-all"
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                                    Precio Venta (S/)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={sizePrices[size] ?? ''}
-                                    onChange={(e) => {
-                                      const val = parseFloat(e.target.value);
-                                      setSizePrices(prev => ({
-                                        ...prev,
-                                        [size]: isNaN(val) ? 0 : val
-                                      }));
-                                    }}
-                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-gray-50/35 transition-all"
-                                    placeholder="0.00"
-                                  />
-                                </div>
                               </div>
                             </div>
                           );

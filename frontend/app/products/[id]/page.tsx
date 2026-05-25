@@ -220,72 +220,109 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {product.variants.map((variant: any) => (
-              <div
-                key={variant.id}
-                className={`border rounded-lg p-4 ${
-                  variant.stock <= product.minStock
-                    ? 'border-yellow-200 bg-yellow-50'
-                    : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-medium text-gray-900">
-                      Talla: {variant.size} | Color: {variant.color}
-                    </h3>
-                    <p className="text-sm text-gray-500">SKU: {variant.variantSku}</p>
+            {product.variants.length === 0 ? (
+              <div className="col-span-full py-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200 p-6">
+                <p className="text-sm font-semibold text-gray-700 mb-1">
+                  Este producto no tiene variantes registradas (SKUs pendientes).
+                </p>
+                <p className="text-xs text-gray-500 mb-4">
+                  Las variantes se generarán automáticamente al registrar su Orden de Producción (OP).
+                </p>
+                <div className="flex flex-wrap gap-6 justify-center text-xs">
+                  <div className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm text-left min-w-[150px]">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Tallas del Producto</span>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {product.sizes && product.sizes.length > 0 ? (
+                        product.sizes.map((s: string) => (
+                          <span key={s} className="px-2 py-0.5 bg-gray-100 text-gray-700 font-bold rounded">{s}</span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic">Ninguna talla seleccionada</span>
+                      )}
+                    </div>
                   </div>
-                  <span className={`text-lg font-bold ${
-                    variant.stock <= product.minStock
-                      ? 'text-yellow-600'
-                      : 'text-green-600'
-                  }`}>
-                    {variant.stock} uni.
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <ProductBarcode value={variant.variantSku} width={0.6} height={45} />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedVariant(variant);
-                        setMovementType('ENTRY');
-                        setShowMovementModal(true);
-                      }}
-                      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
-                      title="Registrar entrada"
-                    >
-                      <ArrowUpCircle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedVariant(variant);
-                        setMovementType('EXIT');
-                        setShowMovementModal(true);
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                      title="Registrar salida"
-                    >
-                      <ArrowDownCircle className="w-5 h-5" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                      title="Imprimir etiqueta"
-                      onClick={() => {
-                        setVariantForBarcode(variant);
-                        setShowBarcodeModal(true);
-                      }}
-                    >
-                      <Printer className="w-5 h-5" />
-                    </button>
+                  <div className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm text-left min-w-[150px]">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Colores del Producto</span>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {product.colors && product.colors.length > 0 ? (
+                        product.colors.map((c: string) => (
+                          <span key={c} className="px-2 py-0.5 bg-gray-100 text-gray-700 font-bold rounded capitalize">{c}</span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic">Ningún color ingresado</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+            ) : (
+              product.variants.map((variant: any) => (
+                <div
+                  key={variant.id}
+                  className={`border rounded-lg p-4 ${
+                    variant.stock <= product.minStock
+                      ? 'border-yellow-200 bg-yellow-50'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-medium text-gray-900">
+                        Talla: {variant.size} | Color: {variant.color}
+                      </h3>
+                      <p className="text-sm text-gray-500">SKU: {variant.variantSku}</p>
+                    </div>
+                    <span className={`text-lg font-bold ${
+                      variant.stock <= product.minStock
+                        ? 'text-yellow-600'
+                        : 'text-green-600'
+                    }`}>
+                      {variant.stock} uni.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <ProductBarcode value={variant.variantSku} width={0.6} height={45} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedVariant(variant);
+                          setMovementType('ENTRY');
+                          setShowMovementModal(true);
+                        }}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                        title="Registrar entrada"
+                      >
+                        <ArrowUpCircle className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedVariant(variant);
+                          setMovementType('EXIT');
+                          setShowMovementModal(true);
+                        }}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Registrar salida"
+                      >
+                        <ArrowDownCircle className="w-5 h-5" />
+                      </button>
+                      <button
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        title="Imprimir etiqueta"
+                        onClick={() => {
+                          setVariantForBarcode(variant);
+                          setShowBarcodeModal(true);
+                        }}
+                      >
+                        <Printer className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

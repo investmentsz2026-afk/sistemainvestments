@@ -96,7 +96,9 @@ export class ProductsService {
     // Generar SKU único para la variante si no se proporciona uno manual
     let variantSku = createVariantDto.variantSku;
     if (!variantSku) {
-      if (isOnlyVariant) {
+      if (product.op) {
+        variantSku = await this.generateUniqueSkuForOp(product.op);
+      } else if (isOnlyVariant) {
         variantSku = product.sku;
       } else {
         variantSku = generateVariantSKU(
@@ -114,6 +116,7 @@ export class ProductsService {
         color: createVariantDto.color,
         stock: createVariantDto.initialStock || 0,
         variantSku,
+        op: product.op || undefined,
       },
     });
 
@@ -192,6 +195,25 @@ export class ProductsService {
         variants: true,
       },
     });
+
+    // Si el producto tiene OP y se actualizaron los precios, actualizar el precio en todos los productos con la misma OP
+    if (updatedProduct.op && (productData.purchasePrice !== undefined || productData.sellingPrice !== undefined)) {
+      const updatePricesData: any = {};
+      if (productData.purchasePrice !== undefined) {
+        updatePricesData.purchasePrice = productData.purchasePrice;
+      }
+      if (productData.sellingPrice !== undefined) {
+        updatePricesData.sellingPrice = productData.sellingPrice;
+      }
+      
+      await this.prisma.product.updateMany({
+        where: {
+          op: updatedProduct.op,
+          id: { not: id }, // Evitar re-actualizar el mismo
+        },
+        data: updatePricesData,
+      });
+    }
 
     // Si el SKU cambió, actualizar todos los variantSku de sus variantes
     if (productData.sku && productData.sku !== product.sku) {
@@ -482,5 +504,35 @@ export class ProductsService {
       totalServiceCost,
       totalCost: totalMaterialCost + totalServiceCost
     };
+  }
+
+  private async generateUniqueSkuForOp(opNumber: string): Promise<string> {
+    const cleanOp = opNumber.replace(/\D/g, ''); // Solo dígitos
+    const opLen = cleanOp.length;
+
+    let attempts = 0;
+    while (attempts < 100) {
+      const neededRandom = Math.max(0, 12 - opLen);
+      let randomPart = '';
+      for (let i = 0; i < neededRandom; i++) {
+        randomPart += Math.floor(Math.random() * 10).toString();
+      }
+      const candidateSku = (randomPart + cleanOp).slice(-12);
+
+      // Verificar que no exista en ProductVariant ni en Product
+      const existsVar = await this.prisma.productVariant.findUnique({
+        where: { variantSku: candidateSku },
+      });
+      const existsProd = await this.prisma.product.findUnique({
+        where: { sku: candidateSku },
+      });
+
+      if (!existsVar && !existsProd) {
+        return candidateSku;
+      }
+      attempts++;
+    }
+
+    throw new BadRequestException('No se pudo generar un SKU único para la variante después de 100 intentos.');
   }
 }

@@ -17,6 +17,59 @@ export class ProductionOrdersService {
       throw new NotFoundException('El producto seleccionado no existe');
     }
 
+    let targetProductId = productId;
+
+    if (product.op && product.op !== opNumber) {
+      // Si el producto ya tiene una OP registrada, creamos un clon para el nuevo lote/OP
+      // Generar un SKU base único para el nuevo clon
+      let newProductSku = '';
+      let attempts = 0;
+      const cleanOp = opNumber.replace(/\D/g, '');
+      const opLen = cleanOp.length;
+      const neededRandom = Math.max(0, 12 - opLen);
+      
+      while (attempts < 100) {
+        let randomPart = '';
+        for (let i = 0; i < neededRandom; i++) {
+          randomPart += Math.floor(Math.random() * 10).toString();
+        }
+        const candidateSku = (randomPart + cleanOp).slice(-12);
+
+        // Verificar que no exista en Product
+        const existsProd = await this.prisma.product.findUnique({
+          where: { sku: candidateSku },
+        });
+        if (!existsProd) {
+          newProductSku = candidateSku;
+          break;
+        }
+        attempts++;
+      }
+
+      if (!newProductSku) {
+        throw new BadRequestException('No se pudo generar un SKU único para el nuevo producto clonado.');
+      }
+
+      const { price, cost } = createProductionOrderDto;
+
+      const clonedProduct = await this.prisma.product.create({
+        data: {
+          name: product.name,
+          category: product.category,
+          inventoryType: product.inventoryType,
+          description: product.description,
+          sku: newProductSku,
+          op: opNumber,
+          purchasePrice: cost !== undefined && cost > 0 ? cost : product.purchasePrice,
+          sellingPrice: price !== undefined && price > 0 ? price : product.sellingPrice,
+          minStock: product.minStock,
+          sizes: product.sizes,
+          colors: product.colors,
+        },
+      });
+      targetProductId = clonedProduct.id;
+    }
+
     // 2. Verificar si la OP ya existe en la base de datos
     const existingOp = await this.prisma.productionOrder.findUnique({
       where: { opNumber },
@@ -29,31 +82,30 @@ export class ProductionOrdersService {
       productionOrder = await this.prisma.productionOrder.create({
         data: {
           opNumber,
-          productId,
+          productId: targetProductId,
         },
       });
     } else {
       // Si ya existe, actualizamos el productId al producto actual para mantener la referencia
       productionOrder = await this.prisma.productionOrder.update({
         where: { id: existingOp.id },
-        data: { productId },
+        data: { productId: targetProductId },
       });
     }
 
-    // Actualizar el campo 'op' del producto principal con este número de OP, y actualizar precios si se definen en alguna de las tallas/variantes
+    // Actualizar el campo 'op' del producto principal con este número de OP, y actualizar precios si se definen a nivel de OP
     const updateProductData: any = { op: opNumber };
-    const firstWithCost = variants.find(v => v.cost !== undefined && v.cost > 0);
-    const firstWithPrice = variants.find(v => v.price !== undefined && v.price > 0);
+    const { price, cost } = createProductionOrderDto;
 
-    if (firstWithCost) {
-      updateProductData.purchasePrice = firstWithCost.cost;
+    if (cost !== undefined && cost > 0) {
+      updateProductData.purchasePrice = cost;
     }
-    if (firstWithPrice) {
-      updateProductData.sellingPrice = firstWithPrice.price;
+    if (price !== undefined && price > 0) {
+      updateProductData.sellingPrice = price;
     }
 
     await this.prisma.product.update({
-      where: { id: productId },
+      where: { id: targetProductId },
       data: updateProductData,
     });
 
@@ -68,7 +120,7 @@ export class ProductionOrdersService {
         // Verificar si la combinación talla/color ya existe para este producto
         const existingVariant = await this.prisma.productVariant.findFirst({
           where: {
-            productId,
+            productId: targetProductId,
             size,
             color,
           },
@@ -87,7 +139,7 @@ export class ProductionOrdersService {
           // Si no existe, creamos la variante con stock inicial 0 y el SKU basado en la OP
           await this.prisma.productVariant.create({
             data: {
-              productId,
+              productId: targetProductId,
               size,
               color,
               stock: 0,

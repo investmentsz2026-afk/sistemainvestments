@@ -29,8 +29,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const handleSubmit = async (data: any) => {
     try {
       setError(null);
-      // Enviar todo incluyendo variantes
-      await updateProduct({ id: params.id, ...data });
+      // Extraer campos que no deben enviarse al backend para evitar errores de validación de DTO (non-whitelisted fields)
+      const { opVariants, importedStockQuantities, purchaseItemId, ...cleanData } = data;
+      await updateProduct({ id: params.id, ...cleanData });
       router.push('/products');
     } catch (err: any) {
       setError(err.message || 'Error al actualizar el producto');
@@ -85,6 +86,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           purchasePrice: product.purchasePrice,
           sellingPrice: product.sellingPrice,
           minStock: product.minStock,
+          sizes: product.sizes || [],
+          colors: product.colors || [],
           variants: product.variants.map((v: any) => ({
             id: v.id,
             size: v.size,

@@ -23,9 +23,17 @@ const getProductSchema = (isEditing: boolean) => z.object({
   purchaseItemId: z.string().optional(),
   opVariants: z.record(z.array(z.string())).optional(),
   importedStockQuantities: z.record(z.record(z.number())).optional(),
+  variants: z.array(z.object({
+    id: z.string().optional(),
+    size: z.string(),
+    color: z.string(),
+    stock: z.number().optional(),
+    initialStock: z.number().optional(),
+    variantSku: z.string().optional(),
+  })).optional(),
 }).superRefine((data, ctx) => {
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
-  const showPrices = isEditing || !!data.op || !!data.purchaseItemId || isMaterialOrMachinery;
+  const showPrices = isMaterialOrMachinery || !!data.op || !!data.purchaseItemId;
 
   // Validar precio de venta solo si NO es material/maquinaria y showPrices es true
   if (showPrices && !isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
@@ -118,6 +126,20 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         dataToReset.sizes = Array.from(new Set(initialData.variants.map((v: any) => v.size).filter(Boolean))) as string[];
         dataToReset.colors = Array.from(new Set(initialData.variants.map((v: any) => v.color).filter(Boolean))) as string[];
       }
+      if (initialData.variants && !initialData.opVariants) {
+        const opVariants: Record<string, string[]> = {};
+        initialData.variants.forEach((v: any) => {
+          if (v.size && v.color) {
+            if (!opVariants[v.size]) {
+              opVariants[v.size] = [];
+            }
+            if (!opVariants[v.size].includes(v.color)) {
+              opVariants[v.size].push(v.color);
+            }
+          }
+        });
+        dataToReset.opVariants = opVariants;
+      }
       reset(dataToReset);
     }
   }, [initialData, reset]);
@@ -139,7 +161,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchOp = watch('op');
   const watchOpVariants = watch('opVariants') || {};
   const watchImportedStockQuantities = watch('importedStockQuantities') || {};
-  const showPrices = isEditing || !!watchOp || !!watch('purchaseItemId') || isMaterialOrMachinery;
+  const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
 
   const [colorInput, setColorInput] = React.useState('');
   const [showOpConfigModal, setShowOpConfigModal] = React.useState(false);
@@ -309,6 +331,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       data.sizes = ['ESTÁNDAR'];
       data.colors = ['ÚNICO'];
     }
+
+    if (data.op && data.opVariants) {
+      const existingVariants = data.variants || [];
+      const nextVariants: any[] = [];
+
+      Object.entries(data.opVariants).forEach(([size, colors]: [string, any]) => {
+        colors.forEach((color: string) => {
+          // Buscamos si ya existe esta combinación talla/color en las variantes originales
+          const existing = existingVariants.find((v: any) => v.size === size && v.color === color);
+          const importedQty = data.importedStockQuantities?.[size]?.[color] || 0;
+
+          if (existing) {
+            nextVariants.push({
+              id: existing.id,
+              size,
+              color,
+              stock: existing.stock !== undefined ? existing.stock : existing.initialStock,
+              variantSku: existing.variantSku,
+            });
+          } else {
+            nextVariants.push({
+              size,
+              color,
+              initialStock: importedQty,
+              stock: importedQty,
+            });
+          }
+        });
+      });
+
+      data.variants = nextVariants;
+    }
+
     onSubmit(data);
   };
 
@@ -434,6 +489,38 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 placeholder="Descripción detallada del producto (opcional)"
               />
             </div>
+
+            {/* SKU Base (solo lectura en edición) */}
+            {isEditing && watch('sku') && (
+              <div>
+                <label className={labelClass}>
+                  <Barcode className="w-3.5 h-3.5 text-blue-500" />
+                  SKU Base
+                </label>
+                <input
+                  type="text"
+                  value={watch('sku') || ''}
+                  readOnly
+                  className={`${inputBase} bg-gray-50 border-gray-200 cursor-not-allowed`}
+                />
+              </div>
+            )}
+
+            {/* Orden de Producción (solo lectura en edición) */}
+            {isEditing && watch('op') && (
+              <div>
+                <label className={labelClass}>
+                  <ClipboardCheck className="w-3.5 h-3.5 text-blue-500" />
+                  Orden de Producción (OP)
+                </label>
+                <input
+                  type="text"
+                  value={watch('op') || ''}
+                  readOnly
+                  className={`${inputBase} bg-gray-50 border-gray-200 cursor-not-allowed`}
+                />
+              </div>
+            )}
 
             {/* SKU and OP inputs removed because SKU is created through OP */}
           </div>
@@ -693,6 +780,71 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Detalle de Variantes y SKUs (Solo Edición) ── */}
+      {isEditing && watch('variants') && watch('variants')!.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Barcode className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Variantes y SKUs Registrados</h2>
+                <p className="text-[10px] text-gray-400">Listado de combinaciones, códigos de barras y stock actual</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <th className="pb-3 font-semibold text-gray-500">Talla</th>
+                    <th className="pb-3 font-semibold text-gray-500">Color</th>
+                    <th className="pb-3 font-semibold text-gray-500">SKU de Variante</th>
+                    <th className="pb-3 font-semibold text-right text-gray-500">Stock Actual</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {watch('variants')?.map((variant: any, idx: number) => {
+                    const stock = variant.stock !== undefined ? variant.stock : variant.initialStock;
+                    return (
+                      <tr key={variant.id || idx} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="py-3 text-sm font-bold text-gray-800">
+                          <span className="inline-flex items-center justify-center px-2.5 py-1 bg-violet-50 text-violet-700 rounded-lg text-xs font-black">
+                            {variant.size}
+                          </span>
+                        </td>
+                        <td className="py-3 text-sm font-bold text-gray-800 capitalize">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
+                            {variant.color}
+                          </span>
+                        </td>
+                        <td className="py-3 text-sm font-mono font-bold text-blue-600">
+                          <div className="flex items-center gap-1.5">
+                            <Barcode className="w-4 h-4 text-gray-400" />
+                            {variant.variantSku}
+                          </div>
+                        </td>
+                        <td className="py-3 text-sm font-bold text-gray-800 text-right">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                            stock > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {stock || 0} uds
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
