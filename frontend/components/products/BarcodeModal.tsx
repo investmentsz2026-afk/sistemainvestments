@@ -40,187 +40,184 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
   };
 
-  const getCommonStyles = () => {
-    return `
-      @page {
-        size: 30.2mm 40mm;
-        margin: 0;
-      }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        text-transform: uppercase;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        font-smoothing: none;
-        text-rendering: crispEdges;
-        color: #000 !important;
-      }
+  const commonStyles = `
+    @page {
+      size: 100mm 40mm;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      text-transform: uppercase;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      font-smoothing: none;
+      text-rendering: crispEdges;
+      color: #000 !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff;
+      color: #000;
+      width: 100mm !important;
+      height: 40mm !important;
+      overflow: visible !important;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .barcode-label {
+      width: 100mm !important;
+      height: 40mm !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      page-break-after: always;
+      background: white;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .barcode-label:last-child {
+      page-break-after: avoid;
+    }
+    .label-inner {
+      width: 30.2mm;
+      height: 40mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 1.5mm 1mm;
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .label-header {
+      text-align: center;
+      width: 100%;
+      line-height: 1.1;
+    }
+    .brand {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .category {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .model {
+      font-size: 6.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      line-height: 1.0;
+      text-align: center;
+      width: 100%;
+      overflow: hidden;
+      white-space: normal;
+      word-break: break-word;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .color-text {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.2mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .barcode-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 0mm;
+    }
+    .barcode-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 1;
+      max-width: 32mm;
+    }
+    .sku-text {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-top: 0.1mm;
+      text-align: center;
+      width: 100%;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .barcode-svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      image-rendering: crisp-edges;
+    }
+    .size-text {
+      font-size: 18pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      line-height: 1;
+      margin-left: 2mm;
+      flex-shrink: 0;
+    }
+    .price-text {
+      font-size: 5.8pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      width: 100%;
+      text-align: left;
+      padding-left: 1.5mm;
+      white-space: nowrap;
+      margin-top: 0mm;
+      padding-top: 0mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    @media print {
       html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff;
-        color: #000;
-        width: 30.2mm !important;
+        width: 100mm !important;
         height: 40mm !important;
-        overflow: visible !important;
-      }
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-      }
-      .barcode-label {
-        width: 30.2mm;
-        height: 40mm;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        page-break-inside: avoid;
-        page-break-after: always;
-        background: white;
-        overflow: hidden;
-        box-sizing: border-box;
-      }
-      .barcode-label:last-child {
-        page-break-after: avoid;
-      }
-      .label-inner {
-        width: 30.2mm;
-        height: 40mm;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        padding: 1mm 1mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        box-sizing: border-box;
       }
-      .label-header {
-        text-align: center;
-        width: 100%;
-        line-height: 1.1;
+      .barcode-label {
+        border: none;
       }
-      .brand {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .category {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .model {
-        font-size: 6.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        line-height: 1.0;
-        text-align: center;
-        width: 100%;
-        overflow: hidden;
-        white-space: normal;
-        word-break: break-word;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .color-text {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.2mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .barcode-section {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        margin-bottom: 0mm;
-      }
-      .barcode-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 1;
-        max-width: 24mm;
-      }
-      .sku-text {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-top: 0.1mm;
-        text-align: center;
-        width: 100%;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .barcode-svg {
-        display: block;
-        max-width: 100%;
-        height: auto;
-        image-rendering: crisp-edges;
-      }
-      .size-text {
-        font-size: 18pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        line-height: 1;
-        margin-left: 2mm;
-        flex-shrink: 0;
-      }
-      .price-text {
-        font-size: 5.8pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        width: 100%;
-        text-align: left;
-        padding-left: 1.5mm;
-        white-space: nowrap;
-        margin-top: 0mm;
-        padding-top: 0mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      @media print {
-        html, body {
-          width: 30.2mm !important;
-          height: 40mm !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        .barcode-label {
-          border: none;
-        }
-      }
-    `;
-  };
+    }
+  `;
 
   const printBarcodes = () => {
     const printWindow = window.open('', '_blank');
@@ -259,7 +256,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         <head>
           <title>Etiquetas - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles()}</style>
+          <style>${commonStyles}</style>
         </head>
         <body>
           ${items}
@@ -327,7 +324,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         <head>
           <title>Todas las Variantes - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles()}</style>
+          <style>${commonStyles}</style>
         </head>
         <body>
           ${items}
@@ -454,7 +451,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     </div>
                     
                     <div className="flex items-center justify-center w-full my-[0.2mm]">
-                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '24mm' }}>
+                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
                           width={1.0}
