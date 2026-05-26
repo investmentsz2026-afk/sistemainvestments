@@ -68,7 +68,9 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     body {
       font-family: Arial, Helvetica, sans-serif;
       display: grid !important;
+      grid-template-rows: repeat(3, 40mm) !important;
       grid-template-columns: repeat(3, 30.2mm) !important;
+      grid-auto-flow: column !important;
       gap: 3mm !important;
       justify-content: start !important;
       align-content: start !important;
@@ -226,8 +228,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     if (!printWindow) return;
 
     const totalItems = quantity;
-    const rows = Math.ceil(totalItems / 3);
-    const rowsOnPage = Math.min(rows, 7);
+    const rowsOnPage = Math.min(totalItems, 3);
     const pageHeight = rowsOnPage * 40 + (rowsOnPage - 1) * 3;
 
     const items = Array(quantity).fill(0).map((_, index) => {
@@ -303,8 +304,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     if (!printWindow) return;
 
     const totalItems = product.variants.flatMap((v: any) => Array(quantity).fill(v)).length;
-    const rows = Math.ceil(totalItems / 3);
-    const rowsOnPage = Math.min(rows, 7);
+    const rowsOnPage = Math.min(totalItems, 3);
     const pageHeight = rowsOnPage * 40 + (rowsOnPage - 1) * 3;
 
     const items = product.variants.flatMap((variant: any) =>
