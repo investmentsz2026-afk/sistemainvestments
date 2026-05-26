@@ -75,14 +75,15 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         font-family: Arial, Helvetica, sans-serif;
       }
       .print-page {
-        display: grid !important;
-        grid-template-columns: repeat(3, 30.2mm) !important;
-        gap: 3mm !important;
-        justify-content: start !important;
-        align-content: start !important;
-        page-break-after: always;
         width: 100mm !important;
+        page-break-after: always;
         box-sizing: border-box;
+        overflow: hidden !important;
+      }
+      .print-page::after {
+        content: "";
+        display: table;
+        clear: both;
       }
       .print-page:last-child {
         page-break-after: avoid;
@@ -90,12 +91,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       .barcode-label {
         width: 30.2mm;
         height: 40mm;
+        float: left;
+        margin-right: 3mm;
+        margin-bottom: 3mm;
         display: flex;
         align-items: center;
         justify-content: center;
         page-break-inside: avoid;
         background: white;
         overflow: hidden;
+        box-sizing: border-box;
+      }
+      .barcode-label:nth-child(3n) {
+        margin-right: 0;
+      }
+      .barcode-label:last-child {
+        page-break-after: auto;
       }
       .label-inner {
         width: 40mm;
@@ -108,9 +119,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         padding: 1mm 1mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-      }
-      .barcode-label:last-child {
-        page-break-after: auto;
       }
       .label-header {
         text-align: center;
