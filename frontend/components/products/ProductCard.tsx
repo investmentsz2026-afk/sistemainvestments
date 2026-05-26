@@ -93,41 +93,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Variantes preview */}
         <div className="border-t border-gray-100 pt-3">
-          {product.variants.length === 0 ? (
-            <div>
-              <p className="text-xs font-semibold text-amber-600 mb-1.5">
-                Variantes no generadas (OP Pendiente)
-              </p>
-              <div className="space-y-1 text-[11px] text-gray-500">
-                <p className="truncate text-gray-500"><strong>Tallas:</strong> {product.sizes && product.sizes.length > 0 ? product.sizes.join(', ') : '--'}</p>
-                <p className="truncate text-gray-500 capitalize"><strong>Colores:</strong> {product.colors && product.colors.length > 0 ? product.colors.join(', ') : '--'}</p>
+          <p className="text-xs font-medium text-gray-500 mb-2">
+            Variantes ({product.variants.length})
+          </p>
+          <div className="space-y-1.5">
+            {product.variants.slice(0, 3).map((variant: any) => (
+              <div key={variant.id} className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 truncate flex-1 min-w-0 mr-2" title={`${variant.size} / ${variant.color}`}>
+                  {variant.size} / {variant.color}
+                </span>
+                <span className={`font-medium flex-shrink-0 ${variant.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'
+                  }`}>
+                  {variant.stock} uni.
+                </span>
               </div>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs font-medium text-gray-500 mb-2">
-                Variantes ({product.variants.length})
+            ))}
+            {product.variants.length > 3 && (
+              <p className="text-xs text-gray-400 mt-1">
+                +{product.variants.length - 3} variantes más
               </p>
-              <div className="space-y-1.5">
-                {product.variants.slice(0, 3).map((variant: any) => (
-                  <div key={variant.id} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 truncate flex-1 min-w-0 mr-2" title={`${variant.size} / ${variant.color}`}>
-                      {variant.size} / {variant.color}
-                    </span>
-                    <span className={`font-medium flex-shrink-0 ${variant.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'
-                      }`}>
-                      {variant.stock} uni.
-                    </span>
-                  </div>
-                ))}
-                {product.variants.length > 3 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    +{product.variants.length - 3} variantes más
-                  </p>
-                )}
-              </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
