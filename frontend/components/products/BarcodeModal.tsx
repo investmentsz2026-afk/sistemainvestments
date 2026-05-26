@@ -40,15 +40,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
   };
 
-  const getCommonStyles = (totalItems: number) => {
-    const safeItems = Math.max(1, totalItems);
-    const rows = Math.ceil(safeItems / 3);
-    const rowsPerPage = 7;
-    const pageHeight = Math.min(rows, rowsPerPage) * 40 + (Math.min(rows, rowsPerPage) - 1) * 3;
-
+  const getCommonStyles = () => {
     return `
       @page {
-        size: 100mm ${pageHeight}mm;
+        size: 30.2mm 40mm;
         margin: 0;
       }
       * {
@@ -67,51 +62,31 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         padding: 0 !important;
         background: #fff;
         color: #000;
-        width: 100mm !important;
-        height: auto !important;
+        width: 30.2mm !important;
+        height: 40mm !important;
         overflow: visible !important;
       }
       body {
         font-family: Arial, Helvetica, sans-serif;
       }
-      .print-page {
-        width: 100mm !important;
-        page-break-after: always;
-        box-sizing: border-box;
-        overflow: hidden !important;
-      }
-      .print-page::after {
-        content: "";
-        display: table;
-        clear: both;
-      }
-      .print-page:last-child {
-        page-break-after: avoid;
-      }
       .barcode-label {
         width: 30.2mm;
         height: 40mm;
-        float: left;
-        margin-right: 3mm;
-        margin-bottom: 3mm;
         display: flex;
         align-items: center;
         justify-content: center;
         page-break-inside: avoid;
+        page-break-after: always;
         background: white;
         overflow: hidden;
         box-sizing: border-box;
       }
-      .barcode-label:nth-child(3n) {
-        margin-right: 0;
-      }
       .barcode-label:last-child {
-        page-break-after: auto;
+        page-break-after: avoid;
       }
       .label-inner {
-        width: 40mm;
-        height: 30.2mm;
-        transform: rotate(90deg);
+        width: 30.2mm;
+        height: 40mm;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -119,6 +94,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         padding: 1mm 1mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        box-sizing: border-box;
       }
       .label-header {
         text-align: center;
@@ -188,7 +164,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
         align-items: center;
         justify-content: center;
         flex-shrink: 1;
-        max-width: 32mm;
+        max-width: 24mm;
       }
       .sku-text {
         font-size: 5.7pt;
@@ -234,7 +210,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       }
       @media print {
         html, body {
-          width: 100mm !important;
+          width: 30.2mm !important;
+          height: 40mm !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
@@ -249,8 +226,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const totalItems = quantity;
-    const itemsArray = Array(quantity).fill(0).map((_, index) => {
+    const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -276,25 +252,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    });
-
-    const pages: string[] = [];
-    const pageSize = 21;
-    for (let i = 0; i < itemsArray.length; i += pageSize) {
-      const pageItems = itemsArray.slice(i, i + pageSize).join('');
-      pages.push(`<div class="print-page">${pageItems}</div>`);
-    }
-    const pagesHTML = pages.join('');
+    }).join('');
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Etiquetas - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles(totalItems)}</style>
+          <style>${getCommonStyles()}</style>
         </head>
         <body>
-          ${pagesHTML}
+          ${items}
           <script>
             setTimeout(() => {
               document.querySelectorAll('.barcode-svg').forEach((el, index) => {
@@ -325,7 +293,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const itemsArray = product.variants.flatMap((variant: any) =>
+    const items = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -352,26 +320,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    );
-
-    const totalItems = itemsArray.length;
-    const pages: string[] = [];
-    const pageSize = 21;
-    for (let i = 0; i < itemsArray.length; i += pageSize) {
-      const pageItems = itemsArray.slice(i, i + pageSize).join('');
-      pages.push(`<div class="print-page">${pageItems}</div>`);
-    }
-    const pagesHTML = pages.join('');
+    ).join('');
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Todas las Variantes - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles(totalItems)}</style>
+          <style>${getCommonStyles()}</style>
         </head>
         <body>
-          ${pagesHTML}
+          ${items}
           <script>
             setTimeout(() => {
               const variants = ${JSON.stringify(product.variants)};
@@ -486,7 +445,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                  <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '30.2mm', height: '40mm' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '5.7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '5.7pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
@@ -495,7 +454,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     </div>
                     
                     <div className="flex items-center justify-center w-full my-[0.2mm]">
-                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
+                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '24mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
                           width={1.0}
