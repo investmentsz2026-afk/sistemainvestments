@@ -40,208 +40,197 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
   };
 
-  const getCommonStyles = (totalItems: number) => {
-    const safeItems = Math.max(1, totalItems);
-    const rows = safeItems;
-    const rowsPerPage = 7;
-    const pageRows = Math.min(rows, rowsPerPage);
-    const pageHeight = pageRows * 40 + (pageRows - 1) * 3;
-
-    return `
-      @page {
-        size: 100mm ${pageHeight}mm;
-        margin: 0;
-      }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        text-transform: uppercase;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        font-smoothing: none;
-        text-rendering: crispEdges;
-        color: #000 !important;
-      }
+  const commonStyles = `
+    @page {
+      size: 100mm 40mm;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      text-transform: uppercase;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      font-smoothing: none;
+      text-rendering: crispEdges;
+      color: #000 !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff;
+      color: #000;
+      width: 100mm !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      display: grid !important;
+      grid-template-columns: repeat(3, 30.2mm) !important;
+      gap: 3mm !important;
+      justify-content: start !important;
+      align-content: start !important;
+    }
+    .barcode-label {
+      width: 30.2mm;
+      height: 40mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      page-break-inside: avoid;
+      background: white;
+      overflow: hidden;
+    }
+    .label-inner {
+      width: 30.2mm;
+      height: 40mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 1mm 1mm;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .barcode-label:last-child {
+      page-break-after: auto;
+    }
+    .label-header {
+      text-align: center;
+      width: 100%;
+      line-height: 1.1;
+    }
+    .brand {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .category {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .model {
+      font-size: 6.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.1mm;
+      line-height: 1.0;
+      text-align: center;
+      width: 100%;
+      overflow: hidden;
+      white-space: normal;
+      word-break: break-word;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .color-text {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-bottom: 0.2mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .barcode-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 0mm;
+    }
+    .barcode-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 1;
+      max-width: 22mm;
+    }
+    .sku-text {
+      font-size: 5.7pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      margin-top: 0.1mm;
+      text-align: center;
+      width: 100%;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    .barcode-svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      image-rendering: crisp-edges;
+    }
+    .size-text {
+      font-size: 18pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      line-height: 1;
+      margin-left: 2mm;
+      flex-shrink: 0;
+    }
+    .price-text {
+      font-size: 5.8pt;
+      font-family: 'Arial Black', sans-serif;
+      font-weight: 900;
+      width: 100%;
+      text-align: left;
+      padding-left: 1.5mm;
+      white-space: nowrap;
+      margin-top: 0mm;
+      padding-top: 0mm;
+      letter-spacing: 0.1mm;
+      -webkit-text-stroke: 0.05pt #000;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: geometricPrecision;
+    }
+    @media print {
       html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff;
-        color: #000;
-        width: 100mm !important;
-        height: auto !important;
-        overflow: visible !important;
-      }
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-      }
-      .print-page {
-        width: 100mm !important;
-        page-break-after: always;
-        box-sizing: border-box;
-        overflow: hidden !important;
-      }
-      .print-page:last-child {
-        page-break-after: avoid;
-      }
-      .barcode-label {
-        width: 30.2mm;
-        height: 40mm;
-        margin: 0 auto 3mm auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        page-break-inside: avoid;
-        background: white;
-        overflow: hidden;
-        box-sizing: border-box;
-      }
-      .barcode-label:last-child {
-        margin-bottom: 0;
-        page-break-after: auto;
-      }
-      .label-inner {
-        width: 30.2mm;
-        height: 40mm;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        padding: 1mm 1mm;
+        width: 100mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .label-header {
-        text-align: center;
-        width: 100%;
-        line-height: 1.1;
+      .barcode-label {
+        border: none;
       }
-      .brand {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .category {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .model {
-        font-size: 6.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.1mm;
-        line-height: 1.0;
-        text-align: center;
-        width: 100%;
-        overflow: hidden;
-        white-space: normal;
-        word-break: break-word;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .color-text {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-bottom: 0.2mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .barcode-section {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        margin-bottom: 0mm;
-      }
-      .barcode-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 1;
-        max-width: 22mm;
-      }
-      .sku-text {
-        font-size: 5.7pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        margin-top: 0.1mm;
-        text-align: center;
-        width: 100%;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      .barcode-svg {
-        display: block;
-        max-width: 100%;
-        height: auto;
-        image-rendering: crisp-edges;
-      }
-      .size-text {
-        font-size: 18pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        line-height: 1;
-        margin-left: 2mm;
-        flex-shrink: 0;
-      }
-      .price-text {
-        font-size: 5.8pt;
-        font-family: 'Arial Black', sans-serif;
-        font-weight: 900;
-        width: 100%;
-        text-align: left;
-        padding-left: 1.5mm;
-        white-space: nowrap;
-        margin-top: 0mm;
-        padding-top: 0mm;
-        letter-spacing: 0.1mm;
-        -webkit-text-stroke: 0.05pt #000;
-        -webkit-font-smoothing: none;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-      }
-      @media print {
-        html, body {
-          width: 100mm !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        .barcode-label {
-          border: none;
-        }
-      }
-    `;
-  };
+    }
+  `;
 
   const printBarcodes = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     const totalItems = quantity;
-    const itemsArray = Array(quantity).fill(0).map((_, index) => {
+    const rows = Math.ceil(totalItems / 3);
+    const rowsOnPage = Math.min(rows, 7);
+    const pageHeight = rowsOnPage * 40 + (rowsOnPage - 1) * 3;
+
+    const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -267,25 +256,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    });
-
-    const pages: string[] = [];
-    const pageSize = 7;
-    for (let i = 0; i < itemsArray.length; i += pageSize) {
-      const pageItems = itemsArray.slice(i, i + pageSize).join('');
-      pages.push(`<div class="print-page">${pageItems}</div>`);
-    }
-    const pagesHTML = pages.join('');
+    }).join('');
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Etiquetas - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles(totalItems)}</style>
+          <style>
+            ${commonStyles}
+            @page {
+              size: 100mm ${pageHeight}mm;
+            }
+          </style>
         </head>
         <body>
-          ${pagesHTML}
+          ${items}
           <script>
             setTimeout(() => {
               document.querySelectorAll('.barcode-svg').forEach((el, index) => {
@@ -316,7 +302,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const itemsArray = product.variants.flatMap((variant: any) =>
+    const totalItems = product.variants.flatMap((v: any) => Array(quantity).fill(v)).length;
+    const rows = Math.ceil(totalItems / 3);
+    const rowsOnPage = Math.min(rows, 7);
+    const pageHeight = rowsOnPage * 40 + (rowsOnPage - 1) * 3;
+
+    const items = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -343,26 +334,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    );
-
-    const totalItems = itemsArray.length;
-    const pages: string[] = [];
-    const pageSize = 7;
-    for (let i = 0; i < itemsArray.length; i += pageSize) {
-      const pageItems = itemsArray.slice(i, i + pageSize).join('');
-      pages.push(`<div class="print-page">${pageItems}</div>`);
-    }
-    const pagesHTML = pages.join('');
+    ).join('');
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Todas las Variantes - ${product.name}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          <style>${getCommonStyles(totalItems)}</style>
+          <style>
+            ${commonStyles}
+            @page {
+              size: 100mm ${pageHeight}mm;
+            }
+          </style>
         </head>
         <body>
-          ${pagesHTML}
+          ${items}
           <script>
             setTimeout(() => {
               const variants = ${JSON.stringify(product.variants)};
@@ -479,7 +466,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
                   <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '30.2mm', height: '40mm' }}>
                     <div className="text-center w-full">
-                       <div style={{ fontSize: '5.7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
+                      <div style={{ fontSize: '5.7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '5.7pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
                       <div style={{ fontSize: '6.7pt' }} className="font-black leading-tight mt-[0.1mm] text-center">{product.name}{product.op ? ` - ${product.op}` : ''}</div>
                       <div style={{ fontSize: '5.7pt' }} className="font-black text-slate-700 mt-[0.2mm]">COLOR: {selectedVariant.color}</div>
