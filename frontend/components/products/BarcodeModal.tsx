@@ -84,9 +84,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       overflow: hidden;
     }
     .label-inner {
-      width: 40mm;
-      height: 30.2mm;
-      transform: rotate(90deg);
+      width: 30.2mm;
+      height: 40mm;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -166,7 +165,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       align-items: center;
       justify-content: center;
       flex-shrink: 1;
-      max-width: 32mm;
+      max-width: 22mm;
     }
     .sku-text {
       font-size: 5.7pt;
@@ -212,7 +211,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     @media print {
       html, body {
-        width: 30.2mm;
+        width: 100mm !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -445,7 +444,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
               <label className="block text-sm font-medium text-gray-700 mb-4 text-center">Vista Previa - Realista (30.2mm x 40mm)</label>
               <div className="flex justify-center">
                 <div className="w-[114px] h-[151px] bg-white border border-gray-300 shadow-2xl flex flex-col items-center justify-center overflow-hidden" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-                  <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
+                  <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '30.2mm', height: '40mm' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '5.7pt' }} className="font-black leading-tight">AMERICAN COLT</div>
                       <div style={{ fontSize: '5.7pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
@@ -454,7 +453,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                     </div>
                     
                     <div className="flex items-center justify-center w-full my-[0.2mm]">
-                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '35mm' }}>
+                      <div className="flex flex-col items-center justify-center overflow-hidden" style={{ maxWidth: '22mm' }}>
                         <ProductBarcode 
                           value={selectedVariant.variantSku} 
                           width={1.0}
