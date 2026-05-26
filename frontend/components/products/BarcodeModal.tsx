@@ -67,11 +67,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     }
     body {
       font-family: Arial, Helvetica, sans-serif;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff;
+      color: #000;
+    }
+    .print-page {
       display: grid !important;
       grid-template-columns: repeat(3, 30.2mm) !important;
+      grid-template-rows: repeat(3, 40mm) !important;
+      grid-auto-flow: column !important;
       gap: 3mm !important;
       justify-content: start !important;
       align-content: start !important;
+      width: 100mm !important;
+      height: 120mm !important;
+      page-break-after: always;
     }
     .barcode-label {
       width: 30.2mm;
@@ -225,7 +236,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    const itemsArray = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -251,7 +262,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    const chunks = [];
+    for (let i = 0; i < itemsArray.length; i += 9) {
+      chunks.push(itemsArray.slice(i, i + 9));
+    }
+    const items = chunks.map(chunk => `
+      <div class="print-page">
+        ${chunk.join('')}
+      </div>
+    `).join('');
 
     printWindow.document.write(`
       <html>
@@ -292,7 +313,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const items = product.variants.flatMap((variant: any) =>
+    const itemsArray = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.op ? ' - ' + product.op : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
@@ -319,7 +340,17 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           </div>
         `;
       })
-    ).join('');
+    );
+
+    const chunks = [];
+    for (let i = 0; i < itemsArray.length; i += 9) {
+      chunks.push(itemsArray.slice(i, i + 9));
+    }
+    const items = chunks.map(chunk => `
+      <div class="print-page">
+        ${chunk.join('')}
+      </div>
+    `).join('');
 
     printWindow.document.write(`
       <html>
