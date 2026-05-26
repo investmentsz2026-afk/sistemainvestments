@@ -149,7 +149,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             .filter(p => 
                 p.inventoryType === 'TERMINADOS' && (
                     p.name.toLowerCase().includes(query.toLowerCase()) || 
-                    p.sku.toLowerCase().includes(query.toLowerCase()) ||
+                    (p.sku && p.sku.toLowerCase().includes(query.toLowerCase())) ||
                     (p.op && p.op.toLowerCase().includes(query.toLowerCase()))
                 )
             )
@@ -158,12 +158,23 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
     const getColorOptions = (productId: string, query: string) => {
         const prod = products?.find(p => p.id === productId);
-        if (!prod || !prod.variants) return [];
-        return Array.from(new Set(
-            prod.variants
-                .map((v: any) => v.color)
-                .filter((c: any) => c.toLowerCase().includes(query.toLowerCase()))
-        ));
+        if (!prod) return [];
+
+        // Si tiene variantes creadas por OP, usamos sus colores
+        if (prod.variants && prod.variants.length > 0) {
+            return Array.from(new Set(
+                prod.variants
+                    .map((v: any) => v.color)
+                    .filter((c: any) => c.toLowerCase().includes(query.toLowerCase()))
+            ));
+        }
+
+        // Si no tiene variantes (OP pendiente), usamos los colores base del producto
+        if (prod.colors && prod.colors.length > 0) {
+            return prod.colors.filter((c: any) => c.toLowerCase().includes(query.toLowerCase()));
+        }
+
+        return [];
     };
 
     const focusFirstAvailableSize = (rowIndex: number) => {
