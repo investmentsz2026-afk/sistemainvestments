@@ -233,6 +233,28 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         }
     }, [isOpen, initialOrder]);
 
+    // Auto-resolve productIds for loaded items when products are available
+    useEffect(() => {
+        if (products && products.length > 0 && items.length > 0) {
+            let updated = false;
+            const newItems = items.map(item => {
+                if (!item.productId && item.modelName) {
+                    const matchedProd = products.find(p => 
+                        p.name.trim().toUpperCase() === item.modelName.trim().toUpperCase()
+                    );
+                    if (matchedProd) {
+                        updated = true;
+                        return { ...item, productId: matchedProd.id };
+                    }
+                }
+                return item;
+            });
+            if (updated) {
+                setItems(newItems);
+            }
+        }
+    }, [products, items]);
+
     // Scroll active items into view
     useEffect(() => {
         if (activeClientIndex >= 0) {
@@ -1325,7 +1347,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                 <td className="p-0 border-r border-slate-900 relative">
                                                     <div className="relative group">
                                                         <input
-                                                            type="text" disabled={readOnly || !item.productId}
+                                                            type="text" disabled={readOnly || !item.modelName}
                                                             data-row={index} data-col="color"
                                                             className="w-full px-4 py-3.5 bg-transparent border-none outline-none font-bold text-slate-900 text-[10px] uppercase focus:bg-white transition-all placeholder:text-slate-300 disabled:opacity-30"
                                                             value={colorSearch?.index === index ? colorSearch.query : item.color}
@@ -1334,7 +1356,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                 setActiveColorIndex(-1);
                                                             }}
                                                             onFocus={() => {
-                                                                if (item.productId) {
+                                                                if (item.productId || item.modelName) {
                                                                     setColorSearch({ index, query: item.color || '' });
                                                                     setActiveColorIndex(-1);
                                                                 }
@@ -1343,7 +1365,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                             placeholder="COLOR..."
                                                         />
                                                         <AnimatePresence>
-                                                            {colorSearch?.index === index && item.productId && (
+                                                            {colorSearch?.index === index && (item.productId || products?.some(p => p.name.trim().toUpperCase() === item.modelName?.trim().toUpperCase())) && (
                                                                 <>
                                                                     <div className="fixed inset-0 z-[60]" onClick={() => setColorSearch(null)} />
                                                                     <motion.div
@@ -1351,7 +1373,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                         className="absolute left-0 w-full top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 z-[70] max-h-60 overflow-y-auto"
                                                                     >
                                                                         <div className="p-1">
-                                                                            {getColorOptions(item.productId, colorSearch.query).map((color, idx) => (
+                                                                            {getColorOptions(item.productId || products?.find(p => p.name.trim().toUpperCase() === item.modelName?.trim().toUpperCase())?.id || '', colorSearch.query).map((color, idx) => (
                                                                                 <button
                                                                                     key={color} type="button"
                                                                                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors color-item-${idx} ${
