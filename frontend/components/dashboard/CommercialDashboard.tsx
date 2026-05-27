@@ -63,15 +63,17 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
   const fetchDashboardData = async () => {
     try {
       // Backend automatically filters results based on vendor role (LIMA/ORIENTE)
-      const [salesResp, auditsResp, clientsResp] = await Promise.all([
+      const [salesResp, auditsResp, clientsResp, ordersResp] = await Promise.all([
         api.get('/sales'),
         api.get('/process-audits?approvalStatus=PENDIENTE'),
-        api.get('/sales/clients')
+        api.get('/sales/clients'),
+        api.get('/orders')
       ]);
 
       const sales = salesResp.data || [];
       const audits = auditsResp.data || [];
       const clients = Array.isArray(clientsResp.data.data) ? clientsResp.data.data : (clientsResp.data || []);
+      const orders = ordersResp.data || [];
 
       const total = sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       
@@ -81,15 +83,20 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
       const limaTotal = limaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const orienteTotal = orienteSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
 
+      // Filter pending orders (status PENDIENTE or EN_LOGISTICA)
+      const pendingOrders = orders.filter((o: any) => o.status === 'PENDIENTE' || o.status === 'EN_LOGISTICA');
+      const limaPending = pendingOrders.filter((o: any) => o.zone === 'LIMA');
+      const orientePending = pendingOrders.filter((o: any) => o.zone === 'ORIENTE');
+
       setStats({
         totalSales: total,
-        salesCount: sales.length,
+        salesCount: pendingOrders.length,
         pendingApprovals: audits.length,
         activeClients: clients.length,
         limaSalesTotal: limaTotal,
         orienteSalesTotal: orienteTotal,
-        limaOrdersCount: limaSales.length,
-        orienteOrdersCount: orienteSales.length
+        limaOrdersCount: limaPending.length,
+        orienteOrdersCount: orientePending.length
       });
 
       setPendingAudits(audits.slice(0, 5));
@@ -172,12 +179,12 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             ]
           },
           { 
-            label: 'Pedidos Realizados', 
+            label: 'Pedidos Pendientes', 
             value: stats.salesCount.toString(), 
             icon: ShoppingBag, 
             color: 'text-indigo-600', 
             bg: 'bg-indigo-50', 
-            trend: '+8%',
+            trend: 'Pendientes',
             extraInfo: [
               { label: 'Lima', value: stats.limaOrdersCount.toString() },
               { label: 'Oriente', value: stats.orienteOrdersCount.toString() }
