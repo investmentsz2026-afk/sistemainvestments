@@ -540,15 +540,19 @@ export default function OrdersPage() {
                                         </div>
                                         
                                         <div className="flex items-center gap-2">
-                                            {order.status === 'PENDIENTE' && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || order.sellerId === user?.id) && (
+                                            {(order.status === 'PENDIENTE' || order.status === 'EN_LOGISTICA') && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || order.sellerId === user?.id) && (
                                                 <div className="flex items-center gap-2">
                                                     {(user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleSendToLogistics(order.id); }}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-indigo-200 uppercase tracking-tight"
-                                                            title="Enviar a Logística"
+                                                            className={`flex items-center gap-2 px-4 py-2 text-white text-xs font-black rounded-xl transition-all shadow-lg uppercase tracking-tight ${
+                                                                order.status === 'EN_LOGISTICA'
+                                                                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200/50'
+                                                                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+                                                            }`}
+                                                            title={order.status === 'EN_LOGISTICA' ? "Reenviar a Logística" : "Enviar a Logística"}
                                                         >
-                                                            <Truck className="w-4 h-4" /> Enviar
+                                                            <Truck className="w-4 h-4" /> {order.status === 'EN_LOGISTICA' ? 'Reenviar' : 'Enviar'}
                                                         </button>
                                                     )}
                                                     <button

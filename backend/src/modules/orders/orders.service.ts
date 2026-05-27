@@ -139,8 +139,8 @@ export class OrdersService {
   async update(id: string, user: any, data: any) {
     const order = await this.findOne(id);
     
-    if (order.status !== 'PENDIENTE' && user.role !== 'ADMIN') {
-      throw new BadRequestException('No se puede editar un pedido que ya está en logística o completado.');
+    if (order.status !== 'PENDIENTE' && order.status !== 'EN_LOGISTICA' && user.role !== 'ADMIN') {
+      throw new BadRequestException('No se puede editar un pedido que ya está completado.');
     }
 
     const { clientId, condition, agency, observations, items, orderNumber, createdAt } = data;
@@ -309,9 +309,11 @@ export class OrdersService {
   async sendToLogistics(id: string, user: any) {
     const order = await this.findOne(id);
     
-    if (order.status !== 'PENDIENTE') {
-      throw new BadRequestException('Solo los pedidos pendientes pueden enviarse a logística.');
+    if (order.status !== 'PENDIENTE' && order.status !== 'EN_LOGISTICA') {
+      throw new BadRequestException('Solo los pedidos pendientes o en logística pueden enviarse.');
     }
+
+    const isResend = order.status === 'EN_LOGISTICA';
 
     const updated = await (this.prisma as any).order.update({
       where: { id },
@@ -322,8 +324,10 @@ export class OrdersService {
 
     // Notify LOGISTICA
     await this.notifications.create({
-      title: 'Pedido Enviado a Logística',
-      message: `El pedido #${order.orderNumber || order.id.slice(-6)} ha sido aprobado por comercial y está listo para ser despachado.`,
+      title: isResend ? 'Pedido Modificado y Reenviado' : 'Pedido Enviado a Logística',
+      message: isResend 
+        ? `El pedido #${order.orderNumber || order.id.slice(-6)} ha sido modificado y reenviado por comercial/vendedor.`
+        : `El pedido #${order.orderNumber || order.id.slice(-6)} ha sido aprobado por comercial y está listo para ser despachado.`,
       type: 'ORDER_SENT_TO_LOGISTICS',
       targetRole: 'LOGISTICA',
       referenceId: order.id

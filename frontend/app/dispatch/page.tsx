@@ -216,7 +216,7 @@ export default function DispatchPage() {
                                             <div className="flex flex-wrap items-center gap-6 mt-2">
                                                 <div className="flex items-center gap-2 text-xs text-gray-400 font-bold">
                                                     <MapPin className="w-4 h-4 text-rose-500" />
-                                                    {order.zone || 'OFICINA'}
+                                                    {order.client?.zone || order.zone || 'OFICINA'}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-xs text-gray-400 font-bold">
                                                     <Calendar className="w-4 h-4" />
