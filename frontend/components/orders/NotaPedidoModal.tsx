@@ -632,7 +632,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             width: 21%;
         }
         .bg-yellow {
-            background-color: #ffff00 !important;
+            background-color: transparent !important;
         }
         .items-table {
             width: 100%;
@@ -673,7 +673,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                 padding: 0;
             }
             .bg-yellow {
-                background-color: #ffff00 !important;
+                background-color: transparent !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
