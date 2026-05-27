@@ -187,6 +187,7 @@ export class OrdersService {
         totalAmount,
         totalQuantity,
         createdAt: createdAt ? new Date(createdAt) : undefined,
+        needsResend: order.status === 'EN_LOGISTICA' ? true : false,
         items: {
           deleteMany: {}, // Simplest update strategy: replace all items
           create: sanitizedItems,
@@ -319,6 +320,7 @@ export class OrdersService {
       where: { id },
       data: { 
         status: 'EN_LOGISTICA',
+        needsResend: false,
       },
     });
 

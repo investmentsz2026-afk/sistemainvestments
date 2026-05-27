@@ -340,6 +340,7 @@ model Order {
   seller          User        @relation("UserOrders", fields: [sellerId], references: [id])
   
   zone            String?     // LIMA, ORIENTE
+  needsResend     Boolean     @default(false) @map("needs_resend")
   
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")

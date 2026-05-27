@@ -542,7 +542,7 @@ export default function OrdersPage() {
                                         <div className="flex items-center gap-2">
                                             {(order.status === 'PENDIENTE' || order.status === 'EN_LOGISTICA') && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || order.sellerId === user?.id) && (
                                                 <div className="flex items-center gap-2">
-                                                    {(user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
+                                                    {(user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (order.status === 'PENDIENTE' || (order.status === 'EN_LOGISTICA' && order.needsResend)) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleSendToLogistics(order.id); }}
                                                             className={`flex items-center gap-2 px-4 py-2 text-white text-xs font-black rounded-xl transition-all shadow-lg uppercase tracking-tight ${
