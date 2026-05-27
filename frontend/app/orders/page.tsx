@@ -485,28 +485,53 @@ export default function OrdersPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                     </div>
 
-                                    {/* SELLER / ZONE INFO - EMPHASIS HERE */}
-                                    <div className="lg:w-1/4 py-4 lg:py-0 px-4 lg:px-0 lg:border-l lg:border-r border-gray-50 flex flex-col justify-center gap-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
-                                                {order.seller?.name?.charAt(0)}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Vendedor</p>
-                                                <p className="text-sm font-black text-gray-900 truncate">{order.seller?.name || 'Sistema'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                                            <span className="text-xs font-black text-gray-600 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-md">
-                                                {order.seller?.zone || 'OFICINA'}
-                                            </span>
-                                        </div>
-                                    </div>
+                                     {/* SELLER & CLIENT ZONE INFO */}
+                                     <div className="lg:w-[35%] py-4 lg:py-0 px-6 lg:border-l lg:border-r border-gray-50 flex flex-col sm:flex-row gap-6 justify-between items-start sm:items-center">
+                                         {/* Seller Info */}
+                                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                             <div className="flex items-center gap-2">
+                                                 <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold text-xs shrink-0">
+                                                     {order.seller?.name?.charAt(0) || 'V'}
+                                                 </div>
+                                                 <div className="min-w-0">
+                                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Vendedor</p>
+                                                     <p className="text-xs font-black text-gray-900 truncate">{order.seller?.name || 'Sistema'}</p>
+                                                 </div>
+                                             </div>
+                                             <div className="flex items-center gap-1.5">
+                                                 <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                                 <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-md">
+                                                     {order.seller?.zone || 'OFICINA'}
+                                                 </span>
+                                             </div>
+                                         </div>
 
-                                    <div className="flex items-center justify-between lg:justify-end gap-6 shrink-0">
+                                         {/* Divider */}
+                                         <div className="w-px h-10 bg-gray-100 hidden sm:block shrink-0" />
+
+                                         {/* Client Info */}
+                                         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                             <div className="flex items-center gap-2">
+                                                 <div className="w-7 h-7 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 font-bold text-xs shrink-0">
+                                                     {order.client?.name?.charAt(0) || 'C'}
+                                                 </div>
+                                                 <div className="min-w-0">
+                                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Cliente</p>
+                                                     <p className="text-xs font-black text-gray-900 truncate">{order.client?.name || 'Cliente'}</p>
+                                                 </div>
+                                             </div>
+                                             <div className="flex items-center gap-1.5">
+                                                 <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                                 <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">
+                                                     {order.client?.zone || order.zone || 'LIMA'}
+                                                 </span>
+                                             </div>
+                                         </div>
+                                     </div>
+
+                                     <div className="flex items-center justify-between lg:justify-end gap-6 shrink-0">
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Monto Total</p>
                                             <p className="text-2xl font-black text-gray-900 uppercase">
