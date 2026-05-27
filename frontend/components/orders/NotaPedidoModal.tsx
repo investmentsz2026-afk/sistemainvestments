@@ -16,7 +16,8 @@ import {
     Search,
     ChevronDown,
     Package,
-    CheckCircle
+    CheckCircle,
+    Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -493,6 +494,285 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             toast.error(error.response?.data?.message || 'Error al guardar el pedido');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handlePrint = () => {
+        if (!initialOrder) return;
+
+        const order = initialOrder;
+        
+        // Helper to format date timezone-safely to DD-MM-YY
+        const formatDateForPrint = (dateString: string) => {
+            if (!dateString) return '';
+            let date: Date;
+            if (dateString.includes('T')) {
+                date = new Date(dateString);
+            } else {
+                const [year, month, day] = dateString.split('-').map(Number);
+                date = new Date(year, month - 1, day);
+            }
+            const dayVal = String(date.getDate()).padStart(2, '0');
+            const monthVal = String(date.getMonth() + 1).padStart(2, '0');
+            const yearVal = String(date.getFullYear()).slice(-2);
+            return `${dayVal}-${monthVal}-${yearVal}`;
+        };
+
+        const displayQty = (qty: number | string) => {
+            const num = parseInt(qty as string);
+            return num && num > 0 ? num.toString() : '';
+        };
+
+        // Construct rows
+        const itemsList = order.items || [];
+        const minRows = 12;
+        let itemsHTML = '';
+        
+        let totalQuantity = 0;
+        let totalAmount = 0;
+
+        itemsList.forEach((item: any) => {
+            const rowQty = [
+                item.s28, item.m30, item.l32, item.xl34, item.xxl36,
+                item.size38, item.size40, item.size42, item.size44, item.size46
+            ].reduce((acc, val) => acc + (parseInt(val) || 0), 0);
+
+            const rowPrice = parseFloat(item.unitPrice) || 0;
+            const rowImporte = rowQty * rowPrice;
+
+            totalQuantity += rowQty;
+            totalAmount += rowImporte;
+
+            itemsHTML += `
+                <tr>
+                    <td class="model-cell">${item.modelName || ''}</td>
+                    <td class="color-cell">${item.color || ''}</td>
+                    <td>${displayQty(item.s28)}</td>
+                    <td>${displayQty(item.m30)}</td>
+                    <td>${displayQty(item.l32)}</td>
+                    <td>${displayQty(item.xl34)}</td>
+                    <td>${displayQty(item.xxl36)}</td>
+                    <td class="bg-gray-column">${displayQty(item.size38)}</td>
+                    <td class="bg-gray-column">${displayQty(item.size40)}</td>
+                    <td class="bg-gray-column">${displayQty(item.size42)}</td>
+                    <td class="bg-gray-column">${displayQty(item.size44)}</td>
+                    <td class="bg-gray-column">${displayQty(item.size46)}</td>
+                    <td class="font-bold">${rowQty || ''}</td>
+                    <td class="text-right">${rowPrice > 0 ? rowPrice.toFixed(2) : ''}</td>
+                    <td class="text-right font-bold">${rowImporte > 0 ? rowImporte.toFixed(2) : ''}</td>
+                </tr>
+            `;
+        });
+
+        // Fill remaining empty rows to look like a template grid
+        for (let i = itemsList.length; i < minRows; i++) {
+            itemsHTML += `
+                <tr>
+                    <td class="model-cell">&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td class="bg-gray-column">&nbsp;</td>
+                    <td class="bg-gray-column">&nbsp;</td>
+                    <td class="bg-gray-column">&nbsp;</td>
+                    <td class="bg-gray-column">&nbsp;</td>
+                    <td class="bg-gray-column">&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+            `;
+        }
+
+        const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Nota de Pedido N° ${order.orderNumber || ''}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+        }
+        .header-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #eaeaea;
+            padding: 8px;
+            border: 1px solid #000;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .meta-table td {
+            border: 1px solid #000;
+            padding: 6px 10px;
+            font-size: 11px;
+            height: 30px;
+            vertical-align: middle;
+        }
+        .meta-label {
+            font-weight: bold;
+            width: 12%;
+            text-transform: uppercase;
+        }
+        .meta-value {
+            width: 21%;
+        }
+        .bg-yellow {
+            background-color: #ffff00 !important;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #000;
+            padding: 6px 4px;
+            font-size: 11px;
+            text-align: center;
+            height: 24px;
+        }
+        .items-table th {
+            font-weight: bold;
+            background-color: #eaeaea;
+        }
+        .items-table td.model-cell {
+            text-align: center;
+            font-weight: bold;
+        }
+        .items-table td.color-cell {
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .bg-gray-column {
+            background-color: #d9d9d9 !important;
+        }
+        .text-right {
+            text-align: right !important;
+            padding-right: 8px !important;
+        }
+        .font-bold {
+            font-weight: bold;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+            .bg-yellow {
+                background-color: #ffff00 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .bg-gray-column {
+                background-color: #d9d9d9 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .items-table th {
+                background-color: #eaeaea !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .header-title {
+                background-color: #eaeaea !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-title">NOTA DE PEDIDO</div>
+    
+    <table class="meta-table">
+        <tr>
+            <td class="meta-label">CLIENTE:</td>
+            <td class="meta-value bg-yellow font-bold">${order.client?.name || ''}</td>
+            <td class="meta-label">ZONA:</td>
+            <td class="meta-value bg-yellow font-bold">${order.zone || order.client?.zone || ''}</td>
+            <td class="meta-label">FECHA:</td>
+            <td class="meta-value font-bold">${formatDateForPrint(order.createdAt)}</td>
+        </tr>
+        <tr>
+            <td class="meta-label">CONDICION:</td>
+            <td class="meta-value font-bold">${order.condition || ''}</td>
+            <td class="meta-label">AGENCIA:</td>
+            <td class="meta-value font-bold">${order.agency || ''}</td>
+            <td class="meta-label">VENDEDOR:</td>
+            <td class="meta-value font-bold">${order.seller?.name || ''}</td>
+        </tr>
+        <tr>
+            <td class="meta-label">OBSERVACION:</td>
+            <td class="meta-value" colspan="3">${order.observations || ''}</td>
+            <td class="meta-label">MARCA:</td>
+            <td class="meta-value font-bold">---</td>
+        </tr>
+    </table>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th rowspan="2" style="width: 15%;">MODELO</th>
+                <th rowspan="2" style="width: 13%;">COLOR</th>
+                <th style="width: 4%;">S</th>
+                <th style="width: 4%;">M</th>
+                <th style="width: 4%;">L</th>
+                <th style="width: 4%;">XL</th>
+                <th style="width: 4%;">XXL</th>
+                <th colspan="5"></th>
+                <th rowspan="2" style="width: 8%;">CANTIDAD</th>
+                <th rowspan="2" style="width: 10%;">PRECIO UNITARIO</th>
+                <th rowspan="2" style="width: 12%;">IMPORTE</th>
+            </tr>
+            <tr>
+                <th>28</th>
+                <th>30</th>
+                <th>32</th>
+                <th>34</th>
+                <th>36</th>
+                <th class="bg-gray-column">38</th>
+                <th class="bg-gray-column">40</th>
+                <th class="bg-gray-column">42</th>
+                <th class="bg-gray-column">44</th>
+                <th class="bg-gray-column">46</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${itemsHTML}
+            <tr>
+                <td colspan="12" class="font-bold text-right" style="border-right: 1px solid #000; height: 26px;">TOTAL</td>
+                <td class="font-bold" style="height: 26px;">${totalQuantity}</td>
+                <td style="height: 26px;"></td>
+                <td class="bg-yellow font-bold text-right" style="height: 26px;">S/ ${totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>`;
+
+        const printWindow = window.open('', '_blank', 'width=900,height=600');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.onload = () => {
+                setTimeout(() => {
+                    printWindow.print();
+                }, 300);
+            };
         }
     };
 
@@ -1322,6 +1602,14 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
                     {/* Footer Actions */}
                     <div className="px-8 py-4 bg-white border-t border-slate-200 flex justify-end items-center gap-4 relative z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+                        {initialOrder && (
+                            <button
+                                type="button" onClick={handlePrint}
+                                className="flex items-center gap-2.5 px-8 py-3 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                            >
+                                <Printer className="w-4 h-4" /> Imprimir PDF
+                            </button>
+                        )}
                         <button
                             type="button" onClick={onClose}
                             className="px-8 py-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all"
