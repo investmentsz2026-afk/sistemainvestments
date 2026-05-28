@@ -49,8 +49,14 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
     activeClients: 0,
     limaSalesTotal: 0,
     orienteSalesTotal: 0,
+    oficinaSalesTotal: 0,
     limaOrdersCount: 0,
-    orienteOrdersCount: 0
+    limaOrdersAmount: 0,
+    orienteOrdersCount: 0,
+    orienteOrdersAmount: 0,
+    oficinaOrdersCount: 0,
+    oficinaOrdersAmount: 0,
+    pendingOrdersAmount: 0
   });
   const [salesData, setSalesData] = useState<any[]>([]);
   const [pendingAudits, setPendingAudits] = useState<any[]>([]);
@@ -79,14 +85,24 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
       
       const limaSales = sales.filter((s: any) => s.seller?.zone === 'LIMA');
       const orienteSales = sales.filter((s: any) => s.seller?.zone === 'ORIENTE');
+      const oficinaSales = sales.filter((s: any) => s.seller?.zone === 'OFICINA' || !s.seller?.zone);
       
       const limaTotal = limaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const orienteTotal = orienteSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
+      const oficinaTotal = oficinaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
 
       // Filter pending orders (status PENDIENTE or EN_LOGISTICA)
       const pendingOrders = orders.filter((o: any) => o.status === 'PENDIENTE' || o.status === 'EN_LOGISTICA');
+      const pendingOrdersTotal = pendingOrders.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
+
       const limaPending = pendingOrders.filter((o: any) => o.zone === 'LIMA');
+      const limaPendingAmount = limaPending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
+
       const orientePending = pendingOrders.filter((o: any) => o.zone === 'ORIENTE');
+      const orientePendingAmount = orientePending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
+
+      const oficinaPending = pendingOrders.filter((o: any) => o.zone === 'OFICINA' || (!o.zone && o.client?.zone === 'OFICINA'));
+      const oficinaPendingAmount = oficinaPending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
       setStats({
         totalSales: total,
@@ -95,8 +111,14 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
         activeClients: clients.length,
         limaSalesTotal: limaTotal,
         orienteSalesTotal: orienteTotal,
+        oficinaSalesTotal: oficinaTotal,
         limaOrdersCount: limaPending.length,
-        orienteOrdersCount: orientePending.length
+        limaOrdersAmount: limaPendingAmount,
+        orienteOrdersCount: orientePending.length,
+        orienteOrdersAmount: orientePendingAmount,
+        oficinaOrdersCount: oficinaPending.length,
+        oficinaOrdersAmount: oficinaPendingAmount,
+        pendingOrdersAmount: pendingOrdersTotal
       });
 
       setPendingAudits(audits.slice(0, 5));
@@ -175,19 +197,22 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             trend: '+15.4%',
             extraInfo: [
               { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()}` },
-              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()}` }
+              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()}` },
+              { label: 'Oficina', value: `S/ ${stats.oficinaSalesTotal.toLocaleString()}` }
             ]
           },
           { 
             label: 'Pedidos Pendientes', 
-            value: stats.salesCount.toString(), 
+            value: `${stats.salesCount} ${stats.salesCount === 1 ? 'Pedido' : 'Pedidos'}`, 
+            subValue: `S/ ${stats.pendingOrdersAmount.toLocaleString()}`,
             icon: ShoppingBag, 
             color: 'text-indigo-600', 
             bg: 'bg-indigo-50', 
             trend: 'Pendientes',
             extraInfo: [
-              { label: 'Lima', value: stats.limaOrdersCount.toString() },
-              { label: 'Oriente', value: stats.orienteOrdersCount.toString() }
+              { label: 'Lima', value: `${stats.limaOrdersCount} ped. • S/ ${stats.limaOrdersAmount.toLocaleString()}` },
+              { label: 'Oriente', value: `${stats.orienteOrdersCount} ped. • S/ ${stats.orienteOrdersAmount.toLocaleString()}` },
+              { label: 'Oficina', value: `${stats.oficinaOrdersCount} ped. • S/ ${stats.oficinaOrdersAmount.toLocaleString()}` }
             ]
           },
           { label: 'Auditorías Pendientes', value: stats.pendingApprovals.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Prioridad Alta' },
@@ -210,8 +235,11 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             </div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{item.label}</p>
             <h3 className="text-3xl font-black text-gray-900">{item.value}</h3>
+            {item.subValue && (
+              <p className="text-lg font-black text-indigo-600 mt-1">{item.subValue}</p>
+            )}
             
-            {item.extraInfo && user?.role === 'COMERCIAL' && (
+            {item.extraInfo && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
               <div className="mt-5 pt-4 border-t border-gray-50 flex flex-col gap-1.5 text-[10px] font-black uppercase tracking-widest">
                 {item.extraInfo.map((extra: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between">
