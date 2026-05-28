@@ -22,6 +22,12 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
   const [quantity, setQuantity] = useState(1);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
 
+  const categoryDisplay = product.category
+    ? (product.category.toUpperCase() === 'PANTALONES' || product.category.toUpperCase() === 'PANTALON' || product.category.toUpperCase() === 'PANTALÓN'
+      ? 'PANTALONES CABALLERO'
+      : product.category)
+    : 'PANTALÓN CABALLERO';
+
   // Sync selected variant when it changes from props
   useEffect(() => {
     if (propSelectedVariant) {
@@ -237,7 +243,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <div class="label-inner">
             <div class="label-header">
               <div class="brand">AMERICAN COLT</div>
-              <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+              <div class="category">${categoryDisplay}</div>
               <div class="model">${modelDisplay}</div>
               <div class="color-text">COLOR: ${variant.color}</div>
             </div>
@@ -304,7 +310,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
             <div class="label-inner">
               <div class="label-header">
                 <div class="brand">AMERICAN COLT</div>
-                <div class="category">${product.category || 'PANTALÓN CABALLERO'}</div>
+                <div class="category">${categoryDisplay}</div>
                 <div class="model">${modelDisplay}</div>
                 <div class="color-text">COLOR: ${variant.color}</div>
               </div>
@@ -448,7 +454,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                   <div className="flex flex-col items-center justify-start pt-[1mm] px-[1mm] uppercase" style={{ width: '40mm', height: '30.2mm', transform: 'rotate(90deg)' }}>
                     <div className="text-center w-full">
                       <div style={{ fontSize: '6.2pt' }} className="font-black leading-tight">AMERICAN COLT</div>
-                      <div style={{ fontSize: '6.2pt' }} className="font-black text-slate-600 mt-[0.1mm]">{product.category || 'PANTALÓN CABALLERO'}</div>
+                      <div style={{ fontSize: '6.2pt' }} className="font-black text-slate-600 mt-[0.1mm]">{categoryDisplay}</div>
                       <div style={{ fontSize: '7.2pt' }} className="font-black leading-tight mt-[0.1mm] text-center">
                         {product.name}
                         {product.entalle ? ` - ${product.entalle}` : ''}
