@@ -228,7 +228,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
     const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
-      const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}${product.op ? ' - ' + product.op : ''}`;
+      const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
       const hasPrice = parseFloat(product.sellingPrice) > 0;
 
@@ -295,7 +295,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
     const items = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
-        const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}${product.op ? ' - ' + product.op : ''}`;
+        const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}`;
         const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
         const hasPrice = parseFloat(product.sellingPrice) > 0;
 
@@ -452,7 +452,6 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                       <div style={{ fontSize: '8pt' }} className="font-black leading-tight mt-[0.1mm] text-center">
                         {product.name}
                         {product.entalle ? ` - ${product.entalle}` : ''}
-                        {product.op ? ` - ${product.op}` : ''}
                       </div>
                       <div style={{ fontSize: '7pt' }} className="font-black text-slate-700 mt-[0.2mm]">COLOR: {selectedVariant.color}</div>
                     </div>
