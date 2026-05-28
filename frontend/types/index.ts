@@ -14,6 +14,7 @@ export interface Product {
   inventoryType: string;
   description?: string;
   op?: string;
+  entalle?: string;
   purchasePrice: number;
   sellingPrice: number;
   minStock: number;

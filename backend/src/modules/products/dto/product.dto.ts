@@ -42,6 +42,10 @@ export class CreateProductDto {
   @IsOptional()
   op?: string;
 
+  @IsString()
+  @IsOptional()
+  entalle?: string;
+
   @IsNumber()
   @Min(0)
   purchasePrice: number;
@@ -99,6 +103,10 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   op?: string;
+
+  @IsString()
+  @IsOptional()
+  entalle?: string;
 
   @IsNumber()
   @IsOptional()

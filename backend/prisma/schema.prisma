@@ -53,6 +53,7 @@ model Product {
   sellingPrice     Float             @map("selling_price")
   minStock         Float             @default(5) @map("min_stock")
   op               String?
+  entalle          String?
   isActive         Boolean           @default(true) @map("is_active")
   sizes            String[]          @default([])
   colors           String[]          @default([])

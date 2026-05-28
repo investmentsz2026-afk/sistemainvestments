@@ -81,6 +81,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           category: product.category,
           sku: product.sku,
           op: product.op || '',
+          entalle: product.entalle || '',
           inventoryType: product.inventoryType,
           description: product.description || '',
           purchasePrice: product.purchasePrice,

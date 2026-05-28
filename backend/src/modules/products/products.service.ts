@@ -41,12 +41,13 @@ export class ProductsService {
         inventoryType: createProductDto.inventoryType || 'TERMINADOS',
         description: createProductDto.description,
         op: createProductDto.op,
+        entalle: createProductDto.entalle,
         purchasePrice: createProductDto.purchasePrice,
         sellingPrice: createProductDto.sellingPrice,
         minStock: createProductDto.minStock || 5,
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
-      },
+      } as any,
     });
 
     // Si viene de una compra, vincular el ítem

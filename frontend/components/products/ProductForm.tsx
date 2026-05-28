@@ -15,6 +15,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
   description: z.string().optional(),
   sku: z.string().optional(),
   op: z.string().optional(),
+  entalle: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
   minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0').default(5),
@@ -110,6 +111,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       description: '',
       sku: '',
       op: '',
+      entalle: '',
       purchasePrice: 0,
       sellingPrice: 0,
       minStock: 5,
@@ -475,6 +477,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <Info className="w-3 h-3" /> Alerta cuando el stock baje de este número
               </p>
             </div>
+
+            {/* Campo Entalle */}
+            {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(watchInventoryType) && (
+              <div>
+                <label className={labelClass}>
+                  <Hash className="w-3.5 h-3.5 text-indigo-500" />
+                  Entalle (Código Interno)
+                </label>
+                <input
+                  type="text"
+                  {...register('entalle')}
+                  className={`${inputBase} ${errors.entalle ? inputError : inputNormal}`}
+                  placeholder="Ej: E-001"
+                />
+                {errors.entalle && (
+                  <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> {(errors.entalle as any).message}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Descripción */}
             <div className="md:col-span-2">
