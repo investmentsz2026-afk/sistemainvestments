@@ -90,13 +90,12 @@ model ProductVariant {
 
 model ProductionOrder {
   id               String        @id @default(cuid())
-  opNumber         String        @map("op_number")
+  opNumber         String        @unique @map("op_number")
   productId        String        @map("product_id")
   product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  @@unique([opNumber, productId])
   @@map("production_orders")
 }
 
