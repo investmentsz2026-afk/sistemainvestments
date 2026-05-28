@@ -70,12 +70,15 @@ export class ProductionOrdersService {
       targetProductId = clonedProduct.id;
     }
 
-    // 2. Verificar si la OP ya existe en la base de datos
-    const existingOp = await this.prisma.productionOrder.findUnique({
-      where: { opNumber },
+    // 2. Verificar si la OP ya existe para este producto en la base de datos
+    const existingOp = await this.prisma.productionOrder.findFirst({
+      where: {
+        opNumber,
+        productId: targetProductId,
+      },
     });
 
-    let productionOrder = existingOp;
+    let productionOrder: any = existingOp;
 
     if (!existingOp) {
       // 3. Crear el registro de la OP
@@ -84,12 +87,6 @@ export class ProductionOrdersService {
           opNumber,
           productId: targetProductId,
         },
-      });
-    } else {
-      // Si ya existe, actualizamos el productId al producto actual para mantener la referencia
-      productionOrder = await this.prisma.productionOrder.update({
-        where: { id: existingOp.id },
-        data: { productId: targetProductId },
       });
     }
 
