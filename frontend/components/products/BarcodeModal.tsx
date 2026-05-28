@@ -24,7 +24,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
   const categoryDisplay = product.category
     ? (product.category.toUpperCase() === 'PANTALONES' || product.category.toUpperCase() === 'PANTALON' || product.category.toUpperCase() === 'PANTALÓN'
-      ? 'PANTALONES CABALLERO'
+      ? 'PANTALÓN CABALLERO'
       : product.category)
     : 'PANTALÓN CABALLERO';
 

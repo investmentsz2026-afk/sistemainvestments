@@ -418,7 +418,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               >
                 <option value="">Seleccionar categoría</option>
                 <option value="Jeans">👖 Jeans</option>
-                <option value="Pantalones">👔 Pantalones</option>
+                <option value="Pantalón">👔 Pantalón</option>
                 <option value="Camisas">👕 Camisas</option>
                 <option value="Camisetas">🎽 Camisetas</option>
                 <option value="Chaquetas">🧥 Chaquetas</option>
