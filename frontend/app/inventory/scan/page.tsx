@@ -49,6 +49,58 @@ interface ScannedItem {
   timestamp: Date;
 }
 
+interface QuantityInputProps {
+  item: ScannedItem;
+  updateItemQuantity: (variantSku: string, newQuantity: number) => void;
+  movementType: MovementType;
+}
+
+const QuantityInput: React.FC<QuantityInputProps> = ({ item, updateItemQuantity, movementType }) => {
+  const [localVal, setLocalVal] = useState(item.quantity.toString());
+
+  useEffect(() => {
+    setLocalVal(item.quantity.toString());
+  }, [item.quantity]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '' || /^\d+$/.test(val)) {
+      setLocalVal(val);
+      if (val !== '') {
+        const num = parseInt(val, 10);
+        if (num > 0) {
+          if (movementType === 'EXIT' && num > item.stock) {
+            updateItemQuantity(item.variantSku, item.stock);
+            setLocalVal(item.stock.toString());
+            toast.error(`Stock insuficiente. Stock actual: ${item.stock}`);
+          } else {
+            updateItemQuantity(item.variantSku, num);
+          }
+        }
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (localVal === '' || parseInt(localVal, 10) < 1) {
+      updateItemQuantity(item.variantSku, 1);
+      setLocalVal('1');
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={localVal}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className="w-16 text-center font-medium border border-gray-300 rounded py-0.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+    />
+  );
+};
+
 export default function ScanPage() {
   const { registerMovement, registerBulkMovement, isRegistering } = useInventory();
   const { products, isLoading: productsLoading } = useProducts();
@@ -781,11 +833,15 @@ export default function ScanPage() {
                               <button
                                 onClick={() => updateItemQuantity(item.variantSku, item.quantity - 1)}
                                 className="p-1 border border-gray-300 rounded hover:bg-gray-100"
-                                disabled={movementType === 'EXIT' && item.quantity <= 1}
+                                disabled={item.quantity <= 1}
                               >
                                 <Minus className="w-4 h-4" />
                               </button>
-                              <span className="w-12 text-center font-medium">{item.quantity}</span>
+                              <QuantityInput 
+                                item={item} 
+                                updateItemQuantity={updateItemQuantity} 
+                                movementType={movementType} 
+                              />
                               <button
                                 onClick={() => updateItemQuantity(item.variantSku, item.quantity + 1)}
                                 className="p-1 border border-gray-300 rounded hover:bg-gray-100"
