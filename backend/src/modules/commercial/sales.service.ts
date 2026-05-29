@@ -15,7 +15,8 @@ export class SalesService {
   async ensureInvoiceConfigs() {
     const configs = [
       { type: 'FACTURA', series: 'F001' },
-      { type: 'BOLETA', series: 'B001' }
+      { type: 'BOLETA', series: 'B001' },
+      { type: 'GUIA', series: 'TTT1' }
     ];
 
     for (const config of configs) {
@@ -27,7 +28,7 @@ export class SalesService {
     }
   }
 
-  async getNextInvoiceNumber(type: 'FACTURA' | 'BOLETA') {
+  async getNextInvoiceNumber(type: 'FACTURA' | 'BOLETA' | 'GUIA') {
     return await this.prisma.$transaction(async (tx) => {
       const config = await tx.invoiceConfig.findUnique({
         where: { type }

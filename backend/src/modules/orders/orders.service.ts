@@ -460,6 +460,12 @@ export class OrdersService {
         finalDocNumber = await this.salesService.getNextInvoiceNumber(type);
     }
 
+    // Auto-generate referralGuide if missing for Facturas
+    let finalReferralGuide = referralGuide;
+    if (!finalReferralGuide && docType === 'FACTURA') {
+        finalReferralGuide = await this.salesService.getNextInvoiceNumber('GUIA');
+    }
+
     const sale = await (this.prisma.sale as any).create({
       data: {
         invoiceNumber: finalDocNumber,
@@ -470,7 +476,7 @@ export class OrdersService {
         status: 'COMPLETADO',
         sellerId: order.sellerId,
         notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'}. (Precios Inc. IGV)`,
-        referralGuide,
+        referralGuide: finalReferralGuide || null,
         sunatStatus: 'PENDIENTE',
         items: {
           create: saleItems

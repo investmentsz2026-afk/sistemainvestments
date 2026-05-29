@@ -403,15 +403,18 @@ export default function InvoicePage() {
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Guía de Remisión</label>
+                            <div className="flex justify-between items-center ml-1">
+                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Guía de Remisión</label>
+                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Auto-generar</span>
+                            </div>
                             <input
                                 type="text"
                                 value={referralGuide}
                                 onChange={(e) => setReferralGuide(e.target.value)}
-                                placeholder="Ej: T001-00000001"
+                                placeholder="Vacío = Siguiente correlativo"
                                 className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700"
                             />
-                            <p className="text-[10px] text-gray-400 font-medium italic ml-1">Opcional: Vincular guía.</p>
+                            <p className="text-[10px] text-gray-400 font-medium italic ml-1">Para Facturas se autogenera si se deja vacío.</p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">IGV (%)</label>
