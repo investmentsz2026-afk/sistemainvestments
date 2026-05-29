@@ -418,6 +418,7 @@ export default function ScanPage() {
             variantId: item.id,
             quantity: item.quantity
           })),
+          type: movementType,
           reason,
           reference: reference || undefined
         });

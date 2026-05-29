@@ -41,6 +41,9 @@ export class RegisterBulkMovementDto {
   @Type(() => BulkMovementItemDto)
   items: BulkMovementItemDto[];
 
+  @IsEnum(MovementType)
+  type: MovementType;
+
   @IsString()
   reason: string;
 

@@ -87,7 +87,7 @@ export class InventoryService {
     userId: string,
     registerBulkMovementDto: RegisterBulkMovementDto,
   ) {
-    const { items, reason, reference } = registerBulkMovementDto;
+    const { items, type, reason, reference } = registerBulkMovementDto;
 
     return this.prisma.$transaction(async (prisma) => {
       // 🔥 SOLUCIÓN AL ERROR never[]
@@ -105,15 +105,20 @@ export class InventoryService {
           );
         }
 
-        if (variant.stock < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for ${variant.product.name} - ${variant.size} ${variant.color}. ` +
-              `Available: ${variant.stock}, Requested: ${item.quantity}`,
-          );
-        }
-
         const previousStock = variant.stock;
-        const newStock = previousStock - item.quantity;
+        let newStock: number;
+
+        if (type === 'ENTRY') {
+          newStock = previousStock + item.quantity;
+        } else {
+          if (previousStock < item.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for ${variant.product.name} - ${variant.size} ${variant.color}. ` +
+                `Available: ${previousStock}, Requested: ${item.quantity}`,
+            );
+          }
+          newStock = previousStock - item.quantity;
+        }
 
         await prisma.productVariant.update({
           where: { id: item.variantId },
@@ -122,8 +127,7 @@ export class InventoryService {
 
         const movement = await prisma.movement.create({
           data: {
-            // 🔥 SOLUCIÓN AL ERROR "EXIT"
-            type: 'EXIT',
+            type,
             quantity: item.quantity,
             reason,
             reference,
