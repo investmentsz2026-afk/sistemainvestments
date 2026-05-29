@@ -342,6 +342,7 @@ model Order {
   
   zone            String?     // LIMA, ORIENTE
   needsResend     Boolean     @default(false) @map("needs_resend")
+  dispatchDetails Json?       @map("dispatch_details")
   
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
@@ -397,6 +398,7 @@ model Sale {
   clientId        String?    @map("client_id")
   client          Client?    @relation(fields: [clientId], references: [id])
   totalAmount     Float      @map("total_amount")
+  totalCost       Float      @default(0) @map("total_cost")
   paymentMethod   String     @map("payment_method") // EFECTIVO, TARJETA, TRANSFERENCIA
   status          String     @default("COMPLETADO") // COMPLETADO, ANULADO
   paymentStatus   String     @default("PENDIENTE") @map("payment_status") // PENDIENTE, PARCIAL, CANCELADO
@@ -439,6 +441,7 @@ model SaleItem {
   variant         ProductVariant @relation(fields: [variantId], references: [id])
   quantity        Float
   unitPrice       Float          @map("unit_price") // Selling price at the time of sale
+  costPrice       Float          @default(0) @map("cost_price")
   totalPrice      Float          @map("total_price")
   createdAt       DateTime       @default(now()) @map("created_at")
 

@@ -118,6 +118,8 @@ export default function SalesPage() {
     const annualRevenue = sales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
+    const totalCost = filteredSales.reduce((acc, s) => acc + (s.totalCost || 0), 0);
+    const totalProfit = totalRevenue - totalCost;
 
     const getExportData = () => {
         const data: any[] = [];
@@ -139,7 +141,10 @@ export default function SalesPage() {
                         'Cant.': item.quantity,
                         'Precio U.': item.unitPrice,
                         'Subtotal': item.totalPrice,
+                        'Costo U.': item.costPrice || 0,
+                        'Costo Total Item': (item.costPrice || 0) * item.quantity,
                         'Total Factura': sale.totalAmount,
+                        'Costo Total Factura': sale.totalCost || 0,
                         'Estado Factura': sale.status,
                         'Estado Pago': sale.paymentStatus || 'PENDIENTE'
                     });
@@ -157,7 +162,10 @@ export default function SalesPage() {
                     'Cant.': 0,
                     'Precio U.': 0,
                     'Subtotal': 0,
+                    'Costo U.': 0,
+                    'Costo Total Item': 0,
                     'Total Factura': sale.totalAmount,
+                    'Costo Total Factura': sale.totalCost || 0,
                     'Estado Factura': sale.status,
                     'Estado Pago': sale.paymentStatus || 'PENDIENTE'
                 });
@@ -218,34 +226,41 @@ export default function SalesPage() {
                 </div>
 
                 {/* STATS SUMMARY */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className={`${cardClass} p-8 flex items-center gap-6`}>
                         <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center">
                             <ArrowUpRight className="w-8 h-8 text-emerald-600" />
                         </div>
                         <div>
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos Totales</p>
-                            <h3 className="text-3xl font-black text-gray-900">S/ {totalRevenue.toLocaleString()}</h3>
+                            <h3 className="text-3xl font-black text-gray-900">S/ {totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                        </div>
+                    </div>
+                    <div className={`${cardClass} p-8 flex items-center gap-6`}>
+                        <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center">
+                            <ArrowUpRight className="w-8 h-8 text-rose-600" style={{ transform: 'rotate(90deg)' }} />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Costo Total</p>
+                            <h3 className="text-3xl font-black text-gray-900">S/ {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
                     </div>
                     <div className={`${cardClass} p-8 flex items-center gap-6`}>
                         <div className="w-16 h-16 bg-indigo-50 rounded-3xl flex items-center justify-center">
-                            <ShoppingBag className="w-8 h-8 text-indigo-600" />
+                            <ArrowUpRight className="w-8 h-8 text-indigo-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Utilidad Estimada</p>
+                            <h3 className="text-3xl font-black text-gray-900">S/ {totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                        </div>
+                    </div>
+                    <div className={`${cardClass} p-8 flex items-center gap-6`}>
+                        <div className="w-16 h-16 bg-blue-50 rounded-3xl flex items-center justify-center">
+                            <ShoppingBag className="w-8 h-8 text-blue-600" />
                         </div>
                         <div>
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Total Ventas</p>
                             <h3 className="text-3xl font-black text-gray-900">{filteredSales.length}</h3>
-                        </div>
-                    </div>
-                    <div className={`${cardClass} p-8 flex items-center gap-6`}>
-                        <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center">
-                            <CreditCard className="w-8 h-8 text-amber-600" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Ticket Promedio</p>
-                            <h3 className="text-3xl font-black text-gray-900">
-                                S/ {filteredSales.length > 0 ? (totalRevenue / filteredSales.length).toFixed(2) : '0'}
-                            </h3>
                         </div>
                     </div>
                 </div>
@@ -377,6 +392,7 @@ export default function SalesPage() {
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto</th>
+                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
                                     <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
@@ -387,13 +403,13 @@ export default function SalesPage() {
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                        <td colSpan={10} className="px-8 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
+                                        <td colSpan={10} className="px-8 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => (
@@ -419,7 +435,10 @@ export default function SalesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <span className="text-lg font-black text-gray-900">S/ {sale.totalAmount.toLocaleString()}</span>
+                                                <span className="text-lg font-black text-gray-900">S/ {sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <span className="text-sm font-bold text-gray-500">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-2 text-sm font-bold text-gray-600">

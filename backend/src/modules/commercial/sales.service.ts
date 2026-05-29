@@ -64,6 +64,8 @@ export class SalesService {
 
     const sale = await this.prisma.$transaction(async (tx) => {
       let totalAmount = 0;
+      let totalCost = 0;
+      const saleItemsData: any[] = [];
 
       // 1. Validate stock and calculate total
       for (const item of items) {
@@ -80,27 +82,36 @@ export class SalesService {
           throw new BadRequestException(`Stock insuficiente para ${variant.product.name} (${variant.size}/${variant.color}). Disponible: ${variant.stock}`);
         }
 
-        const itemTotal = item.quantity * (item.unitPrice || variant.product.sellingPrice);
+        const costPrice = variant.product.purchasePrice || 0;
+        const itemTotalCost = item.quantity * costPrice;
+        totalCost += itemTotalCost;
+
+        const itemUnitPrice = item.unitPrice !== undefined ? item.unitPrice : variant.product.sellingPrice;
+        const itemTotal = item.quantity * itemUnitPrice;
         totalAmount += itemTotal;
+
+        saleItemsData.push({
+          variantId: item.variantId,
+          quantity: item.quantity,
+          unitPrice: itemUnitPrice,
+          totalPrice: itemTotal,
+          costPrice: costPrice,
+        });
       }
 
       // 2. Create Sale
-      const newSale = await tx.sale.create({
+      const newSale = await (tx.sale as any).create({
         data: {
           invoiceNumber,
           clientId,
           paymentMethod,
           totalAmount,
+          totalCost,
           notes,
           sellerId: userId,
           sunatStatus: 'PENDIENTE',
           items: {
-            create: items.map((item: any) => ({
-              variantId: item.variantId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.quantity * item.unitPrice,
-            })),
+            create: saleItemsData,
           },
         },
         include: {

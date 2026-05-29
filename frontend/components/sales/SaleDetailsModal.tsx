@@ -346,6 +346,8 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                     <th className="px-8 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Variante</th>
                                                     <th className="px-8 py-4 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">Cant.</th>
                                                     <th className="px-8 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Precio Unit.</th>
+                                                    <th className="px-8 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Precio Costo</th>
+                                                    <th className="px-8 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Costo Total</th>
                                                     <th className="px-8 py-4 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Total</th>
                                                 </tr>
                                             </thead>
@@ -370,6 +372,12 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                         </td>
                                                         <td className="px-8 py-4 text-right text-xs font-bold text-gray-500">
                                                             S/ {item.unitPrice?.toFixed(2)}
+                                                        </td>
+                                                        <td className="px-8 py-4 text-right text-xs font-bold text-rose-500">
+                                                            S/ {(item.costPrice || 0).toFixed(2)}
+                                                        </td>
+                                                        <td className="px-8 py-4 text-right text-xs font-bold text-rose-500">
+                                                            S/ {((item.costPrice || 0) * item.quantity).toFixed(2)}
                                                         </td>
                                                         <td className="px-8 py-4 text-right text-sm font-black text-gray-900">
                                                             S/ {item.totalPrice?.toFixed(2)}
@@ -421,6 +429,14 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                         <div className="flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                             <span>Impuestos (18%)</span>
                                             <span>S/ ({(sale.totalAmount - (sale.totalAmount / 1.18)).toFixed(2)})</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                                            <span>Costo Total</span>
+                                            <span>S/ {(sale.totalCost || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                                            <span>Utilidad</span>
+                                            <span>S/ {(sale.totalAmount - (sale.totalCost || 0)).toFixed(2)}</span>
                                         </div>
                                     </div>
                                     <div className="h-px bg-gray-200 mb-3" />

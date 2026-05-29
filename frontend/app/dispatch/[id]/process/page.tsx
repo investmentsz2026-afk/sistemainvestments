@@ -55,6 +55,7 @@ export default function DispatchProcessPage() {
     const [order, setOrder] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>([]);
+    const [dispatchedVariants, setDispatchedVariants] = useState<Record<string, number>>({});
     const [scanMode, setScanMode] = useState<ScanMode>('scanner');
     const [barcodeInput, setBarcodeInput] = useState('');
     const [isDispatching, setIsDispatching] = useState(false);
@@ -188,11 +189,20 @@ export default function DispatchProcessPage() {
             return;
         }
 
-        // Check stock
-        if (variant.stock <= 0) {
-            toast.error(`Stock insuficiente para ${variant.product.name} (${variant.size}/${variant.color}). Stock: ${variant.stock}`);
+        // Check stock (considering what's already dispatched)
+        const currentQtyInSession = dispatchedVariants[variant.id] || 0;
+        const availableStock = variant.stock - currentQtyInSession;
+
+        if (availableStock <= 0) {
+            toast.error(`Stock insuficiente para ${variant.product.name} (${variant.size}/${variant.color}). Stock: ${variant.stock}, ya asignado: ${currentQtyInSession}`);
             return;
         }
+
+        // Update dispatchedVariants state
+        setDispatchedVariants(prev => ({
+            ...prev,
+            [variant.id]: (prev[variant.id] || 0) + 1
+        }));
 
         // Increment dispatched count
         setDispatchItems(prev => prev.map(di => {
@@ -222,28 +232,32 @@ export default function DispatchProcessPage() {
         }
     };
 
-    // Helper: find variant for a dispatch item + size field
-    const findVariantForSize = (di: DispatchItem, sizeField: string) => {
-        if (!products) return null;
+    // Helper: find all variants for a dispatch item + size field of first quality (TERMINADOS)
+    const findVariantsForSize = (di: DispatchItem, sizeField: string) => {
+        if (!products) return [];
         const sizeNumMap: Record<string, string> = {
             's28': '28', 'm30': '30', 'l32': '32', 'xl34': '34', 'xxl36': '36',
             'size38': '38', 'size40': '40', 'size42': '42', 'size44': '44', 'size46': '46',
         };
         const sizeNum = sizeNumMap[sizeField];
-        if (!sizeNum) return null;
+        if (!sizeNum) return [];
 
+        const matches: any[] = [];
         for (const p of products) {
+            // First quality only
+            if (p.inventoryType !== 'TERMINADOS') continue;
+
             const nameMatch = p.name.toUpperCase().includes(di.modelName.toUpperCase()) ||
                               di.modelName.toUpperCase().includes(p.name.toUpperCase());
             if (!nameMatch) continue;
 
             for (const v of (p.variants || [])) {
                 if (v.color.toUpperCase() === di.color.toUpperCase() && v.size === sizeNum) {
-                    return { ...v, product: p };
+                    matches.push({ ...v, product: p });
                 }
             }
         }
-        return null;
+        return matches;
     };
 
     // Manually increment a size — with stock validation
@@ -261,9 +275,9 @@ export default function DispatchProcessPage() {
         }
 
         // Find product variant in inventory
-        const variant = findVariantForSize(di, sizeField);
+        const variants = findVariantsForSize(di, sizeField);
 
-        if (!variant) {
+        if (variants.length === 0) {
             toast((t) => (
                 <div className="flex items-start gap-3" style={{ maxWidth: 340 }}>
                     <div style={{ background: '#FEE2E2', borderRadius: 12, padding: 8, marginTop: 2 }}>
@@ -282,11 +296,21 @@ export default function DispatchProcessPage() {
             return;
         }
 
-        // Check real stock — consider how many we've ALREADY dispatched of this variant
-        const alreadyDispatched = sz.dispatched;
-        const availableStock = variant.stock - alreadyDispatched;
+        // Find the first variant with available stock
+        let chosenVariant: any = null;
+        let availableStock = 0;
 
-        if (availableStock <= 0) {
+        for (const v of variants) {
+            const alreadyAssigned = dispatchedVariants[v.id] || 0;
+            if (v.stock - alreadyAssigned > 0) {
+                chosenVariant = v;
+                availableStock = v.stock - alreadyAssigned;
+                break;
+            }
+        }
+
+        if (!chosenVariant) {
+            const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
             toast((t) => (
                 <div className="flex items-start gap-3" style={{ maxWidth: 380 }}>
                     <div style={{ background: '#FEF3C7', borderRadius: 12, padding: 8, marginTop: 2 }}>
@@ -297,7 +321,7 @@ export default function DispatchProcessPage() {
                             Stock insuficiente
                         </p>
                         <p style={{ color: '#6B7280', fontSize: 11 }}>
-                            <strong>{di.modelName} {di.color}</strong> talla <strong>{sz.label}</strong> tiene <strong>{variant.stock}</strong> en stock, ya descargaste <strong>{alreadyDispatched}</strong>. No hay más disponible para este pedido.
+                            <strong>{di.modelName} {di.color}</strong> talla <strong>{sz.label}</strong> tiene <strong>{totalStock}</strong> en stock total, pero ya asignaste todo. No hay más disponible para este pedido.
                         </p>
                         <p style={{ color: '#9CA3AF', fontSize: 10, marginTop: 6 }}>
                             Puedes despachar parcialmente y generar la boleta con menos productos.
@@ -307,6 +331,12 @@ export default function DispatchProcessPage() {
             ), { duration: 5000, style: { background: '#FFF', border: '2px solid #FDE68A', borderRadius: 20, padding: '14px 16px' } });
             return;
         }
+
+        // Increment quantity for the chosen variant
+        setDispatchedVariants(prev => ({
+            ...prev,
+            [chosenVariant.id]: (prev[chosenVariant.id] || 0) + 1
+        }));
 
         // All checks passed — increment
         setDispatchItems(prev => prev.map(d => {
@@ -322,6 +352,39 @@ export default function DispatchProcessPage() {
 
     // Manually decrement a size
     const manualDecrement = (orderItemId: string, sizeField: string) => {
+        const di = dispatchItems.find(d => d.orderItemId === orderItemId);
+        if (!di) return;
+
+        const sz = di.sizes.find(s => s.field === sizeField);
+        if (!sz) return;
+
+        if (sz.dispatched <= 0) return;
+
+        // Find all matching variants across OPs
+        const variants = findVariantsForSize(di, sizeField);
+
+        // Find one variant in the list that is currently in dispatchedVariants with quantity > 0
+        let variantToDecrement: any = null;
+        for (const v of variants) {
+            if ((dispatchedVariants[v.id] || 0) > 0) {
+                variantToDecrement = v;
+                break;
+            }
+        }
+
+        if (variantToDecrement) {
+            setDispatchedVariants(prev => {
+                const updated = { ...prev };
+                const newQty = (updated[variantToDecrement.id] || 0) - 1;
+                if (newQty <= 0) {
+                    delete updated[variantToDecrement.id];
+                } else {
+                    updated[variantToDecrement.id] = newQty;
+                }
+                return updated;
+            });
+        }
+
         setDispatchItems(prev => prev.map(di => {
             if (di.orderItemId !== orderItemId) return di;
             const newSizes = di.sizes.map(s => {
@@ -361,17 +424,12 @@ export default function DispatchProcessPage() {
             // Build inventory deduction items
             const deductionItems: { variantId: string; quantity: number }[] = [];
 
-            for (const di of dispatchItems) {
-                for (const sz of di.sizes) {
-                    if (sz.dispatched <= 0) continue;
-
-                    const variant = findVariantForSize(di, sz.field);
-                    if (variant) {
-                        deductionItems.push({
-                            variantId: variant.id,
-                            quantity: sz.dispatched,
-                        });
-                    }
+            for (const [variantId, quantity] of Object.entries(dispatchedVariants)) {
+                if (quantity > 0) {
+                    deductionItems.push({
+                        variantId,
+                        quantity,
+                    });
                 }
             }
 
@@ -617,9 +675,10 @@ export default function DispatchProcessPage() {
                                                 );
 
                                                 const sizeComplete = sz.dispatched >= sz.ordered;
-                                                const variant = findVariantForSize(di, sz.field);
-                                                const noStock = !variant || (variant.stock - sz.dispatched) <= 0;
-                                                const hasNoInventory = !variant || variant.stock <= 0;
+                                                const variants = findVariantsForSize(di, sz.field);
+                                                const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+                                                const noStock = variants.length === 0 || (totalStock - sz.dispatched) <= 0;
+                                                const hasNoInventory = variants.length === 0 || totalStock <= 0;
 
                                                 return (
                                                     <div key={sz.field} className="text-center">
@@ -648,7 +707,7 @@ export default function DispatchProcessPage() {
                                                             title={
                                                                 sizeComplete ? '¡Completado!' :
                                                                 hasNoInventory && sz.dispatched === 0 ? `Sin stock en inventario` :
-                                                                `Clic para +1 | Clic derecho para -1 ${variant ? `(stock: ${variant.stock})` : ''}`
+                                                                `Clic para +1 | Clic derecho para -1 (stock total: ${totalStock})`
                                                             }
                                                         >
                                                             <span className="text-lg leading-none">{sz.dispatched}</span>
@@ -659,8 +718,8 @@ export default function DispatchProcessPage() {
                                                                 </span>
                                                             )}
                                                         </button>
-                                                        {variant && !sizeComplete && !hasNoInventory && (
-                                                            <p className="text-[8px] text-gray-400 mt-0.5 font-bold">stk: {variant.stock}</p>
+                                                        {variants.length > 0 && !sizeComplete && !hasNoInventory && (
+                                                            <p className="text-[8px] text-gray-400 mt-0.5 font-bold">stk: {totalStock}</p>
                                                         )}
                                                     </div>
                                                 );

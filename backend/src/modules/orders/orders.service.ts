@@ -285,13 +285,17 @@ export class OrdersService {
         where: { id },
         data: { 
           status: 'DESPACHADO',
+          dispatchDetails: items || [],
         }
       });
     } else {
       // No dispatched item details — just update status
       await (this.prisma as any).order.update({
         where: { id },
-        data: { status: 'DESPACHADO' }
+        data: { 
+          status: 'DESPACHADO',
+          dispatchDetails: items || [],
+        }
       });
     }
 
@@ -355,45 +359,92 @@ export class OrdersService {
     });
 
     // 2. Create Sale Record
-    // Map OrderItems to SaleItems (USING DISPATCHED QUANTITIES)
+    // Map OrderItems to SaleItems (USING DISPATCHED QUANTITIES or saved dispatchDetails)
     const saleItems: any[] = [];
-    const sizeMap: Record<string, string> = {
-      'dispS28': '28', 'dispM30': '30', 'dispL32': '32', 'dispXL34': '34', 'dispXXL36': '36',
-      'dispSize38': '38', 'dispSize40': '40', 'dispSize42': '42', 'dispSize44': '44', 'dispSize46': '46',
-    };
-
     let actualTotalAmount = 0;
+    let totalCost = 0;
 
-    for (const item of order.items) {
-      for (const [field, sizeNum] of Object.entries(sizeMap)) {
-        const qty = item[field] || 0;
+    const dispatchDetails = (order as any).dispatchDetails as any[];
+
+    if (dispatchDetails && Array.isArray(dispatchDetails) && dispatchDetails.length > 0) {
+      for (const item of dispatchDetails) {
+        const qty = item.quantity;
         if (qty <= 0) continue;
 
-        const products = await this.prisma.product.findMany({
-          where: { name: { contains: item.modelName, mode: 'insensitive' } },
-          include: { variants: true }
+        const variant = await this.prisma.productVariant.findUnique({
+          where: { id: item.variantId },
+          include: { product: true }
         });
 
-        const product = products.find(p => 
-          p.name.toUpperCase().includes(item.modelName.toUpperCase()) || 
-          item.modelName.toUpperCase().includes(p.name.toUpperCase())
-        );
+        if (variant) {
+          // Find the corresponding order item to get the unitPrice agreed on the order
+          const orderItem = order.items.find((oi: any) => {
+            const nameMatch = variant.product.name.toUpperCase().includes(oi.modelName.toUpperCase()) ||
+                              oi.modelName.toUpperCase().includes(variant.product.name.toUpperCase());
+            const colorMatch = variant.color.toUpperCase() === oi.color.toUpperCase();
+            return nameMatch && colorMatch;
+          });
 
-        if (product) {
-          const variant = product.variants.find(v => 
-            v.color.toUpperCase() === item.color.toUpperCase() && 
-            v.size === sizeNum
+          const unitPrice = orderItem ? orderItem.unitPrice : variant.product.sellingPrice;
+          const costPrice = variant.product.purchasePrice || 0;
+
+          const itemTotal = qty * unitPrice;
+          const itemTotalCost = qty * costPrice;
+
+          saleItems.push({
+            variantId: variant.id,
+            quantity: qty,
+            unitPrice: unitPrice,
+            totalPrice: itemTotal,
+            costPrice: costPrice,
+          });
+          actualTotalAmount += itemTotal;
+          totalCost += itemTotalCost;
+        }
+      }
+    } else {
+      // Fallback for legacy orders
+      const sizeMap: Record<string, string> = {
+        'dispS28': '28', 'dispM30': '30', 'dispL32': '32', 'dispXL34': '34', 'dispXXL36': '36',
+        'dispSize38': '38', 'dispSize40': '40', 'dispSize42': '42', 'dispSize44': '44', 'dispSize46': '46',
+      };
+
+      for (const item of order.items) {
+        for (const [field, sizeNum] of Object.entries(sizeMap)) {
+          const qty = item[field] || 0;
+          if (qty <= 0) continue;
+
+          const products = await this.prisma.product.findMany({
+            where: { name: { contains: item.modelName, mode: 'insensitive' } },
+            include: { variants: true }
+          });
+
+          const product = products.find(p => 
+            p.name.toUpperCase().includes(item.modelName.toUpperCase()) || 
+            item.modelName.toUpperCase().includes(p.name.toUpperCase())
           );
 
-          if (variant) {
-            const itemTotal = qty * item.unitPrice;
-            saleItems.push({
-              variantId: variant.id,
-              quantity: qty,
-              unitPrice: item.unitPrice,
-              totalPrice: itemTotal
-            });
-            actualTotalAmount += itemTotal;
+          if (product) {
+            const variant = product.variants.find(v => 
+              v.color.toUpperCase() === item.color.toUpperCase() && 
+              v.size === sizeNum
+            );
+
+            if (variant) {
+              const itemTotal = qty * item.unitPrice;
+              const costPrice = product.purchasePrice || 0;
+              const itemTotalCost = qty * costPrice;
+
+              saleItems.push({
+                variantId: variant.id,
+                quantity: qty,
+                unitPrice: item.unitPrice,
+                totalPrice: itemTotal,
+                costPrice: costPrice,
+              });
+              actualTotalAmount += itemTotal;
+              totalCost += itemTotalCost;
+            }
           }
         }
       }
@@ -409,11 +460,12 @@ export class OrdersService {
         finalDocNumber = await this.salesService.getNextInvoiceNumber(type);
     }
 
-    const sale = await this.prisma.sale.create({
+    const sale = await (this.prisma.sale as any).create({
       data: {
         invoiceNumber: finalDocNumber,
         clientId: order.clientId,
         totalAmount: finalTotalWithTax, 
+        totalCost: totalCost,
         paymentMethod: paymentMethod || 'CREDITO',
         status: 'COMPLETADO',
         sellerId: order.sellerId,
