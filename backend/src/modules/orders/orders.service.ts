@@ -349,7 +349,7 @@ export class OrdersService {
       throw new BadRequestException('Solo los pedidos despachados pueden completarse.');
     }
 
-    const { docNumber, docType, paymentMethod, igv } = data;
+    const { docNumber, docType, paymentMethod, igv, referralGuide } = data;
     const igvRate = (igv || 18) / 100;
 
     // 1. Update order status
@@ -470,6 +470,7 @@ export class OrdersService {
         status: 'COMPLETADO',
         sellerId: order.sellerId,
         notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'}. (Precios Inc. IGV)`,
+        referralGuide,
         sunatStatus: 'PENDIENTE',
         items: {
           create: saleItems

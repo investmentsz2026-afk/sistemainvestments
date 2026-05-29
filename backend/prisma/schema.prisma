@@ -407,6 +407,7 @@ model Sale {
   sellerId        String     @map("seller_id")
   seller          User       @relation("UserSales", fields: [sellerId], references: [id])
   notes           String?    @db.Text
+  referralGuide   String?    @map("referral_guide")
   sunatStatus     String?    @map("sunat_status") // PENDIENTE, ENVIADO, ACEPTADO, RECHAZADO, ERROR
   sunatResponse   String?    @map("sunat_response") @db.Text
   sunatXmlUrl     String?    @map("sunat_xml_url")

@@ -48,7 +48,7 @@ export class SalesService {
   }
 
   async createSale(userId: string, data: any) {
-    const { clientId, items, paymentMethod, notes } = data;
+    const { clientId, items, paymentMethod, notes, referralGuide } = data;
     let { invoiceNumber } = data;
 
     if (!items || items.length === 0) {
@@ -108,6 +108,7 @@ export class SalesService {
           totalAmount,
           totalCost,
           notes,
+          referralGuide,
           sellerId: userId,
           sunatStatus: 'PENDIENTE',
           items: {
@@ -348,6 +349,14 @@ export class SalesService {
         total_pago_con_monto_fijo_por_item: null,
         total: parseFloat(sale.totalAmount.toFixed(2)),
         enviar_a_sunat: true,
+        ...(typeof (sale as any).referralGuide === 'string' && (sale as any).referralGuide ? {
+          guias: [
+            {
+              numero: (sale as any).referralGuide,
+              codigo_tipo_documento: "09"
+            }
+          ]
+        } : {}),
         items: sale.items.map(item => {
           const itemSubtotal = item.totalPrice / 1.18;
           const itemIgv = item.totalPrice - itemSubtotal;

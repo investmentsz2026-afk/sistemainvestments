@@ -45,6 +45,7 @@ export default function InvoicePage() {
     const [docType, setDocType] = useState<DocumentType>('BOLETA');
     const [docNumber, setDocNumber] = useState('');
     const [igv, setIgv] = useState(18);
+    const [referralGuide, setReferralGuide] = useState('');
     const [isCompleting, setIsCompleting] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('TRANSFERENCIA');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -80,7 +81,8 @@ export default function InvoicePage() {
                 docNumber,
                 docType,
                 paymentMethod,
-                igv
+                igv,
+                referralGuide
             });
             toast.success('¡Pedido finalizado con éxito! La venta ha sido registrada.');
             router.push('/dispatch');
@@ -211,7 +213,8 @@ export default function InvoicePage() {
                         <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Nota de Pedido: <span style="color:#6366f1;font-weight:800;">#${order.orderNumber || order.id?.slice(-6) || ''}</span></div>
                         <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Fecha Pedido: ${pedidoDate}</div>
                         <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Condición: ${order.condition || '—'}</div>
-                        ${order.agency ? `<div style="font-size:11px;color:#555;font-weight:600;">Agencia: ${order.agency}</div>` : ''}
+                        ${order.agency ? `<div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Agencia: ${order.agency}</div>` : ''}
+                        ${referralGuide ? `<div style="font-size:11px;color:#555;font-weight:600;">Guía Remisión: <span style="font-weight:800;">${referralGuide}</span></div>` : ''}
                     </td>
                 </tr>
             </table>
@@ -354,7 +357,7 @@ export default function InvoicePage() {
                 {/* Config Panel */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/20">
                     <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-6">Configuración del Comprobante</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Comprobante</label>
                             <div className="flex rounded-2xl bg-gray-100 p-1">
@@ -398,6 +401,17 @@ export default function InvoicePage() {
                                 <option value="TARJETA">Tarjeta</option>
                                 <option value="CREDITO">Crédito</option>
                             </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Guía de Remisión</label>
+                            <input
+                                type="text"
+                                value={referralGuide}
+                                onChange={(e) => setReferralGuide(e.target.value)}
+                                placeholder="Ej: T001-00000001"
+                                className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700"
+                            />
+                            <p className="text-[10px] text-gray-400 font-medium italic ml-1">Opcional: Vincular guía.</p>
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">IGV (%)</label>

@@ -136,7 +136,8 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                     <div style="text-align:right;">
                         <div style="font-size:8px;font-weight:800;color:#9ca3af;text-transform:uppercase;">Detalles</div>
                         <div style="font-size:10px;color:#666;margin-top:2px;">Fecha: ${today}</div>
-                        <div style="font-size:10px;color:#666;">Vendedor: ${sale.seller?.name || 'N/A'} (${sale.seller?.zone || 'OFICINA'})</div>
+                        <div style="font-size:10px;color:#666;margin-bottom:2px;">Vendedor: ${sale.seller?.name || 'N/A'} (${sale.seller?.zone || 'OFICINA'})</div>
+                        ${sale.referralGuide ? `<div style="font-size:10px;color:#666;">Guía Remisión: <span style="font-weight:700;">${sale.referralGuide}</span></div>` : ''}
                     </div>
                 </div>
 
@@ -273,6 +274,12 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                     <span className="text-[11px] font-bold text-gray-400 uppercase">Moneda</span>
                                                     <span className="text-xs font-black text-gray-700">SOLES (S/)</span>
                                                 </div>
+                                                {sale.referralGuide && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[11px] font-bold text-gray-400 uppercase">Guía Remisión</span>
+                                                        <span className="text-xs font-black text-gray-700">{sale.referralGuide}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 

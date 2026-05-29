@@ -41,6 +41,7 @@ export default function NewSalePage() {
     const [selectedClientId, setSelectedClientId] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('EFECTIVO');
     const [invoiceNumber, setInvoiceNumber] = useState('');
+    const [referralGuide, setReferralGuide] = useState('');
     const [notes, setNotes] = useState('');
 
     // Search/UI States
@@ -151,7 +152,8 @@ export default function NewSalePage() {
                 items: cart,
                 paymentMethod,
                 invoiceNumber: invoiceNumber || null,
-                notes
+                notes,
+                referralGuide
             });
             setShowSuccess(true);
             setTimeout(() => {
@@ -390,7 +392,7 @@ export default function NewSalePage() {
                                     </div>
                                 </div>
                                 
-                                <div className="space-y-2 mb-8">
+                                <div className="space-y-2 mb-6">
                                     <div className="flex justify-between items-center ml-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Número de Comprobante</label>
                                         <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Opcional: Auto-generar</span>
@@ -403,6 +405,20 @@ export default function NewSalePage() {
                                         onChange={(e) => setInvoiceNumber(e.target.value)}
                                     />
                                     <p className="text-[9px] text-gray-500 font-medium italic">Facturas (F) requieren RUC. Boletas (B) son para DNI/Varios.</p>
+                                </div>
+
+                                <div className="space-y-2 mb-8">
+                                    <div className="flex justify-between items-center ml-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Guía de Remisión</label>
+                                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded">Opcional</span>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Ej: T001-00000001"
+                                        className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                                        value={referralGuide}
+                                        onChange={(e) => setReferralGuide(e.target.value)}
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-3 mb-8">
