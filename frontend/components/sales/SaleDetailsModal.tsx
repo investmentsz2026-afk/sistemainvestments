@@ -76,20 +76,19 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
 
     const getVoucherHTML = () => {
         if (!sale) return '';
-
         const docTitle = sale.invoiceNumber?.startsWith('F') ? 'Factura' : 'Boleta de Venta';
         const docNum = sale.invoiceNumber || 'S/N';
         const today = formatDate(sale.createdAt);
 
         const itemRows = (sale.items || []).map((item: any) => `
             <tr>
-                <td style="padding:10px 4px;border-bottom:1px solid #eee;">
-                    <div style="font-weight:800;color:#111;font-size:11px;text-transform:uppercase;">${item.variant?.product?.name || 'PRODUCTO'}</div>
-                    <div style="font-size:9px;color:#888;font-weight:600;">${item.variant?.size || ''} / ${item.variant?.color || ''}</div>
+                <td style="padding:6px 4px;border-bottom:1px solid #eee;">
+                    <div style="font-weight:700;color:#111;font-size:10px;text-transform:uppercase;">${item.variant?.product?.name || 'PRODUCTO'}</div>
+                    <div style="font-size:8px;color:#777;font-weight:600;">Talla: ${item.variant?.size || ''} / Color: ${item.variant?.color || ''}</div>
                 </td>
-                <td style="text-align:center;padding:10px 4px;font-weight:800;color:#111;font-size:11px;border-bottom:1px solid #eee;">${item.quantity}</td>
-                <td style="text-align:right;padding:10px 4px;font-weight:600;color:#555;font-size:10px;border-bottom:1px solid #eee;">S/ ${item.unitPrice?.toFixed(2)}</td>
-                <td style="text-align:right;padding:10px 4px;font-weight:800;color:#111;font-size:11px;border-bottom:1px solid #eee;">S/ ${item.totalPrice?.toFixed(2)}</td>
+                <td style="text-align:center;padding:6px 4px;font-weight:700;color:#111;font-size:10px;border-bottom:1px solid #eee;">${item.quantity}</td>
+                <td style="text-align:right;padding:6px 4px;font-weight:600;color:#555;font-size:9px;border-bottom:1px solid #eee;">S/ ${item.unitPrice?.toFixed(2)}</td>
+                <td style="text-align:right;padding:6px 4px;font-weight:700;color:#111;font-size:10px;border-bottom:1px solid #eee;">${item.totalPrice?.toFixed(2)}</td>
             </tr>
         `).join('');
 
@@ -102,42 +101,41 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             <head>
                 <meta charset="utf-8">
                 <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
                     * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { font-family: 'Inter', sans-serif; color: #111; padding: 40px; }
-                    .header { background:#111; color:#fff; padding:25px; border-radius:12px; margin-bottom:20px; display: flex; justify-content: space-between; align-items: center; }
-                    .client-box { padding:15px; border:1px solid #eee; border-radius:12px; margin-bottom:20px; background:#fafafa; display: flex; justify-content: space-between; }
-                    table { width:100%; border-collapse:collapse; margin-bottom:20px; }
-                    th { text-align:left; padding:10px; font-size:9px; border-bottom:2px solid #111; text-transform:uppercase; }
-                    .totals { width:220px; margin-left:auto; }
-                    .totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; }
-                    .grand-total { border-top: 2px solid #111; margin-top: 10px; padding-top: 10px; font-weight: 900; font-size: 16px; }
+                    body { font-family: 'Inter', sans-serif; color: #111; padding: 20px 30px; font-size: 10px; }
+                    .header { background:#111; color:#fff; padding:15px 20px; border-radius:10px; margin-bottom:12px; display: flex; justify-content: space-between; align-items: center; }
+                    .client-box { padding:10px 15px; border:1px solid #eee; border-radius:10px; margin-bottom:12px; background:#fafafa; display: flex; justify-content: space-between; }
+                    table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+                    th { text-align:left; padding:6px 4px; font-size:8px; border-bottom:2px solid #111; text-transform:uppercase; color:#555; }
+                    .totals { width:180px; margin-left:auto; }
+                    .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 9px; }
+                    .grand-total { border-top: 1px solid #111; margin-top: 6px; padding-top: 6px; font-weight: 800; font-size: 12px; }
                     @media print { body { padding: 0; } }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <div>
-                        <div style="font-size:18px;font-weight:900;">INVESTMENTS Z & G S.A.C.</div>
-                        <div style="font-size:9px;color:#9ca3af;">RUC: 20611188715</div>
+                        <div style="font-size:14px;font-weight:800;">INVESTMENTS Z & G S.A.C.</div>
+                        <div style="font-size:8px;color:#9ca3af;">RUC: 20611188715</div>
                     </div>
-                    <div style="border:1px solid rgba(255,255,255,0.2);padding:10px 20px;border-radius:8px;text-align:center;">
-                        <div style="font-size:8px;font-weight:800;color:#818cf8;text-transform:uppercase;">${docTitle}</div>
-                        <div style="font-size:16px;font-weight:900;">${docNum}</div>
+                    <div style="border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;text-align:center;">
+                        <div style="font-size:7px;font-weight:800;color:#818cf8;text-transform:uppercase;">${docTitle}</div>
+                        <div style="font-size:12px;font-weight:800;">${docNum}</div>
                     </div>
                 </div>
 
                 <div class="client-box">
                     <div>
-                        <div style="font-size:8px;font-weight:800;color:#9ca3af;text-transform:uppercase;">Cliente</div>
-                        <div style="font-size:12px;font-weight:800;margin-top:2px;">${sale.client?.name || 'PUBLICO GENERAL'}</div>
-                        <div style="font-size:10px;color:#666;">${sale.client?.documentType || 'DNI'}: ${sale.client?.documentNumber || '00000000'}</div>
+                        <div style="font-size:7px;font-weight:800;color:#9ca3af;text-transform:uppercase;">Cliente</div>
+                        <div style="font-size:10px;font-weight:800;margin-top:2px;">${sale.client?.name || 'PUBLICO GENERAL'}</div>
+                        <div style="font-size:8px;color:#666;">${sale.client?.documentType || 'DNI'}: ${sale.client?.documentNumber || '00000000'}</div>
                     </div>
                     <div style="text-align:right;">
-                        <div style="font-size:8px;font-weight:800;color:#9ca3af;text-transform:uppercase;">Detalles</div>
-                        <div style="font-size:10px;color:#666;margin-top:2px;">Fecha: ${today}</div>
-                        <div style="font-size:10px;color:#666;margin-bottom:2px;">Vendedor: ${sale.seller?.name || 'N/A'} (${sale.seller?.zone || 'OFICINA'})</div>
-                        ${sale.referralGuide ? `<div style="font-size:10px;color:#666;">Guía Remisión: <span style="font-weight:700;">${sale.referralGuide}</span></div>` : ''}
+                        <div style="font-size:7px;font-weight:800;color:#9ca3af;text-transform:uppercase;">Detalles</div>
+                        <div style="font-size:8px;color:#666;margin-top:2px;">Fecha Emisión: ${today}</div>
+                        ${sale.referralGuide ? `<div style="font-size:8px;color:#666;margin-top:2px;">Guía Remisión: <span style="font-weight:700;">${sale.referralGuide}</span></div>` : ''}
                     </div>
                 </div>
 
@@ -145,9 +143,9 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                     <thead>
                         <tr>
                             <th>Descripción</th>
-                            <th style="text-align:center;">Cant</th>
-                            <th style="text-align:right;">P. Unit</th>
-                            <th style="text-align:right;">Total</th>
+                            <th style="text-align:center;width:40px;">Cant</th>
+                            <th style="text-align:right;width:70px;">P. Unit</th>
+                            <th style="text-align:right;width:80px;">Total</th>
                         </tr>
                     </thead>
                     <tbody>${itemRows}</tbody>
