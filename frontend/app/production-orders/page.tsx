@@ -426,7 +426,7 @@ export default function ProductionOrdersPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
-                      Precio de Venta (S/)
+                      Precio Sugerido (S/)
                     </label>
                     <input
                       required
