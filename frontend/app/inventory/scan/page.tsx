@@ -888,7 +888,7 @@ export default function ScanPage() {
                   <div className="text-right">
                     <p className="text-sm text-gray-600">Valor total</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      ${getTotalValue().toFixed(2)}
+                      S/ {getTotalValue().toFixed(2)}
                     </p>
                   </div>
                 </div>

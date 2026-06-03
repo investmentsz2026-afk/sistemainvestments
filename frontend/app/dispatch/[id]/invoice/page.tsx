@@ -210,8 +210,6 @@ export default function InvoicePage() {
                     </td>
                     <td style="vertical-align:top;width:50%;padding-left:20px;">
                         <div style="font-size:8px;font-weight:800;color:#9ca3af;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Datos del Pedido</div>
-                        <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Nota de Pedido: <span style="color:#6366f1;font-weight:800;">#${order.orderNumber || order.id?.slice(-6) || ''}</span></div>
-                        <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Fecha Pedido: ${pedidoDate}</div>
                         <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Condición: ${order.condition || '—'}</div>
                         ${order.agency ? `<div style="font-size:11px;color:#555;font-weight:600;margin-bottom:2px;">Agencia: ${order.agency}</div>` : ''}
                         ${referralGuide ? `<div style="font-size:11px;color:#555;font-weight:600;">Guía Remisión: <span style="font-weight:800;">${referralGuide}</span></div>` : ''}
@@ -488,14 +486,6 @@ export default function InvoicePage() {
                             <div className="space-y-2">
                                 <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Datos del Pedido</h4>
                                 <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <Hash className="w-3.5 h-3.5 text-gray-400" />
-                                        <span className="font-bold text-gray-600 text-xs">Nota: <span className="text-indigo-600 font-black">#{order.orderNumber || order.id.slice(-6)}</span></span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                                        <span className="font-bold text-gray-600 text-xs">Fecha: {formatDate(order.createdAt)}</span>
-                                    </div>
                                     <div className="flex items-center gap-2">
                                         <Truck className="w-3.5 h-3.5 text-gray-400" />
                                         <span className="font-bold text-gray-600 text-xs">Condición: {order.condition || '—'}</span>
