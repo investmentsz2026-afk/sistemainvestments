@@ -56,4 +56,9 @@ export class SalesController {
   sendToSunat(@Param('id') id: string) {
     return this.salesService.sendToSunat(id);
   }
+
+  @Patch(':id/referral-guide')
+  updateReferralGuide(@Param('id') id: string, @Body() data: { referralGuide: string }) {
+    return this.salesService.updateReferralGuide(id, data.referralGuide);
+  }
 }

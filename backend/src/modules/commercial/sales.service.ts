@@ -638,4 +638,16 @@ export class SalesService {
 
     throw new BadRequestException(`No se pudo conectar con ningún servidor de validación. Error: ${lastError}`);
   }
+
+  async updateReferralGuide(saleId: string, referralGuide: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId }
+    });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    return this.prisma.sale.update({
+      where: { id: saleId },
+      data: { referralGuide: referralGuide || null }
+    });
+  }
 }

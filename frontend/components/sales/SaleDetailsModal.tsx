@@ -37,6 +37,9 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const [sale, setSale] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
+    const [isEditingGuide, setIsEditingGuide] = useState(false);
+    const [guideValue, setGuideValue] = useState('');
+    const [isSavingGuide, setIsSavingGuide] = useState(false);
 
     useEffect(() => {
         if (isOpen && saleId) {
@@ -71,6 +74,21 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             toast.error('Error de conexión con el servidor de SUNAT');
         } finally {
             setIsSending(false);
+        }
+    };
+
+    const handleSaveGuide = async () => {
+        setIsSavingGuide(true);
+        try {
+            await api.patch(`/sales/${saleId}/referral-guide`, { referralGuide: guideValue });
+            toast.success('Guía de remisión actualizada');
+            setIsEditingGuide(false);
+            fetchSaleDetails();
+        } catch (error: any) {
+            console.error('Error updating referral guide:', error);
+            toast.error(error.response?.data?.message || 'Error al actualizar la guía');
+        } finally {
+            setIsSavingGuide(false);
         }
     };
 
@@ -272,12 +290,46 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                     <span className="text-[10px] font-bold text-gray-400 uppercase">Moneda</span>
                                                     <span className="text-xs font-black text-gray-700">SOLES (S/)</span>
                                                 </div>
-                                                {sale.referralGuide && (
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">Guía Remisión</span>
-                                                        <span className="text-xs font-black text-gray-700">{sale.referralGuide}</span>
-                                                    </div>
-                                                )}
+                                                <div className="flex justify-between items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase">Guía Remisión</span>
+                                                    {isEditingGuide ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <input 
+                                                                type="text"
+                                                                className="px-2 py-0.5 border border-gray-300 rounded text-xs font-bold uppercase w-28 bg-white"
+                                                                value={guideValue}
+                                                                onChange={(e) => setGuideValue(e.target.value)}
+                                                                placeholder="T001-000001"
+                                                            />
+                                                            <button 
+                                                                onClick={handleSaveGuide}
+                                                                disabled={isSavingGuide}
+                                                                className="px-1.5 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded uppercase tracking-wider hover:bg-emerald-700 transition"
+                                                            >
+                                                                Ok
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => setIsEditingGuide(false)}
+                                                                className="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-[9px] font-black rounded uppercase tracking-wider hover:bg-gray-300 transition"
+                                                            >
+                                                                X
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-black text-gray-700">{sale.referralGuide || 'SIN GUIA'}</span>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setGuideValue(sale.referralGuide || '');
+                                                                    setIsEditingGuide(true);
+                                                                }}
+                                                                className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
+                                                            >
+                                                                {sale.referralGuide ? 'Editar' : 'Agregar'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
