@@ -168,7 +168,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -198,6 +198,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <Tag className="w-5 h-5 text-purple-600" />
             </div>
             <span className="text-sm text-gray-500">Precio Venta</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">S/ {product.realPrice}</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-pink-100 rounded-lg">
+              <Tag className="w-5 h-5 text-pink-600" />
+            </div>
+            <span className="text-sm text-gray-500">Precio Sugerido</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">S/ {product.sellingPrice}</p>
         </div>
@@ -384,7 +394,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   'Color': v.color,
                   'Stock': v.stock,
                   [['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'Precio Compra']: product.purchasePrice,
-                  'Precio Venta': product.sellingPrice
+                  'Precio Venta': product.realPrice,
+                  'Precio Sugerido': product.sellingPrice
                 }));
                 const csv = data.map(row => Object.values(row).join(',')).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });

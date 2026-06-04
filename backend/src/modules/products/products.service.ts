@@ -44,6 +44,7 @@ export class ProductsService {
         entalle: createProductDto.entalle,
         purchasePrice: createProductDto.purchasePrice,
         sellingPrice: createProductDto.sellingPrice,
+        realPrice: createProductDto.realPrice || 0.0,
         minStock: createProductDto.minStock || 5,
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
@@ -198,13 +199,16 @@ export class ProductsService {
     });
 
     // Si el producto tiene OP y se actualizaron los precios, actualizar el precio en todos los productos con la misma OP
-    if (updatedProduct.op && (productData.purchasePrice !== undefined || productData.sellingPrice !== undefined)) {
+    if (updatedProduct.op && (productData.purchasePrice !== undefined || productData.sellingPrice !== undefined || productData.realPrice !== undefined)) {
       const updatePricesData: any = {};
       if (productData.purchasePrice !== undefined) {
         updatePricesData.purchasePrice = productData.purchasePrice;
       }
       if (productData.sellingPrice !== undefined) {
         updatePricesData.sellingPrice = productData.sellingPrice;
+      }
+      if (productData.realPrice !== undefined) {
+        updatePricesData.realPrice = productData.realPrice;
       }
       
       await this.prisma.product.updateMany({

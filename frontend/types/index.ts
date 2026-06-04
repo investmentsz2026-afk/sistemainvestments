@@ -17,6 +17,7 @@ export interface Product {
   entalle?: string;
   purchasePrice: number;
   sellingPrice: number;
+  realPrice?: number;
   minStock: number;
   isActive: boolean;
   variants: ProductVariant[];

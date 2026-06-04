@@ -7,7 +7,7 @@ export class ProductionOrdersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createProductionOrderDto: CreateProductionOrderDto) {
-    const { opNumber, productId, variants } = createProductionOrderDto;
+    const { opNumber, productId, variants, price, cost, realPrice } = createProductionOrderDto;
 
     // 1. Verificar si el producto existe
     const product = await this.prisma.product.findUnique({
@@ -50,8 +50,6 @@ export class ProductionOrdersService {
         throw new BadRequestException('No se pudo generar un SKU único para el nuevo producto clonado.');
       }
 
-      const { price, cost } = createProductionOrderDto;
-
       const clonedProduct = await this.prisma.product.create({
         data: {
           name: product.name,
@@ -62,6 +60,7 @@ export class ProductionOrdersService {
           op: opNumber,
           purchasePrice: cost !== undefined && cost > 0 ? cost : product.purchasePrice,
           sellingPrice: price !== undefined && price > 0 ? price : product.sellingPrice,
+          realPrice: realPrice !== undefined && realPrice > 0 ? realPrice : product.realPrice,
           minStock: product.minStock,
           sizes: product.sizes,
           colors: product.colors,
@@ -95,13 +94,15 @@ export class ProductionOrdersService {
 
     // Actualizar el campo 'op' del producto principal con este número de OP, y actualizar precios si se definen a nivel de OP
     const updateProductData: any = { op: opNumber };
-    const { price, cost } = createProductionOrderDto;
 
     if (cost !== undefined && cost > 0) {
       updateProductData.purchasePrice = cost;
     }
     if (price !== undefined && price > 0) {
       updateProductData.sellingPrice = price;
+    }
+    if (realPrice !== undefined && realPrice > 0) {
+      updateProductData.realPrice = realPrice;
     }
 
     await this.prisma.product.update({

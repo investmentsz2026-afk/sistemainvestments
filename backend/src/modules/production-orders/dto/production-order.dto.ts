@@ -31,4 +31,9 @@ export class CreateProductionOrderDto {
   @IsOptional()
   @Min(0)
   cost?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  realPrice?: number;
 }

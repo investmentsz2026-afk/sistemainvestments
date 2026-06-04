@@ -18,6 +18,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
   entalle: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
+  realPrice: z.number().min(0, 'El precio real debe ser mayor o igual a 0').optional().default(0.1),
   minStock: z.number().min(0, 'El stock mínimo debe ser mayor o igual a 0').default(5),
   sizes: z.array(z.string()).optional(),
   colors: z.array(z.string()).optional(),
@@ -42,6 +43,15 @@ const getProductSchema = (isEditing: boolean) => z.object({
       code: z.ZodIssueCode.custom,
       message: 'El precio de venta es requerido para este tipo de producto',
       path: ['sellingPrice'],
+    });
+  }
+
+  // Validar precio real solo si NO es material/maquinaria y showPrices es true
+  if (showPrices && !isMaterialOrMachinery && (!data.realPrice || data.realPrice <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El precio real es requerido para este tipo de producto',
+      path: ['realPrice'],
     });
   }
 
@@ -114,6 +124,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       entalle: '',
       purchasePrice: 0,
       sellingPrice: 0,
+      realPrice: 0,
       minStock: 5,
       sizes: [],
       colors: [],
@@ -148,12 +159,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const watchPurchasePrice = watch('purchasePrice');
   const watchSellingPrice = watch('sellingPrice');
+  const watchRealPrice = watch('realPrice');
   const watchInventoryType = watch('inventoryType');
 
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(watchInventoryType);
 
-  const margin = watchPurchasePrice > 0 && watchSellingPrice > 0
-    ? ((watchSellingPrice - watchPurchasePrice) / watchPurchasePrice * 100)
+  const margin = watchPurchasePrice > 0 && watchRealPrice > 0
+    ? ((watchRealPrice - watchPurchasePrice) / watchPurchasePrice * 100)
     : 0;
 
   const AVAILABLE_SIZES = ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'];
@@ -566,7 +578,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Precio de Compra */}
               <div>
                 <label className={labelClass}>
@@ -591,12 +603,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
               </div>
 
-              {/* Precio de Venta */}
+              {/* Precio Sugerido */}
               {!isMaterialOrMachinery && (
                 <div>
                   <label className={labelClass}>
                     <DollarSign className="w-3.5 h-3.5" />
-                    Precio de Venta <span className="text-red-400">*</span>
+                    Precio Sugerido <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
@@ -616,13 +628,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   )}
                 </div>
               )}
+
+              {/* Precio Real */}
+              {!isMaterialOrMachinery && (
+                <div>
+                  <label className={labelClass}>
+                    <DollarSign className="w-3.5 h-3.5" />
+                    Precio Real <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      {...register('realPrice', { valueAsNumber: true })}
+                      className={`${inputBase} pl-10 ${errors.realPrice ? inputError : inputNormal}`}
+                      placeholder="0.00"
+                      min="0"
+                    />
+                  </div>
+                  {errors.realPrice && (
+                    <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {(errors.realPrice as any).message}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Margen de Ganancia - Solo si no es material/maquinaria */}
-      {showPrices && !isMaterialOrMachinery && watchPurchasePrice > 0 && watchSellingPrice > 0 && (
+      {showPrices && !isMaterialOrMachinery && watchPurchasePrice > 0 && watchRealPrice > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 -mt-3">
           <div className={`flex items-center justify-between p-4 rounded-xl border ${margin > 0
             ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200'
@@ -635,7 +673,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               <div>
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Margen de ganancia estimado</p>
                 <p className={`text-lg font-black ${margin > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                  S/ {(watchSellingPrice - watchPurchasePrice).toFixed(2)}
+                  S/ {(watchRealPrice - watchPurchasePrice).toFixed(2)}
                 </p>
               </div>
             </div>

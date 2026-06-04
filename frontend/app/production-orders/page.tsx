@@ -39,6 +39,7 @@ export default function ProductionOrdersPage() {
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string[]>>({});
   const [opPrice, setOpPrice] = useState<number>(0);
   const [opCost, setOpCost] = useState<number>(0);
+  const [opRealPrice, setOpRealPrice] = useState<number>(0);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -108,9 +109,11 @@ export default function ProductionOrdersPage() {
     if (product.op) {
       setOpPrice(0);
       setOpCost(0);
+      setOpRealPrice(0);
     } else {
       setOpPrice(product.sellingPrice || 0);
       setOpCost(product.purchasePrice || 0);
+      setOpRealPrice(product.realPrice || 0);
     }
   };
 
@@ -165,6 +168,7 @@ export default function ProductionOrdersPage() {
     setSelectedVariants({});
     setOpPrice(0);
     setOpCost(0);
+    setOpRealPrice(0);
     setShowDropdown(false);
     setActiveSearchIndex(-1);
   };
@@ -197,7 +201,8 @@ export default function ProductionOrdersPage() {
         productId: selectedProduct.id,
         variants: variantsPayload,
         price: opPrice,
-        cost: opCost
+        cost: opCost,
+        realPrice: opRealPrice
       });
       toast.success('Orden de Producción registrada y variantes generadas exitosamente');
       queryClient.invalidateQueries('products');
@@ -404,8 +409,8 @@ export default function ProductionOrdersPage() {
                   </div>
                 </div>
 
-                {/* Cost and Selling Price for the OP */}
-                <div className="grid grid-cols-2 gap-6">
+                {/* Cost, Suggested Price and Real Price for the OP */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div>
                     <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
                       Costo de Prod. (S/)
@@ -439,6 +444,24 @@ export default function ProductionOrdersPage() {
                       onChange={e => {
                         const val = parseFloat(e.target.value);
                         setOpPrice(isNaN(val) ? 0 : val);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 mb-3 uppercase tracking-widest ml-1">
+                      Precio Real (S/)
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-bold text-gray-900"
+                      placeholder="0.00"
+                      value={opRealPrice || ''}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setOpRealPrice(isNaN(val) ? 0 : val);
                       }}
                     />
                   </div>

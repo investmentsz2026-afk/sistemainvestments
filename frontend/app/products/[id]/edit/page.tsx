@@ -86,6 +86,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           description: product.description || '',
           purchasePrice: product.purchasePrice,
           sellingPrice: product.sellingPrice,
+          realPrice: product.realPrice,
           minStock: product.minStock,
           sizes: product.sizes || [],
           colors: product.colors || [],

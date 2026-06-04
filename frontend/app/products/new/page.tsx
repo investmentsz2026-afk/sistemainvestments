@@ -135,6 +135,7 @@ export default function NewProductPage() {
       description: item.description || `Importado de Factura: ${purchase.invoiceNumber || 'Sin Nro.'}`,
       purchasePrice: item.price,
       sellingPrice: item.price * 1.3,
+      realPrice: item.price * 1.3,
       minStock: 5,
       variants: [{ size: 'ESTÁNDAR', color: 'ÚNICO', initialStock: item.quantity }],
       purchaseItemId: item.id
@@ -229,6 +230,7 @@ export default function NewProductPage() {
       description: `Importado de OP: ${audit.op}. Calidad: ${type}. Tallas: ${selectedSizes.join(', ')}.`,
       purchasePrice: pPrice || 0.1,
       sellingPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
+      realPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
       minStock: 5,
       sizes: selectedSizes,
       colors: [type === '1RA' ? (audit.productionColor || 'Negro') : type === '2DA' ? '2da Calidad' : 'En Proceso'],

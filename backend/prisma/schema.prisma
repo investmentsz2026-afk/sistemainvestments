@@ -51,6 +51,7 @@ model Product {
   description      String?           @db.Text
   purchasePrice    Float             @map("purchase_price")
   sellingPrice     Float             @map("selling_price")
+  realPrice        Float             @default(0.0) @map("real_price")
   minStock         Float             @default(5) @map("min_stock")
   op               String?
   entalle          String?
