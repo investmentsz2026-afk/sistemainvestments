@@ -323,6 +323,46 @@ export class SalesService {
       const serie = parts[0];
       const numero = parseInt(parts[1]);
 
+      // Calculate time difference in Peru timezone to adjust fecha_de_emision if it exceeds SUNAT's 3-day limit.
+      const getMidnightPeru = (d: Date) => {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Lima',
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric'
+        });
+        const pts = formatter.formatToParts(d);
+        const year = pts.find(p => p.type === 'year')?.value;
+        const month = pts.find(p => p.type === 'month')?.value;
+        const day = pts.find(p => p.type === 'day')?.value;
+        return new Date(parseInt(year!), parseInt(month!) - 1, parseInt(day!));
+      };
+
+      const nowMidnight = getMidnightPeru(new Date());
+      const saleMidnight = getMidnightPeru(sale.createdAt);
+      const diffTime = Math.abs(nowMidnight.getTime() - saleMidnight.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      const getFormattedDate = (d: Date) => {
+        const formatter = new Intl.DateTimeFormat('es-PE', {
+          timeZone: 'America/Lima',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        const pts = formatter.formatToParts(d);
+        const day = pts.find(p => p.type === 'day')?.value;
+        const month = pts.find(p => p.type === 'month')?.value;
+        const year = pts.find(p => p.type === 'year')?.value;
+        return `${day}-${month}-${year}`;
+      };
+
+      let fechaEmision = getFormattedDate(sale.createdAt);
+      // If the sale is older than 3 days, force the emission date to today to avoid SUNAT rejection
+      if (diffDays > 3) {
+        fechaEmision = getFormattedDate(new Date());
+      }
+
       const payload = {
         operacion: "generar_comprobante",
         tipo_de_comprobante: sale.invoiceNumber.startsWith('F') ? 1 : 2,
@@ -334,7 +374,7 @@ export class SalesService {
         cliente_denominacion: sale.client?.name || "PÚBLICO GENERAL",
         cliente_direccion: sale.client?.address || "",
         cliente_email: sale.client?.email || "",
-        fecha_de_emision: new Date(sale.createdAt).toLocaleDateString('es-PE').split('/').join('-'),
+        fecha_de_emision: fechaEmision,
         moneda: 1, // Soles
         tipo_de_cambio: null,
         porcentaje_de_igv: 18.0,

@@ -316,13 +316,25 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                         }`}>{sale.sunatStatus || 'PENDIENTE'}</span>
                                                     </div>
                                                     
-                                                    {(!sale.sunatStatus || sale.sunatStatus === 'ERROR') && (
+                                                    {(!sale.sunatStatus || sale.sunatStatus === 'ERROR') ? (
                                                         <button 
                                                             onClick={handleSendToSunat}
                                                             disabled={isSending}
                                                             className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-100"
                                                         >
                                                             {isSending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => {
+                                                                if (window.confirm('¿Está seguro de reenviar este comprobante a SUNAT (Producción)? Se registrará en el entorno de producción de SUNAT y Nubefact. Si la venta tiene más de 3 días de antigüedad, se ajustará la fecha de emisión a la de hoy.')) {
+                                                                    handleSendToSunat();
+                                                                }
+                                                            }}
+                                                            disabled={isSending}
+                                                            className="w-full py-3 bg-amber-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition disabled:opacity-50 shadow-lg shadow-amber-100"
+                                                        >
+                                                            {isSending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Reenviar a SUNAT (Prod)'}
                                                         </button>
                                                     )}
 
