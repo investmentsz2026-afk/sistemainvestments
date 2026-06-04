@@ -22,7 +22,8 @@ import {
     CreditCard,
     Truck,
     AlertCircle,
-    Pencil
+    Pencil,
+    Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -116,7 +117,7 @@ export default function OrdersPage() {
                              o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              o.seller?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+        const matchesStatus = statusFilter === 'ALL' ? o.status !== 'ANULADO' : o.status === statusFilter;
         
         // Advanced filters
         const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
@@ -561,6 +562,24 @@ export default function OrdersPage() {
                                                         title="Editar Pedido"
                                                     >
                                                         <Pencil className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={async (e) => { 
+                                                            e.stopPropagation(); 
+                                                            if (window.confirm('¿Está seguro de anular esta Nota de Pedido?')) {
+                                                                try {
+                                                                    await api.delete(`/orders/${order.id}`);
+                                                                    toast.success('Pedido anulado correctamente');
+                                                                    fetchOrders();
+                                                                } catch (err: any) {
+                                                                    toast.error(err.response?.data?.message || 'Error al anular el pedido');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="p-3.5 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white rounded-2xl transition-all shadow-sm"
+                                                        title="Anular Pedido"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
                                                     </button>
                                                 </div>
                                             )}

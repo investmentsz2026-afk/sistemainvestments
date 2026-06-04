@@ -498,4 +498,42 @@ export class OrdersService {
 
     return updated;
   }
+
+  async annul(id: string, user: any) {
+    const order = await this.findOne(id);
+    
+    if (order.status !== 'PENDIENTE' && order.status !== 'EN_LOGISTICA') {
+      throw new BadRequestException('No se puede eliminar/anular un pedido que ya ha sido despachado o entregado.');
+    }
+
+    const updated = await (this.prisma as any).order.update({
+      where: { id },
+      data: {
+        status: 'ANULADO',
+        annulledAt: new Date(),
+        annulledById: user.id,
+        annulledByName: user.name,
+        annulledByRole: user.role,
+      },
+    });
+
+    // Notify logistics/comercial about annulment
+    await this.notifications.create({
+      title: 'Pedido Anulado',
+      message: `El usuario ${user.name} (${user.role}) ha anulado el pedido #${order.orderNumber || order.id.slice(-6)}`,
+      type: 'ORDER_ANNULLED',
+      targetRole: 'COMERCIAL',
+      referenceId: order.id
+    });
+
+    await this.notifications.create({
+      title: 'Pedido Anulado',
+      message: `El usuario ${user.name} (${user.role}) ha anulado el pedido #${order.orderNumber || order.id.slice(-6)}`,
+      type: 'ORDER_ANNULLED',
+      targetRole: 'LOGISTICA',
+      referenceId: order.id
+    });
+
+    return updated;
+  }
 }

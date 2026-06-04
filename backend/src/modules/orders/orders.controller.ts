@@ -41,4 +41,9 @@ export class OrdersController {
   completeOrder(@Param('id') id: string, @Req() req: any, @Body() data: any) {
     return this.ordersService.completeOrder(id, req.user, data);
   }
+
+  @Delete(':id')
+  annul(@Param('id') id: string, @Req() req: any) {
+    return this.ordersService.annul(id, req.user);
+  }
 }

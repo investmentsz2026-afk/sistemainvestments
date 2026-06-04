@@ -63,6 +63,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     const [showClientPicker, setShowClientPicker] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [duplicateError, setDuplicateError] = useState(false);
+    const [isAnnulling, setIsAnnulling] = useState(false);
 
     // Filtered Products Search State
     const { products } = useProducts();
@@ -516,6 +517,24 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             toast.error(error.response?.data?.message || 'Error al guardar el pedido');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleAnnul = async () => {
+        if (!initialOrder) return;
+        if (!window.confirm('¿Está seguro de anular esta Nota de Pedido?')) return;
+        
+        setIsAnnulling(true);
+        try {
+            await api.delete(`/orders/${initialOrder.id}`);
+            toast.success('Pedido anulado correctamente');
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            console.error('Error annulling order:', error);
+            toast.error(error.response?.data?.message || 'Error al anular el pedido');
+        } finally {
+            setIsAnnulling(false);
         }
     };
 
@@ -1000,6 +1019,16 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     </div>
 
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 custom-scrollbar">
+                        {initialOrder && initialOrder.status === 'ANULADO' && (
+                            <div className="bg-rose-50 border-2 border-rose-200 text-rose-800 px-6 py-4 rounded-xl flex flex-col gap-1 shadow-sm">
+                                <span className="text-xs font-black uppercase tracking-widest flex items-center gap-1.5">
+                                    <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" /> PEDIDO ANULADO
+                                </span>
+                                <span className="text-xs font-bold">
+                                    Este pedido fue anulado el <strong>{initialOrder.annulledAt ? new Date(initialOrder.annulledAt).toLocaleString('es-PE') : '---'}</strong> por <strong>{initialOrder.annulledByName || 'Sistema'}</strong> ({initialOrder.annulledByRole || 'ADMIN'}).
+                                </span>
+                            </div>
+                        )}
                         {/* Form Sections */}
                         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                             {/* Left Column: Client & Info */}
@@ -1624,6 +1653,14 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
                     {/* Footer Actions */}
                     <div className="px-8 py-4 bg-white border-t border-slate-200 flex justify-end items-center gap-4 relative z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+                        {readOnly && initialOrder && (initialOrder.status === 'PENDIENTE' || initialOrder.status === 'EN_LOGISTICA') && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || initialOrder.sellerId === user?.id) && (
+                            <button
+                                type="button" onClick={handleAnnul} disabled={isAnnulling}
+                                className="flex items-center gap-2.5 px-8 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-rose-600/20"
+                            >
+                                {isAnnulling ? 'Anulando...' : 'Anular Pedido'}
+                            </button>
+                        )}
                         {initialOrder && (
                             <button
                                 type="button" onClick={handlePrint}

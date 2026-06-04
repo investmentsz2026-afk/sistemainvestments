@@ -345,6 +345,11 @@ model Order {
   needsResend     Boolean     @default(false) @map("needs_resend")
   dispatchDetails Json?       @map("dispatch_details")
   
+  annulledAt      DateTime?   @map("annulled_at")
+  annulledById    String?     @map("annulled_by_id")
+  annulledByName  String?     @map("annulled_by_name")
+  annulledByRole  String?     @map("annulled_by_role")
+  
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 

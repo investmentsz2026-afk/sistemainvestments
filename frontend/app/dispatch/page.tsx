@@ -19,7 +19,8 @@ import {
     Calendar,
     Eye,
     ShoppingCart,
-    Tag
+    Tag,
+    XCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,6 +41,7 @@ export default function DispatchPage() {
     const [orders, setOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewMode, setViewMode] = useState<'ACTIVOS' | 'ANULADOS'>('ACTIVOS');
     
     // Modal state
     const [showModal, setShowModal] = useState(false);
@@ -69,11 +71,15 @@ export default function DispatchPage() {
     };
 
     const dispatchOrders = orders
-        .filter(o => 
-            (o.status === 'EN_LOGISTICA' || o.status === 'DESPACHADO' || o.status === 'COMPLETADO') &&
-            (o.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-             o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
-        )
+        .filter(o => {
+            const matchesSearch = o.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                  o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+            if (viewMode === 'ACTIVOS') {
+                return (o.status === 'EN_LOGISTICA' || o.status === 'DESPACHADO' || o.status === 'COMPLETADO' || o.status === 'ENTREGADO') && matchesSearch;
+            } else {
+                return o.status === 'ANULADO' && matchesSearch;
+            }
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const stats = [
@@ -93,17 +99,17 @@ export default function DispatchPage() {
         },
         { 
             label: 'Completados', 
-            value: orders.filter(o => o.status === 'COMPLETADO').length.toString(), 
+            value: orders.filter(o => o.status === 'ENTREGADO' || o.status === 'COMPLETADO').length.toString(), 
             icon: CheckCircle, 
             color: 'text-emerald-600', 
             bg: 'bg-emerald-100' 
         },
         { 
-            label: 'Total Recibidos', 
-            value: dispatchOrders.length.toString(), 
-            icon: Package, 
-            color: 'text-indigo-600', 
-            bg: 'bg-indigo-100' 
+            label: 'Anulados', 
+            value: orders.filter(o => o.status === 'ANULADO').length.toString(), 
+            icon: XCircle, 
+            color: 'text-rose-600', 
+            bg: 'bg-rose-100' 
         },
     ];
 
@@ -145,6 +151,30 @@ export default function DispatchPage() {
                             </div>
                         </motion.div>
                     ))}
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-gray-100">
+                    <button
+                        onClick={() => setViewMode('ACTIVOS')}
+                        className={`px-8 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'ACTIVOS'
+                                ? 'border-indigo-600 text-indigo-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Pedidos Activos
+                    </button>
+                    <button
+                        onClick={() => setViewMode('ANULADOS')}
+                        className={`px-8 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'ANULADOS'
+                                ? 'border-rose-600 text-rose-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Pedidos Anulados
+                    </button>
                 </div>
 
                 {/* Toolbar */}
@@ -201,13 +231,20 @@ export default function DispatchPage() {
                                                 <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">
                                                     #{order.orderNumber || order.id.slice(-6).toUpperCase()}
                                                 </span>
-                                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                                 <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                                                     order.status === 'DESPACHADO' ? 'border-blue-100 text-blue-600 bg-blue-50' :
-                                                    order.status === 'COMPLETADO' ? 'border-emerald-100 text-emerald-600 bg-emerald-50' : 
+                                                    order.status === 'COMPLETADO' || order.status === 'ENTREGADO' ? 'border-emerald-100 text-emerald-600 bg-emerald-50' : 
+                                                    order.status === 'ANULADO' ? 'border-rose-100 text-rose-600 bg-rose-50' :
                                                     'border-amber-100 text-amber-600 bg-amber-50'
                                                 }`}>
-                                                    {order.status === 'DESPACHADO' ? <Truck className="w-3.5 h-3.5" /> : order.status === 'COMPLETADO' ? <CheckCircle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                                                    {order.status === 'DESPACHADO' ? 'DESPACHADO' : order.status === 'COMPLETADO' ? 'ENTREGADO' : 'POR DESPACHAR'}
+                                                    {order.status === 'DESPACHADO' ? <Truck className="w-3.5 h-3.5" /> : 
+                                                     order.status === 'COMPLETADO' || order.status === 'ENTREGADO' ? <CheckCircle className="w-3.5 h-3.5" /> : 
+                                                     order.status === 'ANULADO' ? <AlertCircle className="w-3.5 h-3.5" /> : 
+                                                     <Clock className="w-3.5 h-3.5" />}
+                                                    {order.status === 'DESPACHADO' ? 'DESPACHADO' : 
+                                                     order.status === 'COMPLETADO' || order.status === 'ENTREGADO' ? 'ENTREGADO' : 
+                                                     order.status === 'ANULADO' ? 'ANULADO' : 
+                                                     'POR DESPACHAR'}
                                                 </div>
                                             </div>
                                             <h3 className="text-xl font-black text-gray-900 truncate uppercase tracking-tight">
