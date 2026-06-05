@@ -717,6 +717,23 @@ export class SalesService {
     const driverName = (greData.conductor_denominacion || "Eder Joel Ancassi Cárdenas").trim();
     const driverLicence = (greData.conductor_licencia || "Q43225002").trim();
 
+    // Build document reference (factura/boleta associated to this guide)
+    const invoiceNum = sale.invoiceNumber || "";
+    let docRefTipo = "";
+    let docRefSerie = "";
+    let docRefNumero = "";
+    if (invoiceNum) {
+      const invParts = invoiceNum.split('-');
+      docRefSerie = invParts[0] || "";
+      docRefNumero = invParts[1] || "";
+      // F = Factura (01), B = Boleta (03)
+      if (invoiceNum.startsWith('F')) {
+        docRefTipo = "01";
+      } else if (invoiceNum.startsWith('B')) {
+        docRefTipo = "03";
+      }
+    }
+
     // Split driverName to get name and last name
     const nameParts = driverName.split(/\s+/);
     const conductor_nombre = nameParts[0] || "";
@@ -1039,6 +1056,19 @@ export class SalesService {
         transportista_placa_numero: plate,
       },
       enviar_a_sunat: true,
+      // Reference to the associated invoice/boleta
+      ...(docRefTipo && docRefSerie && docRefNumero ? {
+        documento_asociado_tipo: docRefTipo,
+        documento_asociado_serie: docRefSerie,
+        documento_asociado_numero: parseInt(docRefNumero),
+        documentos_relacionados: [
+          {
+            tipo: docRefTipo,
+            serie: docRefSerie,
+            numero: parseInt(docRefNumero),
+          }
+        ],
+      } : {}),
       items: sale.items.map((item, index) => ({
         item: index + 1,
         codigo: item.variant.variantSku,
