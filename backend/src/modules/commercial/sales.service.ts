@@ -712,10 +712,10 @@ export class SalesService {
     const partidaDireccion = greData.punto_de_partida_direccion || "Mza. E Lote. 11 Dpto. 201 Cnd. Las Praderas (Block 18), Lima - Lima - Comas";
     const llegadaUbigeo = greData.punto_de_llegada_ubigeo || "150101";
     const llegadaDireccion = greData.punto_de_llegada_direccion || clientDireccion || "Sin direccion";
-    const plate = greData.vehiculo_placa || "CTP-078";
-    const driverDni = greData.conductor_numero_de_documento || "";
-    const driverName = greData.conductor_denominacion || "Eder Joel Ancassi Cárdenas";
-    const driverLicence = greData.conductor_licencia || "Q43225002";
+    const plate = (greData.vehiculo_placa || "CTP-078").trim();
+    const driverDni = (greData.conductor_numero_de_documento || "").trim();
+    const driverName = (greData.conductor_denominacion || "Eder Joel Ancassi Cárdenas").trim();
+    const driverLicence = (greData.conductor_licencia || "Q43225002").trim();
 
     const getFormattedDate = (d: Date) => {
       const formatter = new Intl.DateTimeFormat('es-PE', {
@@ -757,6 +757,10 @@ export class SalesService {
       conductor_documento_numero: driverDni,
       conductor_denominacion: driverName,
       conductor_licencia: driverLicence,
+      conductor_licencia_de_conducir: driverLicence,
+      licencia_de_conducir: driverLicence,
+      conductor_licencia_numero: driverLicence,
+      conductor_licencia_nro: driverLicence,
       enviar_a_sunat: true,
       items: sale.items.map((item, index) => ({
         item: index + 1,
