@@ -385,6 +385,9 @@ export class SalesService {
         total_exonerada: null,
         total_gratuita: null,
         total_otros_cargos: null,
+        total_igv: parseFloat(igv.toFixed(2)),
+        total_pago_otros: null,
+        total_pago_con_monto_fijo_por_item: null,
         total: parseFloat(sale.totalAmount.toFixed(2)),
         enviar_a_sunat: true,
         ...(typeof (sale as any).referralGuide === 'string' && (sale as any).referralGuide ? {
