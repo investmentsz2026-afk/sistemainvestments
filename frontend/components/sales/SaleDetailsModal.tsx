@@ -13,7 +13,10 @@ import {
     Hash,
     Loader2,
     FileText,
-    ShieldCheck
+    ShieldCheck,
+    Download,
+    Eye,
+    Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -45,6 +48,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const [invoiceValue, setInvoiceValue] = useState('');
     const [isSavingInvoice, setIsSavingInvoice] = useState(false);
     const [showGreForm, setShowGreForm] = useState(false);
+    const [isConsultingGuia, setIsConsultingGuia] = useState(false);
     const [greData, setGreData] = useState({
         peso_bruto_total: '0.00',
         numero_de_bultos: '1',
@@ -121,11 +125,44 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             toast.success('Guía de remisión electrónica generada correctamente');
             setShowGreForm(false);
             fetchSaleDetails();
+            // Auto-consult after a delay to try to get the PDF
+            setTimeout(async () => {
+                try {
+                    const resp = await api.post(`/sales/${saleId}/consultar-guia`);
+                    if (resp.data.pdfUrl) {
+                        toast.success('PDF de guía disponible');
+                        fetchSaleDetails();
+                    }
+                } catch (e) {
+                    // Silently fail - SUNAT may not have processed yet
+                    console.log('Auto-consult: PDF not ready yet');
+                }
+            }, 5000);
         } catch (error: any) {
             console.error('Error generating GRE:', error);
             toast.error(error.response?.data?.message || 'Error al generar la guía');
         } finally {
             setIsSavingGuide(false);
+        }
+    };
+
+    const handleConsultarGuia = async () => {
+        setIsConsultingGuia(true);
+        try {
+            const resp = await api.post(`/sales/${saleId}/consultar-guia`);
+            if (resp.data.pdfUrl) {
+                toast.success('PDF de guía obtenido correctamente');
+                fetchSaleDetails();
+                // Open the PDF in a new tab
+                window.open(resp.data.pdfUrl, '_blank');
+            } else {
+                toast('La guía aún está siendo procesada por SUNAT. Intente en unos minutos.', { icon: '⏳' });
+            }
+        } catch (error: any) {
+            console.error('Error consulting GRE:', error);
+            toast.error(error.response?.data?.message || 'Error al consultar la guía');
+        } finally {
+            setIsConsultingGuia(false);
         }
     };
 
@@ -593,16 +630,25 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                         </a>
                                     )}
 
-                                    {sale.sunatGuidePdfUrl && (
+                                    {sale.sunatGuidePdfUrl ? (
                                         <a
                                             href={sale.sunatGuidePdfUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md hover:bg-teal-700 transition active:scale-95"
                                         >
-                                            <ShieldCheck className="w-3.5 h-3.5" /> Ver Guía Oficial
+                                            <Eye className="w-3.5 h-3.5" /> Ver Guía PDF
                                         </a>
-                                    )}
+                                    ) : sale.referralGuide ? (
+                                        <button
+                                            onClick={handleConsultarGuia}
+                                            disabled={isConsultingGuia}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md hover:bg-teal-700 transition active:scale-95 disabled:opacity-50"
+                                        >
+                                            {isConsultingGuia ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
+                                            {isConsultingGuia ? 'Consultando...' : 'Obtener Guía PDF'}
+                                        </button>
+                                    ) : null}
                                 </div>
 
                                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md w-full md:w-72">

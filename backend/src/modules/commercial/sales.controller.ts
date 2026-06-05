@@ -71,4 +71,9 @@ export class SalesController {
   generateGre(@Param('id') id: string, @Body() greData: any) {
     return this.salesService.sendGreToSunat(id, greData);
   }
+
+  @Post(':id/consultar-guia')
+  consultarGuia(@Param('id') id: string) {
+    return this.salesService.consultarGuia(id);
+  }
 }

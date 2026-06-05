@@ -1095,4 +1095,74 @@ export class SalesService {
       throw new BadRequestException('Error al generar la Guía de Remisión: ' + error.message);
     }
   }
+
+  async consultarGuia(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    if (!sale.referralGuide) throw new BadRequestException('Esta venta no tiene guía de remisión generada');
+
+    const API_TOKEN = process.env.SUNAT_INVOICING_TOKEN;
+    const API_URL = process.env.SUNAT_INVOICING_URL;
+
+    if (!API_TOKEN || !API_URL) {
+      throw new BadRequestException('API de Facturación no configurada en el servidor');
+    }
+
+    const parts = sale.referralGuide.split('-');
+    const series = parts[0];
+    const numero = parseInt(parts[1]);
+
+    const payload = {
+      operacion: "consultar_guia",
+      tipo_de_comprobante: 7,
+      serie: series,
+      numero: numero,
+    };
+
+    console.log("Consultar Guia Payload:", JSON.stringify(payload, null, 2));
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': API_TOKEN
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      console.log("Consultar Guia Response:", JSON.stringify(result, null, 2));
+
+      const pdfUrl = result.enlace_del_pdf || result.enlace || null;
+      const cdrUrl = result.enlace_del_cdr || null;
+      const xmlUrl = result.enlace_del_xml || null;
+
+      // Update the sale with the PDF URL if available
+      if (pdfUrl) {
+        await this.prisma.sale.update({
+          where: { id: saleId },
+          data: {
+            sunatGuidePdfUrl: pdfUrl,
+          }
+        });
+      }
+
+      return {
+        success: true,
+        pdfUrl: pdfUrl,
+        cdrUrl: cdrUrl,
+        xmlUrl: xmlUrl,
+        accepted: result.aceptada_por_sunat !== undefined ? result.aceptada_por_sunat : null,
+        sunatDescription: result.sunat_description || result.cadena_para_codigo_qr || null,
+        data: result
+      };
+    } catch (error: any) {
+      console.error('Error consulting GRE:', error);
+      throw new BadRequestException('Error al consultar la Guía de Remisión: ' + error.message);
+    }
+  }
 }
