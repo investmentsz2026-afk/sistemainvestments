@@ -743,7 +743,7 @@ export class SalesService {
       cliente_direccion: clientDireccion,
       cliente_email: clientEmail,
       motivo_de_traslado: "01",
-      modalidad_de_transporte: "02",
+      tipo_de_transporte: "02",
       peso_bruto_total: peso,
       unidad_de_medida_peso_bruto: "KGM",
       numero_de_bultos: bultos,
