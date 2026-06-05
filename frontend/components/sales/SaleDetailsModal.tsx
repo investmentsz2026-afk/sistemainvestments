@@ -458,6 +458,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                                 X
                                                             </button>
                                                         </div>
+                                                    ) : (
                                                         <div className="flex flex-col gap-1 items-end">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-xs font-black text-gray-700">{sale.referralGuide || 'SIN GUIA'}</span>
