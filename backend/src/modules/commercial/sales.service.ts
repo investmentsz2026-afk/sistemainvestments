@@ -753,14 +753,54 @@ export class SalesService {
       punto_de_llegada_ubigeo: llegadaUbigeo,
       punto_de_llegada_direccion: llegadaDireccion,
       transportista_placa_numero: plate,
+      vehiculo_placa: plate,
+      placa: plate,
+      
       conductor_documento_tipo: 1,
+      conductor_tipo_de_documento: "1",
+      chofer_documento_tipo: 1,
+      chofer_tipo_de_documento: "1",
+      
       conductor_documento_numero: driverDni,
+      conductor_numero_de_documento: driverDni,
+      chofer_documento_numero: driverDni,
+      chofer_numero_de_documento: driverDni,
+      
       conductor_denominacion: driverName,
+      conductor_nombres: driverName,
+      chofer_denominacion: driverName,
+      chofer_nombre: driverName,
+      
       conductor_licencia: driverLicence,
       conductor_licencia_de_conducir: driverLicence,
       licencia_de_conducir: driverLicence,
       conductor_licencia_numero: driverLicence,
       conductor_licencia_nro: driverLicence,
+      chofer_licencia: driverLicence,
+      chofer_licencia_nro: driverLicence,
+      chofer_licencia_numero: driverLicence,
+      chofer_licencia_de_conducir: driverLicence,
+      licencia_conductor: driverLicence,
+      licencia_chofer: driverLicence,
+      
+      conductor: {
+        documento_tipo: 1,
+        documento_numero: driverDni,
+        denominacion: driverName,
+        licencia: driverLicence,
+      },
+      chofer: {
+        documento_tipo: 1,
+        documento_numero: driverDni,
+        denominacion: driverName,
+        licencia: driverLicence,
+      },
+      vehiculo: {
+        placa: plate,
+      },
+      transportista: {
+        placa: plate,
+      },
       enviar_a_sunat: true,
       items: sale.items.map((item, index) => ({
         item: index + 1,

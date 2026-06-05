@@ -658,7 +658,7 @@ export default function ClientsPage() {
                                                 <tbody className="divide-y divide-gray-100">
                                                     {clientSales.map((sale: any) => (
                                                         <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors">
-                                                            <td className="px-8 py-5 text-sm font-bold text-gray-900">
+                                                            <td className="px-8 py-5 text-sm font-bold text-gray-900" suppressHydrationWarning>
                                                                 {new Date(sale.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                             </td>
                                                             <td className="px-8 py-5">

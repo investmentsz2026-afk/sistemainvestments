@@ -429,7 +429,7 @@ export default function SalesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="flex items-center gap-2 text-sm font-bold text-gray-500">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-gray-500" suppressHydrationWarning>
                                                     <Calendar className="w-4 h-4" />
                                                     {formatDate(sale.createdAt)}
                                                 </div>

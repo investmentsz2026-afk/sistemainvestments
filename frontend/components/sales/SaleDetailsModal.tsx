@@ -297,7 +297,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                         <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
                                             <Hash className="w-2.5 h-2.5" /> ID: {saleId}
                                         </div>
-                                        <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-lg border border-emerald-500/20">
+                                        <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-lg border border-emerald-500/20" suppressHydrationWarning>
                                             <Calendar className="w-2.5 h-2.5" /> {sale ? formatDate(sale.createdAt) : '---'}
                                         </div>
                                     </div>

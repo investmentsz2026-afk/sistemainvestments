@@ -284,7 +284,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 {payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
                                                             </span>
                                                         </div>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest" suppressHydrationWarning>
                                                             {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
                                                         </p>
                                                     </div>

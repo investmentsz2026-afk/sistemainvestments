@@ -325,7 +325,7 @@ export default function CollectionsPage() {
                                                 <td className="px-8 py-6">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-bold text-gray-900">{sale.invoiceNumber || 'Sin Factura'}</span>
-                                                        <span className="text-[10px] font-bold text-gray-400 mt-0.5">{new Date(sale.createdAt).toLocaleDateString()}</span>
+                                                        <span className="text-[10px] font-bold text-gray-400 mt-0.5" suppressHydrationWarning>{new Date(sale.createdAt).toLocaleDateString()}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 font-bold text-gray-900">
