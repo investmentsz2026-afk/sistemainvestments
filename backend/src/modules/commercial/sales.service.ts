@@ -1058,16 +1058,10 @@ export class SalesService {
       enviar_a_sunat: true,
       // Reference to the associated invoice/boleta
       ...(docRefTipo && docRefSerie && docRefNumero ? {
-        documento_asociado_tipo: docRefTipo,
-        documento_asociado_serie: docRefSerie,
-        documento_asociado_numero: parseInt(docRefNumero),
-        documentos_relacionados: [
-          {
-            tipo: docRefTipo,
-            serie: docRefSerie,
-            numero: parseInt(docRefNumero),
-          }
-        ],
+        documento_relacionado_tipo_documento: docRefTipo,
+        documento_relacionado_numero_documento: `${docRefSerie}-${docRefNumero}`,
+        documento_relacionado_tipo_documento_emisor: "6", // RUC
+        documento_relacionado_numero_documento_emisor: "20611188715", // The business RUC (from the user's screenshot)
       } : {}),
       items: sale.items.map((item, index) => ({
         item: index + 1,
