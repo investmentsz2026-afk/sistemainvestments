@@ -813,8 +813,9 @@ export class SalesService {
 
     // Debug: write payload before calling the API
     try {
-      require('fs').writeFileSync('d:/proyectolima/debug_gre.json', JSON.stringify({ payload }, null, 2));
+      require('fs').writeFileSync('debug_gre.json', JSON.stringify({ payload }, null, 2));
     } catch (e) {}
+    console.log("GRE Payload sent to Nubefact:", JSON.stringify(payload, null, 2));
 
     try {
       const response = await fetch(API_URL, {
@@ -827,10 +828,11 @@ export class SalesService {
       });
 
       const result = await response.json();
+      console.log("GRE Response from Nubefact:", JSON.stringify(result, null, 2));
 
       // Debug: write payload and API response
       try {
-        require('fs').writeFileSync('d:/proyectolima/debug_gre.json', JSON.stringify({ payload, result }, null, 2));
+        require('fs').writeFileSync('debug_gre.json', JSON.stringify({ payload, result }, null, 2));
       } catch (e) {}
 
       if (result.errors) {
