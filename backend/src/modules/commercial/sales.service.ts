@@ -1061,6 +1061,9 @@ export class SalesService {
       enviar_a_sunat: true,
       // Reference to the associated invoice/boleta
       ...(docRefTipo && docRefSerie && docRefNumero ? {
+        documento_asociado_tipo: docRefTipo,
+        documento_asociado_serie: docRefSerie,
+        documento_asociado_numero: parseInt(docRefNumero),
         documentos_relacionados: [
           {
             tipo_de_documento_relacionado: docRefTipo,
