@@ -349,7 +349,7 @@ export class OrdersService {
       throw new BadRequestException('Solo los pedidos despachados pueden completarse.');
     }
 
-    const { docNumber, docType, paymentMethod, igv, referralGuide } = data;
+    const { docNumber, docType, paymentMethod, igv, referralGuide, generateGRE, greData } = data;
     const igvRate = (igv || 18) / 100;
 
     // 1. Update order status
@@ -462,7 +462,7 @@ export class OrdersService {
 
     // Auto-generate referralGuide if missing for Facturas
     let finalReferralGuide = referralGuide;
-    if (!finalReferralGuide && docType === 'FACTURA') {
+    if (!finalReferralGuide && docType === 'FACTURA' && !generateGRE) {
         finalReferralGuide = await this.salesService.getNextInvoiceNumber('GUIA');
     }
 
@@ -483,6 +483,15 @@ export class OrdersService {
         }
       }
     });
+
+    if (generateGRE && greData) {
+      try {
+        await this.salesService.sendGreToSunat(sale.id, greData);
+      } catch (greErr) {
+        console.error('GRE generation failed during order completion:', greErr);
+        throw greErr;
+      }
+    }
 
     // Trigger SUNAT asynchronously
     this.salesService.sendToSunat(sale.id).catch(err => console.error('Auto SUNAT from Order failed:', err));

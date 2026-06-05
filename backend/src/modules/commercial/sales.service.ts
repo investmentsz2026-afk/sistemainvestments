@@ -650,4 +650,155 @@ export class SalesService {
       data: { referralGuide: referralGuide || null }
     });
   }
+
+  async updateInvoiceNumber(saleId: string, invoiceNumber: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId }
+    });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    // Check unique constraint manually to return user friendly error
+    if (invoiceNumber) {
+      const existing = await this.prisma.sale.findUnique({
+        where: { invoiceNumber }
+      });
+      if (existing && existing.id !== saleId) {
+        throw new BadRequestException('El número de comprobante ya está registrado en otra venta.');
+      }
+    }
+
+    return this.prisma.sale.update({
+      where: { id: saleId },
+      data: { invoiceNumber: invoiceNumber || null }
+    });
+  }
+
+  async sendGreToSunat(saleId: string, greData: any) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: { include: { product: true } }
+          }
+        }
+      }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    const API_TOKEN = process.env.SUNAT_INVOICING_TOKEN;
+    const API_URL = process.env.SUNAT_INVOICING_URL;
+
+    if (!API_TOKEN || !API_URL) {
+      throw new BadRequestException('API de Facturación no configurada en el servidor');
+    }
+
+    const finalGuideNumber = await this.getNextInvoiceNumber('GUIA');
+    const parts = finalGuideNumber.split('-');
+    const series = parts[0];
+    const numero = parseInt(parts[1]);
+
+    const clientDocType = sale.client?.documentType === 'RUC' ? 6 : (sale.client?.documentType === 'DNI' ? 1 : "-");
+    const clientDocNum = sale.client?.documentNumber || "00000000";
+    const clientDenominacion = sale.client?.name || "PÚBLICO GENERAL";
+    const clientDireccion = sale.client?.address || "";
+    const clientEmail = sale.client?.email || "";
+
+    const peso = parseFloat(greData.peso_bruto_total) || 1.0;
+    const bultos = parseInt(greData.numero_de_bultos) || 1;
+    const partidaUbigeo = greData.punto_de_partida_ubigeo || "150110";
+    const partidaDireccion = greData.punto_de_partida_direccion || "Mza. E Lote. 11 Dpto. 201 Cnd. Las Praderas (Block 18), Lima - Lima - Comas";
+    const llegadaUbigeo = greData.punto_de_llegada_ubigeo || "150101";
+    const llegadaDireccion = greData.punto_de_llegada_direccion || clientDireccion || "Sin direccion";
+    const plate = greData.vehiculo_placa || "CTP-078";
+    const driverDni = greData.conductor_numero_de_documento || "";
+    const driverName = greData.conductor_denominacion || "Eder Joel Ancassi Cárdenas";
+    const driverLicence = greData.conductor_licencia || "Q43225002";
+
+    const getFormattedDate = (d: Date) => {
+      const formatter = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const pts = formatter.formatToParts(d);
+      const day = pts.find(p => p.type === 'day')?.value;
+      const month = pts.find(p => p.type === 'month')?.value;
+      const year = pts.find(p => p.type === 'year')?.value;
+      return `${day}-${month}-${year}`;
+    };
+
+    const payload = {
+      operacion: "generar_guia",
+      tipo_de_comprobante: 7,
+      serie: series,
+      numero: numero,
+      fecha_de_emision: getFormattedDate(new Date()),
+      cliente_tipo_de_documento: clientDocType,
+      cliente_numero_de_documento: clientDocNum,
+      cliente_denominacion: clientDenominacion,
+      cliente_direccion: clientDireccion,
+      cliente_email: clientEmail,
+      motivo_de_traslado: "VENTA",
+      modalidad_de_transporte: "TRANSPORTE PRIVADO",
+      peso_bruto_total: peso,
+      unidad_de_medida_peso_bruto: "KGM",
+      numero_de_bultos: bultos,
+      punto_de_partida_ubigeo: partidaUbigeo,
+      punto_de_partida_direccion: partidaDireccion,
+      punto_de_llegada_ubigeo: llegadaUbigeo,
+      punto_de_llegada_direccion: llegadaDireccion,
+      vehiculo_placa: plate,
+      conductor_tipo_de_documento: "1",
+      conductor_numero_de_documento: driverDni,
+      conductor_denominacion: driverName,
+      conductor_licencia: driverLicence,
+      enviar_a_sunat: true,
+      items: sale.items.map((item, index) => ({
+        item: index + 1,
+        codigo: item.variant.variantSku,
+        descripcion: `${item.variant.product.name} (${item.variant.size}/${item.variant.color})`,
+        cantidad: item.quantity,
+        unidad_de_medida: "NIU"
+      }))
+    };
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': API_TOKEN
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(result.errors);
+      }
+
+      // Update sale with guide info
+      await this.prisma.sale.update({
+        where: { id: saleId },
+        data: {
+          referralGuide: finalGuideNumber,
+          sunatGuidePdfUrl: result.enlace_del_pdf || result.enlace || null,
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Guía de remisión generada y enviada a SUNAT correctamente',
+        data: result
+      };
+    } catch (error: any) {
+      console.error('Error generating GRE:', error);
+      throw new BadRequestException('Error al generar la Guía de Remisión: ' + error.message);
+    }
+  }
 }

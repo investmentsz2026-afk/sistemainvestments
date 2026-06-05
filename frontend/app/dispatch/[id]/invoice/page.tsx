@@ -50,9 +50,58 @@ export default function InvoicePage() {
     const [paymentMethod, setPaymentMethod] = useState('TRANSFERENCIA');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+    const [productCategories, setProductCategories] = useState<Record<string, string>>({});
+    const [generateGRE, setGenerateGRE] = useState(false);
+    const [greData, setGreData] = useState({
+        peso_bruto_total: '0.00',
+        numero_de_bultos: '1',
+        punto_de_partida_ubigeo: '150110', // Comas, Lima
+        punto_de_partida_direccion: 'Mza. E Lote. 11 Dpto. 201 Cnd. Las Praderas (Block 18), Lima - Lima - Comas',
+        punto_de_llegada_ubigeo: '150101', // Default to Lima
+        punto_de_llegada_direccion: '',
+        vehiculo_placa: 'CTP-078',
+        conductor_tipo_de_documento: '1',
+        conductor_numero_de_documento: '43225002',
+        conductor_denominacion: 'Eder Joel Ancassi Cárdenas',
+        conductor_licencia: 'Q43225002',
+    });
+
     useEffect(() => {
         if (orderId) fetchOrder();
     }, [orderId]);
+
+    useEffect(() => {
+        const fetchProductsAndCategories = async () => {
+            try {
+                const resp = await api.get('/products');
+                const catMap: Record<string, string> = {};
+                resp.data.forEach((p: any) => {
+                    catMap[p.name.toLowerCase().trim()] = p.category;
+                });
+                setProductCategories(catMap);
+            } catch (err) {
+                console.error('Error fetching products for categories:', err);
+            }
+        };
+        fetchProductsAndCategories();
+    }, []);
+
+    useEffect(() => {
+        if (!order || Object.keys(productCategories).length === 0) return;
+        let totalWeight = 0;
+        order.items?.forEach((item: any) => {
+            const qty = item.dispQuantity || 0;
+            if (qty <= 0) return;
+            const category = productCategories[item.modelName.toLowerCase().trim()] || '';
+            const isBermuda = category.toLowerCase().includes('bermuda') || category.toLowerCase().includes('short');
+            const itemWeight = isBermuda ? 0.5 : 0.6;
+            totalWeight += qty * itemWeight;
+        });
+        setGreData(prev => ({
+            ...prev,
+            peso_bruto_total: totalWeight.toFixed(2)
+        }));
+    }, [order, productCategories]);
 
     const fetchOrder = async () => {
         try {
@@ -61,6 +110,11 @@ export default function InvoicePage() {
             if (resp.data.client?.documentType === 'RUC') {
                 setDocType('FACTURA');
             }
+            setGreData(prev => ({
+                ...prev,
+                punto_de_llegada_direccion: resp.data.client?.address || '',
+                punto_de_llegada_ubigeo: '150101'
+            }));
         } catch (error) {
             console.error('Error fetching order:', error);
             toast.error('No se pudo cargar el pedido');
@@ -74,6 +128,10 @@ export default function InvoicePage() {
     };
 
     const executeCompleteOrder = async () => {
+        if (generateGRE && !greData.conductor_numero_de_documento) {
+            toast.error('Por favor, ingrese el DNI del chofer para la Guía de Remisión');
+            return;
+        }
         setShowConfirmModal(false);
         setIsCompleting(true);
         try {
@@ -82,9 +140,11 @@ export default function InvoicePage() {
                 docType,
                 paymentMethod,
                 igv,
-                referralGuide
+                referralGuide,
+                generateGRE,
+                greData: generateGRE ? greData : null
             });
-            toast.success('¡Pedido finalizado con éxito! La venta ha sido registrada.');
+            toast.success('¡Pedido finalizado con éxito! La venta y Guía han sido registradas.');
             router.push('/dispatch');
         } catch (error: any) {
             console.error('Error completing order:', error);
@@ -424,6 +484,158 @@ export default function InvoicePage() {
                             />
                         </div>
                     </div>
+
+                    <div className="mt-8 border-t border-gray-100 pt-6">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input 
+                                type="checkbox" 
+                                checked={generateGRE} 
+                                onChange={(e) => setGenerateGRE(e.target.checked)} 
+                                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-black text-gray-900 uppercase tracking-tight">Generar Guía de Remisión Electrónica (GRE)</span>
+                        </label>
+                    </div>
+
+                    <AnimatePresence>
+                        {generateGRE && (
+                            <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="overflow-hidden mt-6 border-t border-gray-100 pt-6 space-y-6"
+                            >
+                                <h4 className="text-sm font-black text-gray-905 uppercase tracking-widest">Información de Transporte y Traslado (GRE)</h4>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Motivo de Traslado</label>
+                                        <input 
+                                            type="text" 
+                                            value="VENTA" 
+                                            disabled 
+                                            className="w-full px-6 py-3.5 bg-gray-100 border-none rounded-2xl font-bold text-gray-400 cursor-not-allowed text-xs animate-pulse"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Modalidad de Transporte</label>
+                                        <input 
+                                            type="text" 
+                                            value="TRANSPORTE PRIVADO" 
+                                            disabled 
+                                            className="w-full px-6 py-3.5 bg-gray-100 border-none rounded-2xl font-bold text-gray-400 cursor-not-allowed text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Chofer / Conductor</label>
+                                        <input 
+                                            type="text" 
+                                            value={greData.conductor_denominacion} 
+                                            onChange={(e) => setGreData({...greData, conductor_denominacion: e.target.value})} 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Licencia de Conducir</label>
+                                        <input 
+                                            type="text" 
+                                            value={greData.conductor_licencia} 
+                                            onChange={(e) => setGreData({...greData, conductor_licencia: e.target.value})} 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Placa de Vehículo</label>
+                                        <input 
+                                            type="text" 
+                                            value={greData.vehiculo_placa} 
+                                            onChange={(e) => setGreData({...greData, vehiculo_placa: e.target.value})} 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">DNI del Chofer *</label>
+                                        <input 
+                                            type="text" 
+                                            value={greData.conductor_numero_de_documento} 
+                                            onChange={(e) => setGreData({...greData, conductor_numero_de_documento: e.target.value})} 
+                                            placeholder="Ingrese DNI"
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Peso Bruto Total (kg)</label>
+                                        <input 
+                                            type="text" 
+                                            value={greData.peso_bruto_total} 
+                                            onChange={(e) => setGreData({...greData, peso_bruto_total: e.target.value})} 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Nro de Bultos</label>
+                                        <input 
+                                            type="number" 
+                                            value={greData.numero_de_bultos} 
+                                            onChange={(e) => setGreData({...greData, numero_de_bultos: e.target.value})} 
+                                            className="w-full px-6 py-3.5 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-gray-700 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                    <div className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                                        <h5 className="text-xs font-black text-gray-800 uppercase tracking-wider">Punto de Partida (Origen)</h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="sm:col-span-2 space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dirección Origen</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={greData.punto_de_partida_direccion} 
+                                                    onChange={(e) => setGreData({...greData, punto_de_partida_direccion: e.target.value})} 
+                                                    className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-xs text-gray-700"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ubigeo Origen</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={greData.punto_de_partida_ubigeo} 
+                                                    onChange={(e) => setGreData({...greData, punto_de_partida_ubigeo: e.target.value})} 
+                                                    className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-xs text-gray-700"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                                        <h5 className="text-xs font-black text-gray-800 uppercase tracking-wider">Punto de Llegada (Destino)</h5>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="sm:col-span-2 space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dirección Destino</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={greData.punto_de_llegada_direccion} 
+                                                    onChange={(e) => setGreData({...greData, punto_de_llegada_direccion: e.target.value})} 
+                                                    className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-xs text-gray-700"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ubigeo Destino</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={greData.punto_de_llegada_ubigeo} 
+                                                    onChange={(e) => setGreData({...greData, punto_de_llegada_ubigeo: e.target.value})} 
+                                                    placeholder="Ej. 150101"
+                                                    className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-600 transition-all outline-none font-bold text-xs text-gray-700"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* Invoice Preview */}
