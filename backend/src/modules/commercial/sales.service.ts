@@ -771,6 +771,11 @@ export class SalesService {
       }))
     };
 
+    // Debug: write payload before calling the API
+    try {
+      require('fs').writeFileSync('d:/proyectolima/debug_gre.json', JSON.stringify({ payload }, null, 2));
+    } catch (e) {}
+
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -782,6 +787,11 @@ export class SalesService {
       });
 
       const result = await response.json();
+
+      // Debug: write payload and API response
+      try {
+        require('fs').writeFileSync('d:/proyectolima/debug_gre.json', JSON.stringify({ payload, result }, null, 2));
+      } catch (e) {}
 
       if (result.errors) {
         throw new Error(result.errors);
