@@ -1050,10 +1050,13 @@ export class SalesService {
       enviar_a_sunat: true,
       // Reference to the associated invoice/boleta
       ...(docRefTipo && docRefSerie && docRefNumero ? {
-        documento_relacionado_tipo_documento: docRefTipo,
-        documento_relacionado_numero_documento: `${docRefSerie}-${docRefNumero}`,
-        documento_relacionado_tipo_documento_emisor: "6", // RUC
-        documento_relacionado_numero_documento_emisor: "20611188715", // The business RUC (from the user's screenshot)
+        documentos_relacionados: [
+          {
+            tipo_de_documento: docRefTipo,
+            serie: docRefSerie,
+            numero: docRefNumero
+          }
+        ]
       } : {}),
       items: sale.items.map((item, index) => ({
         item: index + 1,
