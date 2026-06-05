@@ -737,6 +737,7 @@ export class SalesService {
       serie: series,
       numero: numero,
       fecha_de_emision: getFormattedDate(new Date()),
+      fecha_de_inicio_de_traslado: getFormattedDate(new Date()),
       cliente_tipo_de_documento: clientDocType,
       cliente_numero_de_documento: clientDocNum,
       cliente_denominacion: clientDenominacion,
