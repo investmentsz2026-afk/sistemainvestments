@@ -393,8 +393,8 @@ export class SalesService {
         ...(typeof (sale as any).referralGuide === 'string' && (sale as any).referralGuide ? {
           guias: [
             {
-              numero: (sale as any).referralGuide,
-              codigo_tipo_documento: "09"
+              guia_tipo: 1,
+              guia_serie_numero: (sale as any).referralGuide
             }
           ]
         } : {}),
