@@ -458,16 +458,24 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                                 X
                                                             </button>
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-xs font-black text-gray-700">{sale.referralGuide || 'SIN GUIA'}</span>
+                                                        <div className="flex flex-col gap-1 items-end">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-xs font-black text-gray-700">{sale.referralGuide || 'SIN GUIA'}</span>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setGuideValue(sale.referralGuide || '');
+                                                                        setIsEditingGuide(true);
+                                                                    }}
+                                                                    className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
+                                                                >
+                                                                    {sale.referralGuide ? 'Editar Nro' : 'Agregar Nro'}
+                                                                </button>
+                                                            </div>
                                                             <button 
-                                                                onClick={() => {
-                                                                    setShowGreForm(true);
-                                                                }}
-                                                                className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
+                                                                onClick={() => setShowGreForm(true)}
+                                                                className="text-[9px] px-2 py-0.5 bg-indigo-50 text-indigo-600 font-black rounded border border-indigo-100 hover:bg-indigo-100 transition uppercase"
                                                             >
-                                                                {sale.referralGuide ? 'Editar' : 'Agregar'}
+                                                                Emitir GRE
                                                             </button>
                                                         </div>
                                                     )}
