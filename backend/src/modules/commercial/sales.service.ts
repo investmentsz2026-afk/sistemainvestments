@@ -390,14 +390,6 @@ export class SalesService {
         total_pago_con_monto_fijo_por_item: null,
         total: parseFloat(sale.totalAmount.toFixed(2)),
         enviar_a_sunat: true,
-        ...(typeof (sale as any).referralGuide === 'string' && (sale as any).referralGuide ? {
-          guias: [
-            {
-              guia_tipo: 1,
-              guia_serie_numero: (sale as any).referralGuide
-            }
-          ]
-        } : {}),
         items: sale.items.map(item => {
           const itemSubtotal = item.totalPrice / 1.18;
           const itemIgv = item.totalPrice - itemSubtotal;
