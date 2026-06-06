@@ -1066,9 +1066,10 @@ export class SalesService {
         documento_asociado_numero: parseInt(docRefNumero),
         documentos_relacionados: [
           {
-            tipo_de_documento_relacionado: docRefTipo,
-            numero_de_documento_relacionado: `${docRefSerie}-${docRefNumero}`,
-            ruc_documento_relacionado: "20611188715"
+            tipo_documento_relacionado: docRefTipo,
+            numero_documento_relacionado: `${docRefSerie}-${docRefNumero}`,
+            tipo_documento_emisor: "6",
+            ruc_emisor_documento_relacionado: "20611188715"
           }
         ]
       } : {}),
