@@ -462,7 +462,7 @@ export class OrdersService {
 
     // Auto-generate referralGuide if missing for Facturas
     let finalReferralGuide = referralGuide;
-    if (!finalReferralGuide && docType === 'FACTURA' && !generateGRE) {
+    if (!finalReferralGuide && docType === 'FACTURA') {
         finalReferralGuide = await this.salesService.getNextInvoiceNumber('GUIA');
     }
 
@@ -492,9 +492,6 @@ export class OrdersService {
         throw greErr;
       }
     }
-
-    // Trigger SUNAT asynchronously
-    this.salesService.sendToSunat(sale.id).catch(err => console.error('Auto SUNAT from Order failed:', err));
 
     // Notify Comercial and Seller
     await this.notifications.create({

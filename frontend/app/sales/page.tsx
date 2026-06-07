@@ -92,7 +92,8 @@ export default function SalesPage() {
     const filteredSales = sales.filter(s => {
         const matchesSearch = s.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              s.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             s.id.toLowerCase().includes(searchTerm.toLowerCase());
+                             s.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             s.notes?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
         
         const saleDate = new Date(s.createdAt).toISOString().split('T')[0];
