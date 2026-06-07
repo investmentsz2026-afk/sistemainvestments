@@ -378,12 +378,21 @@ export class OrdersService {
 
         if (variant) {
           // Find the corresponding order item to get the unitPrice agreed on the order
-          const orderItem = order.items.find((oi: any) => {
-            const nameMatch = variant.product.name.toUpperCase().includes(oi.modelName.toUpperCase()) ||
-                              oi.modelName.toUpperCase().includes(variant.product.name.toUpperCase());
-            const colorMatch = variant.color.toUpperCase() === oi.color.toUpperCase();
-            return nameMatch && colorMatch;
-          });
+          // First attempt an exact match
+          let orderItem = order.items.find((oi: any) => 
+            variant.product.name.trim().toUpperCase() === oi.modelName.trim().toUpperCase() &&
+            variant.color.trim().toUpperCase() === oi.color.trim().toUpperCase()
+          );
+
+          // If exact match fails, fallback to loose include match
+          if (!orderItem) {
+            orderItem = order.items.find((oi: any) => {
+              const nameMatch = variant.product.name.toUpperCase().includes(oi.modelName.toUpperCase()) ||
+                                oi.modelName.toUpperCase().includes(variant.product.name.toUpperCase());
+              const colorMatch = variant.color.toUpperCase() === oi.color.toUpperCase();
+              return nameMatch && colorMatch;
+            });
+          }
 
           const unitPrice = orderItem ? orderItem.unitPrice : variant.product.sellingPrice;
           const costPrice = variant.product.purchasePrice || 0;
@@ -419,10 +428,16 @@ export class OrdersService {
             include: { variants: true }
           });
 
-          const product = products.find(p => 
-            p.name.toUpperCase().includes(item.modelName.toUpperCase()) || 
-            item.modelName.toUpperCase().includes(p.name.toUpperCase())
-          );
+          // First attempt an exact match
+          let product = products.find(p => p.name.trim().toUpperCase() === item.modelName.trim().toUpperCase());
+          
+          // Fallback to includes
+          if (!product) {
+            product = products.find(p => 
+              p.name.toUpperCase().includes(item.modelName.toUpperCase()) || 
+              item.modelName.toUpperCase().includes(p.name.toUpperCase())
+            );
+          }
 
           if (product) {
             const variant = product.variants.find(v => 
