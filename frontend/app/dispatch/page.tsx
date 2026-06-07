@@ -272,7 +272,11 @@ export default function DispatchPage() {
                                     <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
                                         <div className="text-right hidden xl:block mr-4">
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pedido</p>
-                                            <p className="text-xl font-black text-gray-900">S/ {order.totalAmount.toLocaleString()}</p>
+                                            <p className={`text-xl font-black ${order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO' ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                                S/ {(order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO') && Array.isArray(order.items) && order.items.length > 0
+                                                    ? order.items.reduce((sum: number, item: any) => sum + ((item.dispQuantity || 0) * (item.unitPrice || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })
+                                                    : order.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button 
