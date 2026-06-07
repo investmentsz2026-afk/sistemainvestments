@@ -46,6 +46,7 @@ export default function SalesPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [zoneFilter, setZoneFilter] = useState('ALL');
+    const [viewMode, setViewMode] = useState<'ACTIVOS' | 'ANULADOS'>('ACTIVOS');
 
     // Modal state
     const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -102,7 +103,9 @@ export default function SalesPage() {
         const activeZone = s.seller?.zone || 'OFICINA';
         const matchesZone = zoneFilter === 'ALL' || activeZone === zoneFilter;
 
-        return matchesSearch && matchesStatus && matchesStart && matchesEnd && matchesZone;
+        const matchesViewMode = viewMode === 'ACTIVOS' ? s.status !== 'ANULADO' : s.status === 'ANULADO';
+
+        return matchesSearch && matchesStatus && matchesStart && matchesEnd && matchesZone && matchesViewMode;
     });
 
     // Stats calculations
@@ -111,12 +114,14 @@ export default function SalesPage() {
     const thisMonth = now.getMonth();
     const thisYear = now.getFullYear();
 
-    const dailyRevenue = sales.filter(s => s.createdAt.startsWith(todayStr)).reduce((acc, s) => acc + s.totalAmount, 0);
-    const monthlyRevenue = sales.filter(s => {
+    const activeSales = sales.filter(s => s.status !== 'ANULADO');
+
+    const dailyRevenue = activeSales.filter(s => s.createdAt.startsWith(todayStr)).reduce((acc, s) => acc + s.totalAmount, 0);
+    const monthlyRevenue = activeSales.filter(s => {
         const d = new Date(s.createdAt);
         return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     }).reduce((acc, s) => acc + s.totalAmount, 0);
-    const annualRevenue = sales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
+    const annualRevenue = activeSales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
     const totalCost = filteredSales.reduce((acc, s) => acc + (s.totalCost || 0), 0);
@@ -308,6 +313,22 @@ export default function SalesPage() {
                         <p className="text-xs font-bold text-gray-400 uppercase mb-1">Ventas del Año</p>
                         <h4 className="text-2xl font-black text-gray-900">S/ {annualRevenue.toLocaleString()}</h4>
                     </div>
+                </div>
+
+                {/* VIEW TABS */}
+                <div className="flex bg-gray-100 p-1.5 rounded-2xl w-max shadow-inner">
+                    <button
+                        onClick={() => setViewMode('ACTIVOS')}
+                        className={`px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${viewMode === 'ACTIVOS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        Ventas Activas
+                    </button>
+                    <button
+                        onClick={() => setViewMode('ANULADOS')}
+                        className={`px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${viewMode === 'ANULADOS' ? 'bg-white text-rose-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        Ventas Anuladas
+                    </button>
                 </div>
 
                 {/* FILTERS */}
