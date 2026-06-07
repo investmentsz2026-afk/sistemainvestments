@@ -12,7 +12,7 @@ export class OrdersService {
   ) {}
 
   async create(user: any, data: any) {
-    const { clientId, condition, agency, observations, items, orderNumber, createdAt } = data;
+    const { clientId, condition, agency, observations, items, orderNumber, createdAt, deliveryAddress } = data;
 
     if (!items || items.length === 0) {
       throw new BadRequestException('El pedido debe tener al menos un modelo');
@@ -72,6 +72,7 @@ export class OrdersService {
         condition,
         agency,
         observations,
+        deliveryAddress,
         totalAmount,
         totalQuantity,
         sellerId: user.id,
@@ -143,7 +144,7 @@ export class OrdersService {
       throw new BadRequestException('No se puede editar un pedido que ya está completado.');
     }
 
-    const { clientId, condition, agency, observations, items, orderNumber, createdAt } = data;
+    const { clientId, condition, agency, observations, items, orderNumber, createdAt, deliveryAddress } = data;
 
     // Sanitize items
     const sanitizedItems = items.map((item: any) => {
@@ -184,6 +185,7 @@ export class OrdersService {
         condition,
         agency,
         observations,
+        deliveryAddress,
         totalAmount,
         totalQuantity,
         createdAt: createdAt ? new Date(createdAt) : undefined,

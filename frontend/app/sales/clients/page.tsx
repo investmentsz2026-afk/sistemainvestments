@@ -60,6 +60,7 @@ export default function ClientsPage() {
         email: '',
         phone: '',
         address: '',
+        address2: '',
         zone: ''
     });
 
@@ -86,7 +87,7 @@ export default function ClientsPage() {
             await api.post('/sales/clients', newClient);
             setShowAddModal(false);
             fetchClients();
-            setNewClient({ documentType: 'DNI', documentNumber: '', name: '', email: '', phone: '', address: '', zone: '' });
+            setNewClient({ documentType: 'DNI', documentNumber: '', name: '', email: '', phone: '', address: '', address2: '', zone: '' });
             toast.success('Cliente registrado correctamente');
         } catch (error) {
             console.error('Error adding client:', error);
@@ -128,7 +129,8 @@ export default function ClientsPage() {
                 setNewClient(prev => ({
                     ...prev,
                     name: name || '',
-                    address: address || ''
+                    address: address || '',
+                    address2: prev.address2 || ''
                 }));
                 if (resp.data.mockData) {
                     toast.error(resp.data.message, { duration: 5000 });
@@ -507,14 +509,25 @@ export default function ClientsPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de Entrega / Fiscal</label>
-                                    <input 
-                                        type="text"
-                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
-                                        value={newClient.address}
-                                        onChange={(e) => setNewClient({ ...newClient, address: e.target.value })}
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección Principal</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={newClient.address}
+                                            onChange={(e) => setNewClient({ ...newClient, address: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección Alternativa (Opcional)</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={newClient.address2}
+                                            onChange={(e) => setNewClient({ ...newClient, address2: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
 
                                 {(authUser?.role === 'ADMIN' || authUser?.role === 'COMERCIAL') && (
@@ -779,14 +792,25 @@ export default function ClientsPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de Entrega / Fiscal</label>
-                                    <input 
-                                        type="text"
-                                        className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
-                                        value={editingClient.address || ''}
-                                        onChange={(e) => setEditingClient({ ...editingClient, address: e.target.value })}
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección Principal</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={editingClient.address || ''}
+                                            onChange={(e) => setEditingClient({ ...editingClient, address: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección Alternativa (Opcional)</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={editingClient.address2 || ''}
+                                            onChange={(e) => setEditingClient({ ...editingClient, address2: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
 
                                 {(authUser?.role === 'ADMIN' || authUser?.role === 'COMERCIAL') && (

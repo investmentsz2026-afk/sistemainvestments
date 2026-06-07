@@ -42,6 +42,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         condition: 'FACTURA/CREDITO 45 DIAS',
         agency: '',
         observations: '',
+        deliveryAddress: '',
         orderNumber: '',
         createdAt: new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD local format
     });
@@ -208,6 +209,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     condition: initialOrder.condition || '',
                     agency: initialOrder.agency || '',
                     observations: initialOrder.observations || '',
+                    deliveryAddress: initialOrder.deliveryAddress || initialOrder.client?.address || '',
                     orderNumber: initialOrder.orderNumber || '',
                     createdAt: new Date(initialOrder.createdAt).toLocaleDateString('sv-SE')
                 });
@@ -220,6 +222,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     condition: 'FACTURA/CREDITO 45 DIAS',
                     agency: '',
                     observations: '',
+                    deliveryAddress: '',
                     orderNumber: '',
                     createdAt: new Date().toLocaleDateString('sv-SE')
                 });
@@ -350,7 +353,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         }
         const client = clients.find(c => String(c.id) === String(id));
         setSelectedClient(client || null);
-        setFormData({ ...formData, clientId: id });
+        setFormData({ ...formData, clientId: id, deliveryAddress: client?.address || '' });
     };
 
     const handleRowChange = (index: number, field: string, value: any) => {
@@ -1179,6 +1182,32 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                             onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
                                             placeholder="Pago al contado, Crédito, etc."
                                         />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5 font-sans">
+                                            <MapPin className="w-3 h-3 text-indigo-500" /> Dirección de Entrega
+                                        </label>
+                                        {selectedClient?.address2 ? (
+                                            <select
+                                                disabled={readOnly}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all outline-none font-bold text-slate-900 text-sm shadow-inner"
+                                                value={formData.deliveryAddress}
+                                                onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+                                            >
+                                                {selectedClient.address && <option value={selectedClient.address}>Principal: {selectedClient.address}</option>}
+                                                {selectedClient.address2 && <option value={selectedClient.address2}>Alternativa: {selectedClient.address2}</option>}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                disabled={readOnly || !!selectedClient?.address}
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all outline-none font-bold text-slate-900 text-sm shadow-inner"
+                                                value={formData.deliveryAddress}
+                                                onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+                                                placeholder="Dirección de entrega..."
+                                            />
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">

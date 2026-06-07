@@ -308,6 +308,7 @@ model Client {
   email           String?
   phone           String?
   address         String?  @db.Text
+  address2        String?  @db.Text
   zone            String?  // LIMA, ORIENTE, etc.
   createdById     String?  @map("created_by_id")
   createdBy       User?    @relation("ClientCreator", fields: [createdById], references: [id])
@@ -342,6 +343,7 @@ model Order {
   seller          User        @relation("UserOrders", fields: [sellerId], references: [id])
   
   zone            String?     // LIMA, ORIENTE
+  deliveryAddress String?     @map("delivery_address") @db.Text
   needsResend     Boolean     @default(false) @map("needs_resend")
   dispatchDetails Json?       @map("dispatch_details")
   
