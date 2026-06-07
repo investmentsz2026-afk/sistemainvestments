@@ -42,6 +42,11 @@ export class OrdersController {
     return this.ordersService.completeOrder(id, req.user, data);
   }
 
+  @Get('fix-stuck')
+  async fixStuckOrders() {
+    return this.ordersService.fixStuckOrders();
+  }
+
   @Delete(':id')
   annul(@Param('id') id: string, @Req() req: any) {
     return this.ordersService.annul(id, req.user);

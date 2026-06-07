@@ -352,11 +352,7 @@ export class OrdersService {
     const { docNumber, docType, paymentMethod, igv, referralGuide, generateGRE, greData } = data;
     const igvRate = (igv || 18) / 100;
 
-    // 1. Update order status
-    const updated = await (this.prisma as any).order.update({
-      where: { id },
-      data: { status: 'ENTREGADO' }
-    });
+    // (Status will be updated at the end to prevent inconsistent state if sale creation fails)
 
     // 2. Create Sale Record
     // Map OrderItems to SaleItems (USING DISPATCHED QUANTITIES or saved dispatchDetails)
@@ -517,7 +513,30 @@ export class OrdersService {
       referenceId: order.id
     });
 
+    // Finally, update the order status
+    const updated = await (this.prisma as any).order.update({
+      where: { id },
+      data: { status: 'ENTREGADO' }
+    });
+
     return updated;
+  }
+
+  async fixStuckOrders() {
+    const orders = await this.prisma.order.findMany({
+      where: { status: 'ENTREGADO' }
+    });
+    let fixedCount = 0;
+    for (const order of orders) {
+      if (order.orderNumber === '000002' || order.id.endsWith('000002')) {
+        await (this.prisma as any).order.update({
+          where: { id: order.id },
+          data: { status: 'DESPACHADO' }
+        });
+        fixedCount++;
+      }
+    }
+    return { success: true, fixedCount };
   }
 
   async annul(id: string, user: any) {

@@ -3,7 +3,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const client = await prisma.client.findFirst({
-    where: { name: { contains: 'GRANDES OFERTAS' } }
+    where: { name: { contains: 'GRANDES OFERTAS', mode: 'insensitive' } }
   });
   console.log('CLIENT:', client);
 

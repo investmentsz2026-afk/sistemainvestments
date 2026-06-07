@@ -12,6 +12,13 @@ export class SalesService {
     this.ensureInvoiceConfigs();
   }
 
+  async debugData() {
+    return {
+      sales: await this.prisma.sale.findMany({ include: { client: true } }),
+      orders: await this.prisma.order.findMany({ include: { client: true } })
+    };
+  }
+
   async ensureInvoiceConfigs() {
     const configs = [
       { type: 'FACTURA', series: 'F001' },

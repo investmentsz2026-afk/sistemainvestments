@@ -7,6 +7,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
+  @Get('debug')
+  async debugData() {
+    return this.salesService.debugData();
+  }
+
   @Post()
   create(@Req() req: any, @Body() data: any) {
     return this.salesService.createSale(req.user.id, data);

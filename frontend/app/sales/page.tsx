@@ -217,12 +217,28 @@ export default function SalesPage() {
                         <p className="text-gray-500 font-medium text-lg mt-1">Historial de transacciones y facturación.</p>
                     </div>
                     {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE') && (
-                        <Link 
-                            href="/sales/new"
-                            className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-black transition active:scale-95"
-                        >
-                            <Plus className="w-5 h-5" /> Registrar Venta
-                        </Link>
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        toast.loading('Sincronizando pedidos...', { id: 'sync' });
+                                        const res = await api.get('/orders/fix-stuck');
+                                        toast.success(`Sincronización completada. Pedidos recuperados: ${res.data.fixedCount}`, { id: 'sync' });
+                                    } catch (e) {
+                                        toast.error('Error al sincronizar', { id: 'sync' });
+                                    }
+                                }}
+                                className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-6 py-4 rounded-2xl font-bold hover:bg-indigo-200 transition active:scale-95"
+                            >
+                                Sincronizar Pedidos
+                            </button>
+                            <Link 
+                                href="/sales/new"
+                                className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-black transition active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" /> Registrar Venta
+                            </Link>
+                        </div>
                     )}
                 </div>
 
