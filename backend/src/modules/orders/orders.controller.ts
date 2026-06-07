@@ -17,6 +17,11 @@ export class OrdersController {
     return this.ordersService.findAll(req.user, query);
   }
 
+  @Get('fix-stuck')
+  async fixStuckOrders() {
+    return this.ordersService.fixStuckOrders();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
@@ -42,10 +47,6 @@ export class OrdersController {
     return this.ordersService.completeOrder(id, req.user, data);
   }
 
-  @Get('fix-stuck')
-  async fixStuckOrders() {
-    return this.ordersService.fixStuckOrders();
-  }
 
   @Delete(':id')
   annul(@Param('id') id: string, @Req() req: any) {
