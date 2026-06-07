@@ -42,6 +42,11 @@ export class SalesController {
     return this.salesService.findOne(id);
   }
 
+  @Delete(':id')
+  annul(@Param('id') id: string, @Req() req: any) {
+    return this.salesService.annulSale(id, req.user);
+  }
+
   @Post(':id/payments')
   addPayment(@Param('id') id: string, @Body() data: any) {
     return this.salesService.addPayment(id, data);

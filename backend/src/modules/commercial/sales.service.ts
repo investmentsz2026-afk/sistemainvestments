@@ -562,6 +562,52 @@ export class SalesService {
     return updated;
   }
 
+  async annulSale(id: string, user: any) {
+    if (user.role !== 'ADMIN' && user.role !== 'COMERCIAL') {
+      throw new BadRequestException('No tienes permisos para anular ventas');
+    }
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    if (sale.status === 'ANULADO') throw new BadRequestException('La venta ya está anulada');
+
+    // Annul the sale
+    await this.prisma.sale.update({
+      where: { id },
+      data: { status: 'ANULADO' }
+    });
+
+    // Revert the order status to DESPACHADO if there is a notes link
+    if (sale.notes && sale.notes.includes('VENTA DESDE PEDIDO #')) {
+      const match = sale.notes.match(/VENTA DESDE PEDIDO #([A-Za-z0-9-]+)/);
+      if (match && match[1]) {
+        const orderIdentifier = match[1];
+        const orders = await this.prisma.order.findMany({
+          where: {
+            OR: [
+              { orderNumber: orderIdentifier },
+              { id: { endsWith: orderIdentifier } }
+            ]
+          }
+        });
+        
+        for (const order of orders) {
+          if (order.status === 'ENTREGADO' || order.status === 'COMPLETADO') {
+            await (this.prisma as any).order.update({
+              where: { id: order.id },
+              data: { status: 'DESPACHADO' }
+            });
+          }
+        }
+      }
+    }
+
+    return { success: true, message: 'Venta anulada correctamente. El pedido ha vuelto a estado DESPACHADO.' };
+  }
+
   async findAllClients(user: any) {
     const where: any = {};
 

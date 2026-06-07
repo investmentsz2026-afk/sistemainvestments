@@ -199,6 +199,20 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
         }
     };
 
+    const handleAnnulSale = async () => {
+        if (!window.confirm('¿Está seguro de anular esta venta? Esto revertirá el pedido a estado DESPACHADO para que pueda ser generado nuevamente.')) {
+            return;
+        }
+        try {
+            toast.loading('Anulando venta...', { id: 'annul' });
+            await api.delete(`/sales/${saleId}`);
+            toast.success('Venta anulada correctamente', { id: 'annul' });
+            onClose();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Error al anular la venta', { id: 'annul' });
+        }
+    };
+
     const getVoucherHTML = () => {
         if (!sale) return '';
         const docTitle = sale.invoiceNumber?.startsWith('F') ? 'Factura' : 'Boleta de Venta';
@@ -619,7 +633,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                         onClick={handlePrint}
                                         className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md hover:bg-black transition active:scale-95"
                                     >
-                                        <Printer className="w-3.5 h-3.5" /> Reimprimir Comprobante
+                                        <Printer className="w-3.5 h-3.5" /> Reimprimir
                                     </button>
                                     <button
                                         onClick={handleDownloadPDF}
@@ -627,6 +641,15 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                     >
                                         <FileText className="w-3.5 h-3.5" /> Descargar PDF
                                     </button>
+
+                                    {sale.status !== 'ANULADO' && (
+                                        <button
+                                            onClick={handleAnnulSale}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm hover:bg-rose-200 transition active:scale-95 ml-2"
+                                        >
+                                            <X className="w-3.5 h-3.5" /> Anular Venta
+                                        </button>
+                                    )}
 
                                     {sale.sunatPdfUrl && (
                                         <a
@@ -662,6 +685,10 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
 
                                 <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md w-full md:w-72">
                                     <div className="space-y-1.5 mb-2">
+                                        <div className="flex justify-between items-center text-[9px] font-black text-indigo-600 uppercase tracking-widest border-b border-gray-100 pb-1 mb-1">
+                                            <span>Total Prendas</span>
+                                            <span>{sale.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}</span>
+                                        </div>
                                         <div className="flex justify-between items-center text-[9px] font-black text-gray-400 uppercase tracking-widest">
                                             <span>Subtotal</span>
                                             <span>S/ {(sale.totalAmount / 1.18).toFixed(2)}</span>
