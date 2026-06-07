@@ -259,9 +259,11 @@ export default function DispatchPage() {
                                                     <Calendar className="w-4 h-4" />
                                                     {formatDate(order.createdAt)}
                                                 </div>
-                                                <div className="flex items-center gap-2 text-xs text-indigo-500 font-black">
+                                                <div className={`flex items-center gap-2 text-xs font-black ${order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO' ? 'text-emerald-500' : 'text-indigo-500'}`}>
                                                     <Tag className="w-4 h-4" />
-                                                    {order.totalQuantity} PRENDAS
+                                                    {(order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO') && Array.isArray(order.dispatchDetails) && order.dispatchDetails.length > 0 
+                                                        ? order.dispatchDetails.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+                                                        : order.totalQuantity} PRENDAS
                                                 </div>
                                             </div>
                                         </div>
