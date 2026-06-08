@@ -948,6 +948,7 @@ export default function ScanPage() {
                         <option value="Merma">Merma</option>
                         <option value="Ajuste">Ajuste de inventario</option>
                         <option value="Transferencia">Transferencia</option>
+                        <option value="Muestras">Muestras</option>
                       </>
                     )}
                   </select>
@@ -975,7 +976,7 @@ export default function ScanPage() {
                     <span className="font-medium">{getTotalItems()}</span> unidades
                   </p>
                   <p className="text-lg font-bold text-gray-900 mt-1">
-                    Total: ${getTotalValue().toFixed(2)}
+                    Total: S/ {getTotalValue().toFixed(2)}
                   </p>
                 </div>
               </div>
