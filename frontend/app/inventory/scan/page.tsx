@@ -582,9 +582,9 @@ export default function ScanPage() {
       </div>
 
       {/* Área de escaneo */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 items-start">
         {/* Panel de escaneo */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               {scanMode === 'camera' ? 'Escaneo con Cámara' : 
