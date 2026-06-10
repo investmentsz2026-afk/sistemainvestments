@@ -407,7 +407,7 @@ export class SalesService {
           const itemIgv = item.totalPrice - itemSubtotal;
           return {
             unidad_de_medida: "NIU",
-            codigo: item.variant.variantSku,
+            codigo: "", // Se envía vacío para que no ocupe espacio extra en la factura PDF
             descripcion: `${item.variant.product.name} (${item.variant.size}/${item.variant.color})`,
             cantidad: item.quantity,
             valor_unitario: parseFloat((item.unitPrice / 1.18).toFixed(2)),
