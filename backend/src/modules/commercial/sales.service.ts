@@ -364,11 +364,8 @@ export class SalesService {
         return `${day}-${month}-${year}`;
       };
 
-      let fechaEmision = getFormattedDate(sale.createdAt);
-      // If the sale is older than 3 days, force the emission date to today to avoid SUNAT rejection
-      if (diffDays > 3) {
-        fechaEmision = getFormattedDate(new Date());
-      }
+      // La fecha de emisión siempre será la fecha actual en la que se envía a SUNAT
+      const fechaEmision = getFormattedDate(new Date());
 
       const payload = {
         operacion: "generar_comprobante",
