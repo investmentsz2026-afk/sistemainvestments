@@ -766,9 +766,9 @@ export class SalesService {
     const llegadaUbigeo = greData.punto_de_llegada_ubigeo || "150101";
     const llegadaDireccion = greData.punto_de_llegada_direccion || clientDireccion || "Sin direccion";
     const plate = (greData.vehiculo_placa || "CTP-078").trim();
-    const driverDni = (greData.conductor_numero_de_documento || "").trim();
-    const driverName = (greData.conductor_denominacion || "Eder Joel Ancassi Cárdenas").trim();
-    const driverLicence = (greData.conductor_licencia || "Q43225002").trim();
+    const driverDni = (greData.conductor_numero_de_documento || "40401880").trim();
+    const driverName = (greData.conductor_denominacion || "Juan Carlos Aguirre haro").trim();
+    const driverLicence = (greData.conductor_licencia || "E40401880").trim();
 
     // Build document reference (factura/boleta associated to this guide)
     const invoiceNum = sale.invoiceNumber || "";
@@ -790,7 +790,7 @@ export class SalesService {
     // Split driverName to get name and last name
     const nameParts = driverName.split(/\s+/);
     const conductor_nombre = nameParts[0] || "";
-    const conductor_apellidos = nameParts.slice(1).join(" ") || "Ancassi Cárdenas";
+    const conductor_apellidos = nameParts.slice(1).join(" ") || "Aguirre haro";
 
     const getFormattedDate = (d: Date) => {
       const formatter = new Intl.DateTimeFormat('es-PE', {
