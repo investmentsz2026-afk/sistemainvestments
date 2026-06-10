@@ -61,9 +61,9 @@ export default function InvoicePage() {
         punto_de_llegada_direccion: '',
         vehiculo_placa: 'CTP-078',
         conductor_tipo_de_documento: '1',
-        conductor_numero_de_documento: '43225002',
-        conductor_denominacion: 'Eder Joel Ancassi Cárdenas',
-        conductor_licencia: 'Q43225002',
+        conductor_numero_de_documento: '40401880',
+        conductor_denominacion: 'Juan Carlos Aguirre haro',
+        conductor_licencia: 'E40401880',
     });
 
     useEffect(() => {
