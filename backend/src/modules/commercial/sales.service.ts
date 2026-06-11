@@ -379,6 +379,17 @@ export class SalesService {
         cliente_direccion: sale.client?.address || "",
         cliente_email: sale.client?.email || "",
         fecha_de_emision: fechaEmision,
+        condicion_de_pago: sale.paymentMethod === 'CREDITO' ? 2 : 1,
+        ...(sale.paymentMethod === 'CREDITO' ? {
+          cuotas: [
+            {
+              cuota: 1,
+              fecha_de_pago: fechaEmision,
+              importe: parseFloat(sale.totalAmount.toFixed(2))
+            }
+          ]
+        } : {}),
+        observaciones: `METODO DE PAGO: ${sale.paymentMethod || 'NO ESPECIFICADO'}`,
         moneda: 1, // Soles
         tipo_de_cambio: null,
         porcentaje_de_igv: 18.0,
