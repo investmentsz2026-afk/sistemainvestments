@@ -333,7 +333,7 @@ export default function ScanPage() {
           color: variant.color,
           stock: variant.stock,
           quantity: 1,
-          price: variant.product.sellingPrice,
+          price: variant.product.purchasePrice, // Mostrar costo de producción en vez del precio de venta
           timestamp: new Date()
         };
         setScannedItems(prev => [newItem, ...prev]);
