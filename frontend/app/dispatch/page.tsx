@@ -317,15 +317,15 @@ export default function DispatchPage() {
                                                 <>
                                                     <button 
                                                         onClick={() => handleCancelDispatch(order.id)}
-                                                        className="px-8 py-4 bg-rose-100 hover:bg-rose-200 text-rose-600 text-xs font-black rounded-2xl transition-all shadow-sm shadow-rose-100/50 flex items-center gap-2 uppercase tracking-widest scale-up active:scale-95"
+                                                        className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-600 text-[10px] sm:text-xs font-black rounded-xl transition-all shadow-sm shadow-rose-100/50 flex items-center gap-1.5 uppercase tracking-widest scale-up active:scale-95 whitespace-nowrap"
                                                     >
-                                                        <XCircle className="w-4 h-4" /> Anular Despacho
+                                                        <XCircle className="w-3.5 h-3.5" /> Anular Despacho
                                                     </button>
                                                     <Link 
                                                         href={`/dispatch/${order.id}/invoice`}
-                                                        className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl transition-all shadow-xl shadow-emerald-100 flex items-center gap-2 uppercase tracking-widest scale-up active:scale-95"
+                                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] sm:text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-100 flex items-center gap-1.5 uppercase tracking-widest scale-up active:scale-95 whitespace-nowrap"
                                                     >
-                                                        <FileText className="w-4 h-4" /> Generar Boleta
+                                                        <FileText className="w-3.5 h-3.5" /> Generar Boleta
                                                     </Link>
                                                 </>
                                             )}
