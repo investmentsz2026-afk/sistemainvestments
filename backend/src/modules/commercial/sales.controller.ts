@@ -43,8 +43,8 @@ export class SalesController {
   }
 
   @Delete(':id')
-  annul(@Param('id') id: string, @Req() req: any) {
-    return this.salesService.annulSale(id, req.user);
+  annul(@Param('id') id: string, @Req() req: any, @Query('revertDispatch') revertDispatch?: string) {
+    return this.salesService.annulSale(id, req.user, revertDispatch === 'true');
   }
 
   @Post(':id/payments')

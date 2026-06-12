@@ -570,13 +570,14 @@ export class SalesService {
     return updated;
   }
 
-  async annulSale(id: string, user: any) {
+  async annulSale(id: string, user: any, revertDispatch: boolean = false) {
     if (user.role !== 'ADMIN' && user.role !== 'COMERCIAL') {
       throw new BadRequestException('No tienes permisos para anular ventas');
     }
 
     const sale = await this.prisma.sale.findUnique({
-      where: { id }
+      where: { id },
+      include: { items: true }
     });
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
@@ -588,7 +589,29 @@ export class SalesService {
       data: { status: 'ANULADO' }
     });
 
-    // Revert the order status to DESPACHADO if there is a notes link
+    // Revert inventory if requested
+    if (revertDispatch) {
+      for (const item of sale.items) {
+        const variant = await this.prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } }
+        });
+        await this.prisma.movement.create({
+          data: {
+            type: 'ENTRY',
+            quantity: item.quantity,
+            reason: `ANULACIÓN DE VENTA Y DESPACHO - Ref: ${sale.invoiceNumber || sale.id}`,
+            reference: sale.invoiceNumber || sale.id,
+            previousStock: variant.stock - item.quantity,
+            newStock: variant.stock,
+            variantId: item.variantId,
+            userId: user.id
+          }
+        });
+      }
+    }
+
+    // Revert the order status
     if (sale.notes && sale.notes.includes('VENTA DESDE PEDIDO #')) {
       const match = sale.notes.match(/VENTA DESDE PEDIDO #([A-Za-z0-9-]+)/);
       if (match && match[1]) {
@@ -606,14 +629,19 @@ export class SalesService {
           if (order.status === 'ENTREGADO' || order.status === 'COMPLETADO') {
             await (this.prisma as any).order.update({
               where: { id: order.id },
-              data: { status: 'DESPACHADO' }
+              data: { status: revertDispatch ? 'PENDIENTE' : 'DESPACHADO' }
             });
           }
         }
       }
     }
 
-    return { success: true, message: 'Venta anulada correctamente. El pedido ha vuelto a estado DESPACHADO.' };
+    return { 
+      success: true, 
+      message: revertDispatch 
+        ? 'Venta anulada. Los productos regresaron al inventario y el pedido vuelve a estar pendiente.' 
+        : 'Venta anulada correctamente. El pedido ha vuelto a estado DESPACHADO.' 
+    };
   }
 
   async findAllClients(user: any) {

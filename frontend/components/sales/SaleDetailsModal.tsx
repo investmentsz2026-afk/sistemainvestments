@@ -213,6 +213,20 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
         }
     };
 
+    const handleAnnulSaleAndDispatch = async () => {
+        if (!window.confirm('¿Está seguro de anular esta venta Y devolver los productos al inventario? El pedido volverá a estado PENDIENTE para despachar nuevamente.')) {
+            return;
+        }
+        try {
+            toast.loading('Anulando venta y devolviendo productos...', { id: 'annul' });
+            await api.delete(`/sales/${saleId}?revertDispatch=true`);
+            toast.success('Venta anulada y productos devueltos al inventario', { id: 'annul' });
+            onClose();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Error al anular', { id: 'annul' });
+        }
+    };
+
     const getVoucherHTML = () => {
         if (!sale) return '';
         const docTitle = sale.invoiceNumber?.startsWith('F') ? 'Factura' : 'Boleta de Venta';
@@ -643,12 +657,20 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                     </button>
 
                                     {sale.status !== 'ANULADO' && (
-                                        <button
-                                            onClick={handleAnnulSale}
-                                            className="flex items-center gap-2 px-4 py-2.5 bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm hover:bg-rose-200 transition active:scale-95 ml-2"
-                                        >
-                                            <X className="w-3.5 h-3.5" /> Anular Venta
-                                        </button>
+                                        <div className="flex items-center gap-2 ml-2">
+                                            <button
+                                                onClick={handleAnnulSale}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-rose-100 text-rose-600 border border-rose-200 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm hover:bg-rose-200 transition active:scale-95"
+                                            >
+                                                <X className="w-3.5 h-3.5" /> Anular Venta
+                                            </button>
+                                            <button
+                                                onClick={handleAnnulSaleAndDispatch}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md hover:bg-rose-700 transition active:scale-95"
+                                            >
+                                                <X className="w-3.5 h-3.5" /> Anular Venta y Despacho
+                                            </button>
+                                        </div>
                                     )}
 
                                     {sale.sunatPdfUrl && (
