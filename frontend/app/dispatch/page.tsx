@@ -67,10 +67,7 @@ export default function DispatchPage() {
         }
     };
 
-    const handleCancelDispatch = async (orderId: string) => {
-        if (!window.confirm('¿Está seguro de anular el despacho? Todos los productos despachados volverán al inventario y el pedido quedará listo para ser despachado nuevamente.')) {
-            return;
-        }
+    const executeCancelDispatch = async (orderId: string) => {
         try {
             toast.loading('Anulando despacho y devolviendo productos al inventario...', { id: 'cancelDispatch' });
             await api.patch(`/orders/${orderId}/cancel-dispatch`);
@@ -79,6 +76,39 @@ export default function DispatchPage() {
         } catch (error: any) {
             toast.error(error.response?.data?.message || 'Error al anular despacho', { id: 'cancelDispatch' });
         }
+    };
+
+    const handleCancelDispatch = (orderId: string) => {
+        toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col p-6 border border-gray-100`}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-black text-gray-900 text-lg uppercase tracking-tight">Anular Despacho</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    ¿Está seguro de anular el despacho? Todos los productos volverán al inventario y el pedido quedará listo para ser despachado nuevamente.
+                </p>
+                <div className="flex gap-3 justify-end">
+                    <button 
+                        onClick={() => toast.dismiss(t.id)} 
+                        className="px-5 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-gray-200 transition"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            executeCancelDispatch(orderId);
+                        }} 
+                        className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-rose-700 transition shadow-lg shadow-rose-200"
+                    >
+                        Sí, Anular
+                    </button>
+                </div>
+            </div>
+        ), { duration: Infinity });
     };
 
 

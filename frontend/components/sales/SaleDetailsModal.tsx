@@ -199,10 +199,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
         }
     };
 
-    const handleAnnulSale = async () => {
-        if (!window.confirm('¿Está seguro de anular esta venta? Esto revertirá el pedido a estado DESPACHADO para que pueda ser generado nuevamente.')) {
-            return;
-        }
+    const executeAnnulSale = async () => {
         try {
             toast.loading('Anulando venta...', { id: 'annul' });
             await api.delete(`/sales/${saleId}`);
@@ -213,10 +210,40 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
         }
     };
 
-    const handleAnnulSaleAndDispatch = async () => {
-        if (!window.confirm('¿Está seguro de anular esta venta Y devolver los productos al inventario? El pedido volverá a estado PENDIENTE para despachar nuevamente.')) {
-            return;
-        }
+    const handleAnnulSale = () => {
+        toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col p-6 border border-gray-100`}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-black text-gray-900 text-lg uppercase tracking-tight">Anular Venta</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    ¿Está seguro de anular esta venta? Esto revertirá el pedido a estado DESPACHADO para que pueda ser generado nuevamente.
+                </p>
+                <div className="flex gap-3 justify-end">
+                    <button 
+                        onClick={() => toast.dismiss(t.id)} 
+                        className="px-5 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-gray-200 transition"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            executeAnnulSale();
+                        }} 
+                        className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-rose-700 transition shadow-lg shadow-rose-200"
+                    >
+                        Sí, Anular
+                    </button>
+                </div>
+            </div>
+        ), { duration: Infinity });
+    };
+
+    const executeAnnulSaleAndDispatch = async () => {
         try {
             toast.loading('Anulando venta y devolviendo productos...', { id: 'annul' });
             await api.delete(`/sales/${saleId}?revertDispatch=true`);
@@ -225,6 +252,39 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
         } catch (error: any) {
             toast.error(error.response?.data?.message || 'Error al anular', { id: 'annul' });
         }
+    };
+
+    const handleAnnulSaleAndDispatch = () => {
+        toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col p-6 border border-gray-100`}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <h3 className="font-black text-gray-900 text-lg uppercase tracking-tight">Anular Venta y Despacho</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    ¿Está seguro de anular esta venta Y devolver los productos al inventario? El pedido volverá a estado PENDIENTE para despachar nuevamente.
+                </p>
+                <div className="flex gap-3 justify-end">
+                    <button 
+                        onClick={() => toast.dismiss(t.id)} 
+                        className="px-5 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-gray-200 transition"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            executeAnnulSaleAndDispatch();
+                        }} 
+                        className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-rose-700 transition shadow-lg shadow-rose-200"
+                    >
+                        Sí, Anular Todo
+                    </button>
+                </div>
+            </div>
+        ), { duration: Infinity });
     };
 
     const getVoucherHTML = () => {
