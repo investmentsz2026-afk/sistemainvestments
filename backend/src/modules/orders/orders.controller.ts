@@ -42,6 +42,11 @@ export class OrdersController {
     return this.ordersService.dispatch(id, req.user, data);
   }
 
+  @Patch(':id/cancel-dispatch')
+  cancelDispatch(@Param('id') id: string, @Req() req: any) {
+    return this.ordersService.cancelDispatch(id, req.user);
+  }
+
   @Patch(':id/complete')
   completeOrder(@Param('id') id: string, @Req() req: any, @Body() data: any) {
     return this.ordersService.completeOrder(id, req.user, data);

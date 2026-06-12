@@ -313,6 +313,82 @@ export class OrdersService {
     return await this.findOne(id);
   }
 
+  async cancelDispatch(id: string, user: any) {
+    if (user.role !== 'ADMIN' && user.role !== 'LOGISTICA' && user.role !== 'COMERCIAL') {
+      throw new BadRequestException('No tienes permisos para anular despachos');
+    }
+
+    const order = await (this.prisma as any).order.findUnique({
+      where: { id }
+    });
+
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.status !== 'DESPACHADO') {
+      throw new BadRequestException('Solo se pueden anular pedidos en estado DESPACHADO');
+    }
+
+    const dispatchDetails = order.dispatchDetails || [];
+    
+    // Process each item to revert inventory
+    for (const item of dispatchDetails) {
+      if (!item.variantId || !item.quantity) continue;
+      
+      const variant = await this.prisma.productVariant.findUnique({
+        where: { id: item.variantId }
+      });
+      
+      if (!variant) continue;
+      
+      const previousStock = variant.stock;
+      const newStock = previousStock + item.quantity;
+      
+      await this.prisma.productVariant.update({
+        where: { id: item.variantId },
+        data: { stock: newStock }
+      });
+      
+      await this.prisma.movement.create({
+        data: {
+          type: 'ENTRY',
+          quantity: item.quantity,
+          reason: `Anulación de Despacho - Pedido #${order.orderNumber || order.id.slice(-6)}`,
+          reference: order.id,
+          previousStock,
+          newStock,
+          variantId: variant.id,
+          userId: user.id
+        }
+      });
+    }
+
+    // Reset order item dispatched quantities
+    const orderItems = await (this.prisma as any).orderItem.findMany({
+      where: { orderId: id }
+    });
+    
+    for (const oi of orderItems) {
+      await (this.prisma as any).orderItem.update({
+        where: { id: oi.id },
+        data: {
+          dispS28: 0, dispM30: 0, dispL32: 0, dispXL34: 0, dispXXL36: 0,
+          dispSize38: 0, dispSize40: 0, dispSize42: 0, dispSize44: 0, dispSize46: 0,
+          dispQuantity: 0
+        }
+      });
+    }
+
+    // Reset order status
+    await (this.prisma as any).order.update({
+      where: { id },
+      data: { 
+        status: 'EN_LOGISTICA',
+        dispatchDetails: [] 
+      }
+    });
+
+    return { success: true, message: 'Despacho anulado correctamente. Productos regresaron al inventario.' };
+  }
+
   async sendToLogistics(id: string, user: any) {
     const order = await this.findOne(id);
     

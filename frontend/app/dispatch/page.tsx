@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { NotaPedidoModal } from '../../components/orders/NotaPedidoModal';
+import toast from 'react-hot-toast';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -59,11 +60,27 @@ export default function DispatchPage() {
             const allOrders = resp.data || [];
             setOrders(allOrders);
         } catch (error) {
-            console.error('Error fetching orders for dispatch:', error);
+            console.error('Error fetching orders:', error);
+            toast.error('Error al cargar pedidos');
         } finally {
             setIsLoading(false);
         }
     };
+
+    const handleCancelDispatch = async (orderId: string) => {
+        if (!window.confirm('¿Está seguro de anular el despacho? Todos los productos despachados volverán al inventario y el pedido quedará listo para ser despachado nuevamente.')) {
+            return;
+        }
+        try {
+            toast.loading('Anulando despacho y devolviendo productos al inventario...', { id: 'cancelDispatch' });
+            await api.patch(`/orders/${orderId}/cancel-dispatch`);
+            toast.success('Despacho anulado correctamente', { id: 'cancelDispatch' });
+            fetchOrders();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Error al anular despacho', { id: 'cancelDispatch' });
+        }
+    };
+
 
     const handleView = (order: any) => {
         setSelectedOrder(order);
@@ -297,12 +314,20 @@ export default function DispatchPage() {
                                             )}
 
                                             {order.status === 'DESPACHADO' && (
-                                                <Link 
-                                                    href={`/dispatch/${order.id}/invoice`}
-                                                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl transition-all shadow-xl shadow-emerald-100 flex items-center gap-2 uppercase tracking-widest scale-up active:scale-95"
-                                                >
-                                                    <FileText className="w-4 h-4" /> Generar Boleta
-                                                </Link>
+                                                <>
+                                                    <button 
+                                                        onClick={() => handleCancelDispatch(order.id)}
+                                                        className="px-8 py-4 bg-rose-100 hover:bg-rose-200 text-rose-600 text-xs font-black rounded-2xl transition-all shadow-sm shadow-rose-100/50 flex items-center gap-2 uppercase tracking-widest scale-up active:scale-95"
+                                                    >
+                                                        <XCircle className="w-4 h-4" /> Anular Despacho
+                                                    </button>
+                                                    <Link 
+                                                        href={`/dispatch/${order.id}/invoice`}
+                                                        className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl transition-all shadow-xl shadow-emerald-100 flex items-center gap-2 uppercase tracking-widest scale-up active:scale-95"
+                                                    >
+                                                        <FileText className="w-4 h-4" /> Generar Boleta
+                                                    </Link>
+                                                </>
                                             )}
                                         </div>
                                     </div>
