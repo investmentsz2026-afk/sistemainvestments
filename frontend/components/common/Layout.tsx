@@ -381,7 +381,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <div className={`${lgPaddingLeftClass} pt-16`}>
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-4 sm:p-6 lg:px-4 lg:py-6">
           {children}
         </main>
       </div>

@@ -430,7 +430,6 @@ export default function SalesPage() {
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto</th>
-                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
@@ -441,13 +440,13 @@ export default function SalesPage() {
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-20 text-center">
+                                        <td colSpan={9} className="px-4 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
+                                        <td colSpan={9} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => (
@@ -474,9 +473,6 @@ export default function SalesPage() {
                                             </td>
                                             <td className="px-4 py-4">
                                                 <span className="text-sm font-black text-gray-900">S/ {sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </td>
-                                            <td className="px-4 py-4">
-                                                <span className="text-xs font-bold text-gray-500">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
