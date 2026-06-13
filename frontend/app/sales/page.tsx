@@ -426,87 +426,87 @@ export default function SalesPage() {
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50">
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">ID / Factura</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">SUNAT</th>
-                                    <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">ID / Factura</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Monto</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vendedor</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Venta</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">SUNAT</th>
+                                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={10} className="px-8 py-20 text-center">
+                                        <td colSpan={10} className="px-4 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={10} className="px-8 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
+                                        <td colSpan={10} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => (
                                         <tr key={sale.id} className="hover:bg-gray-50/50 transition duration-150 group">
-                                            <td className="px-8 py-6">
+                                            <td className="px-4 py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="font-mono text-xs font-black text-indigo-600 uppercase">#{sale.id.slice(-6)}</span>
-                                                    <span className="text-sm font-bold text-gray-900 mt-0.5">{sale.invoiceNumber || 'Sin Factura'}</span>
+                                                    <span className="font-mono text-[10px] font-black text-indigo-600 uppercase">#{sale.id.slice(-6)}</span>
+                                                    <span className="text-xs font-bold text-gray-900 mt-0.5">{sale.invoiceNumber || 'Sin Factura'}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center font-black text-gray-400 text-xs">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center font-black text-gray-400 text-[10px]">
                                                         {sale.client?.name?.charAt(0) || 'C'}
                                                     </div>
-                                                    <span className="font-bold text-gray-900">{sale.client?.name || 'Cliente Varios'}</span>
+                                                    <span className="font-bold text-gray-900 text-xs">{sale.client?.name || 'Cliente Varios'}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex items-center gap-2 text-sm font-bold text-gray-500" suppressHydrationWarning>
-                                                    <Calendar className="w-4 h-4" />
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500" suppressHydrationWarning>
+                                                    <Calendar className="w-3.5 h-3.5" />
                                                     {formatDate(sale.createdAt)}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <span className="text-lg font-black text-gray-900">S/ {sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            <td className="px-4 py-4">
+                                                <span className="text-sm font-black text-gray-900">S/ {sale.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <span className="text-sm font-bold text-gray-500">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                            <td className="px-4 py-4">
+                                                <span className="text-xs font-bold text-gray-500">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex items-center gap-2 text-sm font-bold text-gray-600">
-                                                    <User className="w-4 h-4" />
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600">
+                                                    <User className="w-3 h-3" />
                                                     {sale.seller?.name}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                    sale.status === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                                            <td className="px-4 py-4">
+                                                <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
+                                                    sale.status === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
                                                 }`}>
                                                     {sale.status}
                                                 </span>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                    sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-500 text-white' : 
-                                                    sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
+                                            <td className="px-4 py-4">
+                                                <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
+                                                    sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                    sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                                                 }`}>
                                                     {sale.paymentStatus || 'PENDIENTE'}
                                                 </span>
                                             </td>
-                                            <td className="px-8 py-6">
-                                                <div className="flex items-center gap-3">
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-2">
                                                     {sale.invoiceNumber ? (
                                                         <>
                                                             <span 
-                                                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest cursor-help ${
-                                                                    sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600' :
-                                                                    sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'
+                                                                className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest cursor-help ${
+                                                                    sale.sunatStatus === 'ACEPTADO' || sale.sunatStatus === 'ENVIADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                                    sale.sunatStatus === 'ERROR' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-400 border-gray-200'
                                                                 }`}
                                                                 title={sale.sunatResponse || (sale.sunatStatus === 'ERROR' ? 'Error desconocido' : '')}
                                                             >
@@ -518,7 +518,7 @@ export default function SalesPage() {
                                                                         e.stopPropagation();
                                                                         handleSendToSunat(sale.id);
                                                                     }}
-                                                                    className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+                                                                    className="p-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition shadow-sm"
                                                                     title="Enviar a SUNAT"
                                                                 >
                                                                     <Send className="w-3 h-3" />
@@ -526,27 +526,27 @@ export default function SalesPage() {
                                                             )}
                                                         </>
                                                     ) : (
-                                                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                                                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">
                                                             N/A
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
+                                            <td className="px-4 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
                                                     <button 
                                                         onClick={() => openPayments(sale.id)}
-                                                        className="p-2 border border-emerald-100 rounded-xl text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-200 shadow-sm transition group-hover:scale-110 flex items-center gap-2 px-4 whitespace-nowrap"
+                                                        className="p-1.5 border border-emerald-100 rounded-lg text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-200 shadow-sm transition flex items-center gap-1 px-2 whitespace-nowrap"
                                                     >
-                                                        <Wallet className="w-4 h-4" />
-                                                        <span className="text-xs font-black uppercase">Pagos</span>
+                                                        <Wallet className="w-3 h-3" />
+                                                        <span className="text-[10px] font-black uppercase">Pagos</span>
                                                     </button>
                                                     <button 
                                                         onClick={() => openDetails(sale.id)}
-                                                        className="p-2 border border-gray-100 rounded-xl text-indigo-600 hover:bg-indigo-50 hover:border-indigo-100 shadow-sm transition group-hover:scale-110 flex items-center gap-2 px-4"
+                                                        className="p-1.5 border border-gray-100 rounded-lg text-indigo-600 hover:bg-indigo-50 hover:border-indigo-100 shadow-sm transition flex items-center gap-1 px-2"
                                                     >
-                                                        <Eye className="w-4 h-4" />
-                                                        <span className="text-xs font-black uppercase">Ver</span>
+                                                        <Eye className="w-3 h-3" />
+                                                        <span className="text-[10px] font-black uppercase">Ver</span>
                                                     </button>
                                                 </div>
                                             </td>
