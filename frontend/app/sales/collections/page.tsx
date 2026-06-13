@@ -296,25 +296,25 @@ export default function CollectionsPage() {
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-gray-50/50">
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Factura / Fecha</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Pagado</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo</th>
-                                    <th className="px-8 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Estado</th>
-                                    <th className="px-8 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Factura / Fecha</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Pagado</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Estado</th>
+                                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                        <td colSpan={7} className="px-4 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center opacity-50 italic">No se encontraron ventas para cobrar</td>
+                                        <td colSpan={7} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas para cobrar</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => {
@@ -322,59 +322,59 @@ export default function CollectionsPage() {
                                         const balance = sale.totalAmount - paid;
                                         return (
                                             <tr key={sale.id} className="hover:bg-gray-50/50 transition duration-150 group">
-                                                <td className="px-8 py-6">
+                                                <td className="px-4 py-4">
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-bold text-gray-900">{sale.invoiceNumber || 'Sin Factura'}</span>
                                                         <span className="text-[10px] font-bold text-gray-400 mt-0.5" suppressHydrationWarning>{new Date(sale.createdAt).toLocaleDateString()}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-6 font-bold text-gray-900">
+                                                <td className="px-4 py-4 font-bold text-gray-900 text-sm">
                                                     {sale.client?.name || 'Cliente Varios'}
                                                 </td>
-                                                <td className="px-8 py-6 font-black text-gray-900">
+                                                <td className="px-4 py-4 font-black text-gray-900 text-sm">
                                                     S/ {sale.totalAmount.toLocaleString()}
                                                 </td>
-                                                <td className="px-8 py-6 font-bold text-emerald-600">
+                                                <td className="px-4 py-4 font-bold text-emerald-600 text-sm">
                                                     S/ {paid.toLocaleString()}
                                                 </td>
-                                                <td className="px-8 py-6">
+                                                <td className="px-4 py-4 text-sm">
                                                     <span className={`font-black ${balance > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
                                                         S/ {balance.toLocaleString()}
                                                     </span>
                                                 </td>
-                                                <td className="px-8 py-6">
-                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                                <td className="px-4 py-4">
+                                                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
                                                         sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600' : 
                                                         sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
                                                     }`}>
                                                         {sale.paymentStatus || 'PENDIENTE'}
                                                     </span>
                                                 </td>
-                                                <td className="px-8 py-6 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
+                                                <td className="px-4 py-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
                                                         <button 
                                                             onClick={() => openDetails(sale.id)}
-                                                            className="p-2 border border-gray-100 rounded-xl text-gray-600 hover:bg-gray-50 transition flex items-center gap-2 px-4 whitespace-nowrap"
+                                                            className="p-1.5 border border-gray-100 rounded-xl text-gray-600 hover:bg-gray-50 transition flex items-center gap-1.5 px-3 whitespace-nowrap"
                                                             title="Ver Detalles"
                                                         >
-                                                            <Eye className="w-4 h-4" />
-                                                            <span className="text-xs font-black uppercase">Detalles</span>
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                            <span className="text-[10px] font-black uppercase">Detalles</span>
                                                         </button>
                                                         <button 
                                                             onClick={() => downloadCollectionNote(sale)}
-                                                            className="p-2 bg-indigo-600 rounded-xl text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center gap-2 px-4 whitespace-nowrap"
+                                                            className="p-1.5 bg-indigo-600 rounded-xl text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition flex items-center gap-1.5 px-3 whitespace-nowrap"
                                                             title="Descargar PDF"
                                                         >
-                                                            <FileText className="w-4 h-4" />
-                                                            <span className="text-xs font-black uppercase">PDF</span>
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                            <span className="text-[10px] font-black uppercase">PDF</span>
                                                         </button>
                                                         <button 
                                                             onClick={() => downloadCollectionExcel(sale)}
-                                                            className="p-2 bg-emerald-600 rounded-xl text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center gap-2 px-4 whitespace-nowrap"
+                                                            className="p-1.5 bg-emerald-600 rounded-xl text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center gap-1.5 px-3 whitespace-nowrap"
                                                             title="Descargar Excel"
                                                         >
-                                                            <Download className="w-4 h-4" />
-                                                            <span className="text-xs font-black uppercase">Excel</span>
+                                                            <Download className="w-3.5 h-3.5" />
+                                                            <span className="text-[10px] font-black uppercase">Excel</span>
                                                         </button>
                                                     </div>
                                                 </td>
