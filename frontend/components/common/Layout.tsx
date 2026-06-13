@@ -113,6 +113,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ] : []),
   ];
 
+  const isComercialOrVendedor = user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
+  const sidebarWidthClass = isComercialOrVendedor ? 'w-48' : 'w-56';
+  const lgSidebarWidthClass = isComercialOrVendedor ? 'lg:w-48' : 'lg:w-56';
+  const lgPaddingLeftClass = isComercialOrVendedor ? 'lg:pl-48' : 'lg:pl-56';
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
@@ -197,7 +202,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Mobile Sidebar */}
       <div className={`lg:hidden fixed inset-0 z-50 ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 w-56 bg-white shadow-xl">
+        <div className={`fixed inset-y-0 left-0 ${sidebarWidthClass} bg-white shadow-xl`}>
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <Link href="/" onClick={() => setSidebarOpen(false)}>
               <img src="/logo.jpeg" alt="Logo" className="h-8 w-auto rounded-lg object-contain" />
@@ -285,7 +290,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-56 lg:flex-col">
+      <div className={`hidden lg:fixed lg:inset-y-0 lg:flex ${lgSidebarWidthClass} lg:flex-col`}>
         <div className="flex flex-col flex-1 min-h-0 bg-white border-r">
           <div className="flex items-center h-16 px-4 border-b bg-white">
             {/* Logo will be shown in the Top Nav instead for better visibility */}
@@ -375,7 +380,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <div className="lg:pl-56 pt-16">
+      <div className={`${lgPaddingLeftClass} pt-16`}>
         <main className="p-4 sm:p-6 lg:p-8">
           {children}
         </main>
