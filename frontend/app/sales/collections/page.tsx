@@ -62,28 +62,29 @@ export default function CollectionsPage() {
     };
 
     const downloadCollectionNote = (sale: any) => {
-        const doc = new jsPDF('l', 'mm', 'a4'); // Horizontal for the wide table
+        const doc = new jsPDF('p', 'mm', 'a4'); // Vertical
         const pageWidth = doc.internal.pageSize.width;
 
-        // Header - Simple and Bold like the image
+        // Header - Simple and Bold
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.text('NOTA DE COBRANZA', 15, 15);
 
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         const dateStr = new Date(sale.createdAt).toLocaleDateString('es-PE');
-        doc.text(`FECHA: ${dateStr}`, 15, 25);
-        doc.text(`FACTURA: ${sale.invoiceNumber || 'S/N'}`, pageWidth / 3, 25);
+        doc.text(`FECHA: ${dateStr}`, 15, 23);
+        doc.text(`FACTURA: ${sale.invoiceNumber || 'S/N'}`, pageWidth / 2 - 20, 23);
+        doc.text(`GUÍA: ${sale.referralGuide || 'S/N'}`, pageWidth / 2 + 30, 23);
         
-        doc.text(`CLIENTE: ${sale.client?.name || 'PUBLICO GENERAL'}`, 15, 33);
-        doc.text(`RUC: ${sale.client?.documentNumber || '---------'}`, 15, 41);
+        doc.text(`CLIENTE: ${sale.client?.name || 'PUBLICO GENERAL'}`, 15, 30);
+        doc.text(`RUC: ${sale.client?.documentNumber || '---------'}`, 15, 37);
         
         // Multiline address
         const address = sale.client?.address || 'Sin dirección registrada';
         const splitAddress = doc.splitTextToSize(`DIRECCIÓN: ${address}`, pageWidth - 30);
-        doc.text(splitAddress, 15, 49);
+        doc.text(splitAddress, 15, 44);
 
-        const tableStartY = 57 + (splitAddress.length * 5);
+        const tableStartY = 50 + (splitAddress.length * 4);
 
         // Grouping items by Product, Color & Price
         const grouped = (sale.items || []).reduce((acc: any, item: any) => {
@@ -144,27 +145,22 @@ export default function CollectionsPage() {
                 lineColor: [0, 0, 0] 
             },
             styles: { 
-                fontSize: 8, 
-                cellPadding: 2, 
+                fontSize: 7, 
+                cellPadding: 1.5, 
                 textColor: [0, 0, 0],
                 font: 'helvetica'
             },
             columnStyles: {
-                0: { cellWidth: 15, fontStyle: 'bold' },
-                1: { cellWidth: 80, fontStyle: 'bold' },
-                ...Object.fromEntries(sizeColumns.map((_, i) => [i + 2, { cellWidth: 10, halign: 'center' }])),
-                12: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
-                13: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+                0: { cellWidth: 10, fontStyle: 'bold' },
+                1: { cellWidth: 50, fontStyle: 'bold' },
+                ...Object.fromEntries(sizeColumns.map((_, i) => [i + 2, { cellWidth: 7, halign: 'center' }])),
+                12: { cellWidth: 14, halign: 'right', fontStyle: 'bold' },
+                13: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
             },
             didParseCell: (data) => {
                 // Formatting for the last total row
                 if (data.row.index === tableBody.length - 1) {
                     data.cell.styles.fontStyle = 'bold';
-                    if (data.column.index === 0 || data.column.index === 13) {
-                       // Keep it bold
-                    } else {
-                        // data.cell.text = ['']; // Keep other cells empty if needed
-                    }
                 }
             }
         });
