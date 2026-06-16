@@ -248,7 +248,7 @@ export default function SalesPage() {
                 </div>
 
                 {/* STATS SUMMARY */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-6`}>
                     <div className={`${cardClass} p-8 flex items-center gap-6`}>
                         <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center">
                             <ArrowUpRight className="w-8 h-8 text-emerald-600" />
@@ -258,24 +258,28 @@ export default function SalesPage() {
                             <h3 className="text-3xl font-black text-gray-900">S/ {totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
                     </div>
-                    <div className={`${cardClass} p-8 flex items-center gap-6`}>
-                        <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center">
-                            <ArrowUpRight className="w-8 h-8 text-rose-600" style={{ transform: 'rotate(90deg)' }} />
-                        </div>
-                        <div>
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Costo Total</p>
-                            <h3 className="text-3xl font-black text-gray-900">S/ {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
-                        </div>
-                    </div>
-                    <div className={`${cardClass} p-8 flex items-center gap-6`}>
-                        <div className="w-16 h-16 bg-indigo-50 rounded-3xl flex items-center justify-center">
-                            <ArrowUpRight className="w-8 h-8 text-indigo-600" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Utilidad Estimada</p>
-                            <h3 className="text-3xl font-black text-gray-900">S/ {totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
-                        </div>
-                    </div>
+                    {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                        <>
+                            <div className={`${cardClass} p-8 flex items-center gap-6`}>
+                                <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center">
+                                    <ArrowUpRight className="w-8 h-8 text-rose-600" style={{ transform: 'rotate(90deg)' }} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Costo Total</p>
+                                    <h3 className="text-3xl font-black text-gray-900">S/ {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                                </div>
+                            </div>
+                            <div className={`${cardClass} p-8 flex items-center gap-6`}>
+                                <div className="w-16 h-16 bg-indigo-50 rounded-3xl flex items-center justify-center">
+                                    <ArrowUpRight className="w-8 h-8 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Utilidad Estimada</p>
+                                    <h3 className="text-3xl font-black text-gray-900">S/ {totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                                </div>
+                            </div>
+                        </>
+                    )}
                     <div className={`${cardClass} p-8 flex items-center gap-6`}>
                         <div className="w-16 h-16 bg-blue-50 rounded-3xl flex items-center justify-center">
                             <ShoppingBag className="w-8 h-8 text-blue-600" />
