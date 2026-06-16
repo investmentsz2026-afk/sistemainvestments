@@ -37,6 +37,21 @@ export class SalesController {
     return this.salesService.updateClient(req.user, id, data);
   }
 
+  @Get('payments/pending')
+  getPendingPayments() {
+    return this.salesService.getPendingPayments();
+  }
+
+  @Post('payments/:paymentId/approve')
+  approvePayment(@Param('paymentId') paymentId: string) {
+    return this.salesService.approvePayment(paymentId);
+  }
+
+  @Post('payments/:paymentId/reject')
+  rejectPayment(@Param('paymentId') paymentId: string) {
+    return this.salesService.rejectPayment(paymentId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);
@@ -48,13 +63,13 @@ export class SalesController {
   }
 
   @Post(':id/payments')
-  addPayment(@Param('id') id: string, @Body() data: any) {
-    return this.salesService.addPayment(id, data);
+  addPayment(@Param('id') id: string, @Req() req: any, @Body() data: any) {
+    return this.salesService.addPayment(id, data, req.user);
   }
 
   @Patch(':id/finalize')
-  finalizePayment(@Param('id') id: string) {
-    return this.salesService.finalizePayment(id);
+  finalizePayment(@Param('id') id: string, @Req() req: any) {
+    return this.salesService.finalizePayment(id, req.user);
   }
 
   @Get('clients/lookup/:docType/:docNum')

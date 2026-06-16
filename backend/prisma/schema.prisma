@@ -438,6 +438,9 @@ model SalePayment {
   method          String   // EFECTIVO, TRANSFERENCIA, etc.
   evidenceUrl     String?  @map("evidence_url") // Voucher image
   notes           String?  @db.Text
+  status          String   @default("APROBADO") // APROBADO, PENDIENTE, RECHAZADO
+  registeredById  String?  @map("registered_by_id")
+  registeredByName String? @map("registered_by_name")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-hot-toast';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -104,7 +105,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         const numericAmount = parseFloat(amount);
         if (!amount || numericAmount <= 0) return;
 
-        const totalPaid = sale?.payments?.reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
         const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
 
         if (numericAmount > pendingAmount) {
@@ -113,6 +114,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         }
 
         setIsSubmitting(true);
+        const isVendor = user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
         try {
             await api.post(`/sales/${saleId}/payments`, {
                 amount: numericAmount,
@@ -128,12 +130,18 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             setEvidenceUrl('');
             setShowAddForm(false);
             
+            if (isVendor) {
+                toast.success('Abono registrado. En espera de confirmación por el área Comercial.', { duration: 6000 });
+            } else {
+                toast.success('Abono registrado correctamente.');
+            }
+
             // Refresh data
             await fetchSaleDetails();
             if (onUpdate) onUpdate();
         } catch (error) {
             console.error('Error adding payment:', error);
-            alert('Error al registrar el pago');
+            toast.error('Error al registrar el pago');
         } finally {
             setIsSubmitting(false);
         }
@@ -141,13 +149,20 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
     const handleFinalize = async () => {
         setIsSubmitting(true);
+        const isVendor = user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
         try {
             await api.patch(`/sales/${saleId}/finalize`);
             setShowConfirmLiquidation(false);
+            if (isVendor) {
+                toast.success('Liquidación registrada. En espera de confirmación por el área Comercial.', { duration: 6000 });
+            } else {
+                toast.success('Operación finalizada y venta liquidada.');
+            }
             await fetchSaleDetails();
             if (onUpdate) onUpdate();
         } catch (error) {
             console.error('Error finalizing sale:', error);
+            toast.error('Error al liquidar la venta');
         } finally {
             setIsSubmitting(false);
         }
@@ -155,7 +170,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
     if (!isOpen) return null;
 
-    const totalPaid = sale?.payments?.reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+    const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
     const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
     const isCompleted = sale?.paymentStatus === 'CANCELADO';
 
@@ -269,34 +284,74 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 initial={{ opacity: 0, scale: 0.98 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 key={payment.id} 
-                                                className="bg-white border border-slate-100 p-4 rounded-[1.5rem] flex items-center justify-between group hover:border-indigo-100 transition-all shadow-sm"
+                                                className={`bg-white border p-4 rounded-[1.5rem] group transition-all shadow-sm ${
+                                                    payment.status === 'RECHAZADO' 
+                                                        ? 'border-rose-200 bg-rose-50/30' 
+                                                        : 'border-slate-100 hover:border-indigo-100'
+                                                }`}
                                             >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-500 shadow-inner">
-                                                        <DollarSign className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2 mb-0.5">
-                                                            <span className="text-sm font-black text-slate-900 font-mono">S/ {payment.amount.toLocaleString()}</span>
-                                                            <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase ${
-                                                                payment.method === 'LIQUIDACION' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
-                                                            }`}>
-                                                                {payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
-                                                            </span>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${
+                                                            payment.status === 'RECHAZADO' 
+                                                                ? 'bg-rose-100 text-rose-500' 
+                                                                : 'bg-slate-50 text-indigo-500'
+                                                        }`}>
+                                                            <DollarSign className="w-5 h-5" />
                                                         </div>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest" suppressHydrationWarning>
-                                                            {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-                                                        </p>
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className="text-sm font-black text-slate-900 font-mono">S/ {payment.amount.toLocaleString()}</span>
+                                                                <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                                                    payment.method === 'LIQUIDACION' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
+                                                                }`}>
+                                                                    {payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
+                                                                </span>
+                                                                <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase border ${
+                                                                    payment.status === 'APROBADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                                    payment.status === 'RECHAZADO' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                                    'bg-amber-50 text-amber-600 border-amber-100'
+                                                                }`}>
+                                                                    {payment.status === 'APROBADO' ? 'CONFIRMADO' :
+                                                                     payment.status === 'RECHAZADO' ? 'RECHAZADO' : 'PENDIENTE'}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest" suppressHydrationWarning>
+                                                                {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                        </div>
                                                     </div>
+                                                    {payment.evidenceUrl && (
+                                                        <a 
+                                                            href={`${SERVER_URL}${payment.evidenceUrl}`} 
+                                                            target="_blank" 
+                                                            className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                        >
+                                                            <ImageIcon className="w-4 h-4" />
+                                                        </a>
+                                                    )}
                                                 </div>
-                                                {payment.evidenceUrl && (
-                                                    <a 
-                                                        href={`${SERVER_URL}${payment.evidenceUrl}`} 
-                                                        target="_blank" 
-                                                        className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all flex items-center justify-center shadow-sm"
-                                                    >
-                                                        <ImageIcon className="w-4 h-4" />
-                                                    </a>
+                                                {payment.status === 'RECHAZADO' && (
+                                                    <div className="mt-3 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5">
+                                                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-rose-700 uppercase tracking-wider">Rechazado por Comercial</p>
+                                                            <p className="text-[9px] text-rose-500 font-bold leading-snug mt-0.5">
+                                                                Este cobro fue rechazado. Puede registrar un nuevo abono con los datos correctos.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {payment.status === 'PENDIENTE' && (
+                                                    <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5">
+                                                        <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider">En espera de confirmación</p>
+                                                            <p className="text-[9px] text-amber-500 font-bold leading-snug mt-0.5">
+                                                                Este cobro será revisado y aprobado por el área Comercial.
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </motion.div>
                                         ))

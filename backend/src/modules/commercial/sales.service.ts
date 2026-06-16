@@ -223,7 +223,7 @@ export class SalesService {
     return sale;
   }
 
-  async addPayment(saleId: string, data: any) {
+  async addPayment(saleId: string, data: any, currentUser?: any) {
     const { amount, method, notes, evidenceUrl } = data;
 
     const sale = await this.prisma.sale.findUnique({
@@ -232,6 +232,8 @@ export class SalesService {
     });
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
 
     return await this.prisma.$transaction(async (tx) => {
       // Create payment
@@ -242,28 +244,36 @@ export class SalesService {
           method: method || 'EFECTIVO',
           notes,
           evidenceUrl,
+          status: isVendor ? 'PENDIENTE' : 'APROBADO',
+          registeredById: currentUser?.id || null,
+          registeredByName: currentUser?.name || null,
         }
       });
 
-      // Calculate total paid including the new payment
-      const existingTotal = sale.payments.reduce((acc, p) => acc + p.amount, 0);
-      const newTotalPaid = existingTotal + parseFloat(amount);
+      // If registered by a vendor, the payment remains pending and doesn't update sale status
+      if (!isVendor) {
+        // Calculate total paid including the new payment (only approved ones)
+        const existingTotal = sale.payments
+          .filter(p => p.status === 'APROBADO')
+          .reduce((acc, p) => acc + p.amount, 0);
+        const newTotalPaid = existingTotal + parseFloat(amount);
 
-      let paymentStatus = 'PARCIAL';
-      if (newTotalPaid >= sale.totalAmount) {
-        paymentStatus = 'CANCELADO';
+        let paymentStatus = 'PARCIAL';
+        if (newTotalPaid >= sale.totalAmount) {
+          paymentStatus = 'CANCELADO';
+        }
+
+        await tx.sale.update({
+          where: { id: saleId },
+          data: { paymentStatus }
+        });
       }
-
-      await tx.sale.update({
-        where: { id: saleId },
-        data: { paymentStatus }
-      });
 
       return payment;
     });
   }
 
-  async finalizePayment(saleId: string) {
+  async finalizePayment(saleId: string, currentUser?: any) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: { payments: true }
@@ -271,8 +281,12 @@ export class SalesService {
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
-    const totalPaid = sale.payments.reduce((acc, p) => acc + p.amount, 0);
+    const totalPaid = sale.payments
+      .filter(p => p.status === 'APROBADO')
+      .reduce((acc, p) => acc + p.amount, 0);
     const pendingAmount = sale.totalAmount - totalPaid;
+
+    const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
 
     return await this.prisma.$transaction(async (tx) => {
       // If there is a pending balance, record a liquidation payment
@@ -283,14 +297,89 @@ export class SalesService {
             amount: pendingAmount,
             method: 'LIQUIDACION',
             notes: 'Liquidación manual de saldo pendiente',
+            status: isVendor ? 'PENDIENTE' : 'APROBADO',
+            registeredById: currentUser?.id || null,
+            registeredByName: currentUser?.name || null,
           }
         });
       }
 
-      return await tx.sale.update({
-        where: { id: saleId },
-        data: { paymentStatus: 'CANCELADO' }
+      if (!isVendor) {
+        return await tx.sale.update({
+          where: { id: saleId },
+          data: { paymentStatus: 'CANCELADO' }
+        });
+      }
+
+      return sale;
+    });
+  }
+
+  async getPendingPayments() {
+    return this.prisma.salePayment.findMany({
+      where: { status: 'PENDIENTE' },
+      include: {
+        sale: {
+          include: {
+            client: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async approvePayment(paymentId: string) {
+    const payment = await this.prisma.salePayment.findUnique({
+      where: { id: paymentId },
+      include: { sale: { include: { payments: true } } },
+    });
+
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (payment.status !== 'PENDIENTE') {
+      throw new BadRequestException('El pago ya ha sido procesado');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Approve the payment
+      const approvedPayment = await tx.salePayment.update({
+        where: { id: paymentId },
+        data: { status: 'APROBADO' },
       });
+
+      // Calculate total paid including this newly approved payment
+      const existingApprovedTotal = payment.sale.payments
+        .filter(p => p.status === 'APROBADO' && p.id !== paymentId)
+        .reduce((acc, p) => acc + p.amount, 0);
+      const newTotalPaid = existingApprovedTotal + payment.amount;
+
+      let paymentStatus = 'PARCIAL';
+      if (newTotalPaid >= payment.sale.totalAmount) {
+        paymentStatus = 'CANCELADO';
+      }
+
+      await tx.sale.update({
+        where: { id: payment.saleId },
+        data: { paymentStatus },
+      });
+
+      return approvedPayment;
+    });
+  }
+
+  async rejectPayment(paymentId: string) {
+    const payment = await this.prisma.salePayment.findUnique({
+      where: { id: paymentId },
+    });
+
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (payment.status !== 'PENDIENTE') {
+      throw new BadRequestException('El pago ya ha sido procesado');
+    }
+
+    return this.prisma.salePayment.update({
+      where: { id: paymentId },
+      data: { status: 'RECHAZADO' },
     });
   }
 

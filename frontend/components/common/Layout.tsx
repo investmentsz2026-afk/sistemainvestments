@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/axios';
+import PaymentApprovalsModal from '../sales/PaymentApprovalsModal';
 import {
   Package,
   ShoppingCart,
@@ -46,13 +47,27 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [showApprovalsModal, setShowApprovalsModal] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'ADMIN' || user?.role === 'LOGISTICA' || user?.role === 'UDP' || user?.role === 'COMERCIAL') {
       fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 60000); // Check every minute
-      return () => clearInterval(interval);
     }
+    if (user?.role === 'ADMIN' || user?.role === 'COMERCIAL') {
+      fetchPendingApprovalsCount();
+    }
+
+    const interval = setInterval(() => {
+      if (user?.role === 'ADMIN' || user?.role === 'LOGISTICA' || user?.role === 'UDP' || user?.role === 'COMERCIAL') {
+        fetchUnreadCount();
+      }
+      if (user?.role === 'ADMIN' || user?.role === 'COMERCIAL') {
+        fetchPendingApprovalsCount();
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
   }, [user]);
 
   const fetchUnreadCount = async () => {
@@ -61,6 +76,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       setUnreadNotifications(resp.data.count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
+    }
+  };
+
+  const fetchPendingApprovalsCount = async () => {
+    try {
+      const resp = await api.get('/sales/payments/pending');
+      setPendingApprovals(resp.data.length || 0);
+    } catch (error) {
+      console.error('Error fetching pending approvals count:', error);
     }
   };
 
@@ -143,6 +167,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Right side icons */}
             <div className="flex items-center gap-4">
+              {/* Payment Approvals (Comercial and Admin only) */}
+              {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                <button 
+                  onClick={() => setShowApprovalsModal(true)}
+                  className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 relative transition-all duration-200"
+                  title="Aprobación de Cobros"
+                >
+                  <DollarSign className="w-5 h-5" />
+                  {pendingApprovals > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-pulse">
+                      {pendingApprovals}
+                    </span>
+                  )}
+                </button>
+              )}
+
               {/* Notifications */}
               <Link 
                 href={(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' || user?.role === 'UDP' || user?.role === 'COMERCIAL') ? '/notifications' : '#'}
@@ -457,6 +497,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Payment Approvals Modal */}
+      <PaymentApprovalsModal 
+        isOpen={showApprovalsModal} 
+        onClose={() => setShowApprovalsModal(false)} 
+        onUpdate={fetchPendingApprovalsCount} 
+      />
     </div>
   );
 };
