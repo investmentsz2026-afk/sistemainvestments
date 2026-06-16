@@ -17,6 +17,7 @@ import {
   RefreshCw,
   X,
   ChevronDown,
+  ChevronUp,
   Calendar,
   BarChart3,
   AlertTriangle,
@@ -59,6 +60,44 @@ export default function InventoryPage() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
+
+  // Estados para controlar visualización de variantes
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [expandAll, setExpandAll] = useState(false);
+
+  const toggleProductExpand = (productId: string) => {
+    setExpandedProducts(prev => ({
+      ...prev,
+      [productId]: !prev[productId]
+    }));
+  };
+
+  const handleToggleExpandAll = () => {
+    const nextExpandAll = !expandAll;
+    setExpandAll(nextExpandAll);
+    if (nextExpandAll) {
+      const newExpanded: Record<string, boolean> = {};
+      sortedProducts.forEach(p => {
+        newExpanded[p.id] = true;
+      });
+      setExpandedProducts(newExpanded);
+    } else {
+      setExpandedProducts({});
+    }
+  };
+
+  // Agrupar variantes por color
+  const getGroupedVariants = (variants: any[]) => {
+    const grouped: Record<string, any[]> = {};
+    variants.forEach(v => {
+      const color = v.color || 'Sin Color';
+      if (!grouped[color]) {
+        grouped[color] = [];
+      }
+      grouped[color].push(v);
+    });
+    return grouped;
+  };
   const [movementType, setMovementType] = useState<'ENTRY' | 'EXIT'>('ENTRY');
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
@@ -440,6 +479,20 @@ export default function InventoryPage() {
               <span className="hidden sm:inline">Filtros</span>
             </button>
 
+            <button
+              onClick={handleToggleExpandAll}
+              className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition ${expandAll
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              title={expandAll ? 'Contraer todas las variantes' : 'Expandir todas las variantes'}
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandAll ? 'rotate-180' : ''}`} />
+              <span className="hidden sm:inline">
+                {expandAll ? 'Contraer Variantes' : 'Expandir Variantes'}
+              </span>
+            </button>
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -684,23 +737,61 @@ export default function InventoryPage() {
                             {product.sku}
                           </code>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {product.variants.map((variant, idx) => (
-                              <div
-                                key={variant.id}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-xs"
-                                title={`Stock: ${variant.stock}`}
-                              >
-                                <span>{variant.size}</span>
-                                <span className="text-gray-400">/</span>
-                                <span>{variant.color}</span>
-                                <span className={`ml-1 font-medium ${variant.stock <= product.minStock ? 'text-yellow-600' : 'text-green-600'
-                                  }`}>
-                                  ({variant.stock})
-                                </span>
-                              </div>
-                            ))}
+                        <td className="px-6 py-4 min-w-[240px]">
+                          <div className="flex flex-col gap-2">
+                            {(() => {
+                              const grouped = getGroupedVariants(product.variants);
+                              const colors = Object.keys(grouped).sort();
+                              const isExpanded = !!expandedProducts[product.id];
+                              const visibleColors = isExpanded ? colors : colors.slice(0, 2);
+
+                              return (
+                                <>
+                                  <div className="space-y-2">
+                                    {visibleColors.map(color => (
+                                      <div key={color} className="flex items-start sm:items-center gap-2">
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-gray-100/80 border border-gray-200/50 px-2 py-0.5 rounded flex-shrink-0 w-24 truncate" title={color}>
+                                          {color}
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5 flex-1">
+                                          {grouped[color].map((v: any) => (
+                                            <span
+                                              key={v.id}
+                                              className="inline-flex items-center px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-medium text-gray-700 shadow-sm"
+                                              title={`SKU: ${v.variantSku}`}
+                                            >
+                                              <span>{v.size}</span>
+                                              <span className={`ml-1 font-bold ${v.stock <= product.minStock ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                                ({v.stock})
+                                              </span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {colors.length > 2 && (
+                                    <button
+                                      onClick={() => toggleProductExpand(product.id)}
+                                      className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 mt-1 self-start hover:underline transition-all"
+                                    >
+                                      {isExpanded ? (
+                                        <>
+                                          Contraer colores
+                                          <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform" />
+                                        </>
+                                      ) : (
+                                        <>
+                                          Ver {colors.length - 2} colores más
+                                          <ChevronDown className="w-3.5 h-3.5 transition-transform" />
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </td>
                         <td className="px-6 py-4">
