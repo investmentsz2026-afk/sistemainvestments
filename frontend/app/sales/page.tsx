@@ -512,7 +512,7 @@ export default function SalesPage() {
                                                             >
                                                                 {sale.sunatStatus || 'PENDIENTE'}
                                                             </span>
-                                                            {(sale.sunatStatus === 'PENDIENTE' || sale.sunatStatus === 'ERROR' || !sale.sunatStatus) && (
+                                                            {(sale.sunatStatus === 'PENDIENTE' || sale.sunatStatus === 'ERROR' || !sale.sunatStatus) && (user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();

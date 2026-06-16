@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -41,6 +42,7 @@ interface SaleDetailsModalProps {
 }
 
 export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetailsModalProps) {
+    const { user } = useAuth();
     const [sale, setSale] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -532,15 +534,17 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                     ) : (
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="text-xs font-black text-indigo-600">{sale.invoiceNumber || 'Sin comprobante'}</span>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setInvoiceValue(sale.invoiceNumber || '');
-                                                                    setIsEditingInvoice(true);
-                                                                }}
-                                                                className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
-                                                            >
-                                                                Editar
-                                                            </button>
+                                                            {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setInvoiceValue(sale.invoiceNumber || '');
+                                                                        setIsEditingInvoice(true);
+                                                                    }}
+                                                                    className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
+                                                                >
+                                                                    Editar
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -581,22 +585,26 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                         <div className="flex flex-col gap-1 items-end">
                                                             <div className="flex items-center gap-1.5">
                                                                 <span className="text-xs font-black text-gray-700">{sale.referralGuide || 'SIN GUIA'}</span>
-                                                                <button 
-                                                                    onClick={() => {
-                                                                        setGuideValue(sale.referralGuide || '');
-                                                                        setIsEditingGuide(true);
-                                                                    }}
-                                                                    className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
-                                                                >
-                                                                    {sale.referralGuide ? 'Editar Nro' : 'Agregar Nro'}
-                                                                </button>
+                                                                {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setGuideValue(sale.referralGuide || '');
+                                                                            setIsEditingGuide(true);
+                                                                        }}
+                                                                        className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase"
+                                                                    >
+                                                                        {sale.referralGuide ? 'Editar Nro' : 'Agregar Nro'}
+                                                                    </button>
+                                                                )}
                                                             </div>
-                                                            <button 
-                                                                onClick={() => setShowGreForm(true)}
-                                                                className="text-[9px] px-2 py-0.5 bg-indigo-50 text-indigo-600 font-black rounded border border-indigo-100 hover:bg-indigo-100 transition uppercase"
-                                                            >
-                                                                Emitir GRE
-                                                            </button>
+                                                            {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                                                <button 
+                                                                    onClick={() => setShowGreForm(true)}
+                                                                    className="text-[9px] px-2 py-0.5 bg-indigo-50 text-indigo-600 font-black rounded border border-indigo-100 hover:bg-indigo-100 transition uppercase"
+                                                                >
+                                                                    Emitir GRE
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -638,26 +646,28 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                         }`}>{sale.sunatStatus || 'PENDIENTE'}</span>
                                                     </div>
                                                     
-                                                    {(!sale.sunatStatus || sale.sunatStatus === 'ERROR') ? (
-                                                        <button 
-                                                            onClick={handleSendToSunat}
-                                                            disabled={isSending}
-                                                            className="w-full py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-md shadow-indigo-100"
-                                                        >
-                                                            {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
-                                                        </button>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => {
-                                                                if (window.confirm('¿Está seguro de reenviar este comprobante a SUNAT (Producción)? Se registrará en el entorno de producción de SUNAT y Nubefact. Si la venta tiene más de 3 días de antigüedad, se ajustará la fecha de emisión a la de hoy.')) {
-                                                                    handleSendToSunat();
-                                                                }
-                                                            }}
-                                                            disabled={isSending}
-                                                            className="w-full py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition disabled:opacity-50 shadow-md shadow-amber-100"
-                                                        >
-                                                            {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Reenviar a SUNAT (Prod)'}
-                                                        </button>
+                                                    {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                                        (!sale.sunatStatus || sale.sunatStatus === 'ERROR') ? (
+                                                            <button 
+                                                                onClick={handleSendToSunat}
+                                                                disabled={isSending}
+                                                                className="w-full py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-md shadow-indigo-100"
+                                                            >
+                                                                {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (window.confirm('¿Está seguro de reenviar este comprobante a SUNAT (Producción)? Se registrará en el entorno de producción de SUNAT y Nubefact. Si la venta tiene más de 3 días de antigüedad, se ajustará la fecha de emisión a la de hoy.')) {
+                                                                        handleSendToSunat();
+                                                                    }
+                                                                }}
+                                                                disabled={isSending}
+                                                                className="w-full py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition disabled:opacity-50 shadow-md shadow-amber-100"
+                                                            >
+                                                                {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Reenviar a SUNAT (Prod)'}
+                                                            </button>
+                                                        )
                                                     )}
 
                                                     {sale.sunatResponse && (
@@ -818,7 +828,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                         <FileText className="w-3.5 h-3.5" /> Descargar PDF
                                     </button>
 
-                                    {sale.status !== 'ANULADO' && (
+                                    {sale.status !== 'ANULADO' && (user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
                                         <div className="flex items-center gap-2 ml-2">
                                             <button
                                                 onClick={handleAnnulSale}
