@@ -749,18 +749,25 @@ export default function InventoryPage() {
                                 <>
                                   <div className="space-y-2">
                                     {visibleColors.map(color => (
-                                      <div key={color} className="flex items-start sm:items-center gap-2">
-                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-gray-100/80 border border-gray-200/50 px-2 py-0.5 rounded flex-shrink-0 w-24 truncate" title={color}>
-                                          {color}
-                                        </span>
-                                        <div className="flex flex-wrap gap-1.5 flex-1">
+                                      <div key={color} className="border border-gray-200 rounded-lg p-2 bg-gray-50/50 shadow-sm">
+                                        {/* Cabecera del Color */}
+                                        <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-gray-200/60">
+                                          <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider truncate" title={color}>
+                                            {color}
+                                          </span>
+                                          <span className="text-[9px] bg-gray-200/80 text-gray-600 px-1.5 py-0.2 rounded font-semibold flex-shrink-0">
+                                            Stock: {grouped[color].reduce((sum: number, v: any) => sum + v.stock, 0)}
+                                          </span>
+                                        </div>
+                                        {/* Lista de Tallas */}
+                                        <div className="flex flex-wrap gap-1.5">
                                           {grouped[color].map((v: any) => (
                                             <span
                                               key={v.id}
                                               className="inline-flex items-center px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-medium text-gray-700 shadow-sm"
                                               title={`SKU: ${v.variantSku}`}
                                             >
-                                              <span>{v.size}</span>
+                                              <span className="text-gray-500 font-normal">{v.size}</span>
                                               <span className={`ml-1 font-bold ${v.stock <= product.minStock ? 'text-amber-600' : 'text-emerald-600'}`}>
                                                 ({v.stock})
                                               </span>
