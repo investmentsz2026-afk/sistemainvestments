@@ -481,7 +481,17 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         e.preventDefault();
         if (readOnly) return;
         if (!formData.clientId) return toast.error('Selecciona un cliente');
-        if (items.some(item => !item.modelName || item.quantity <= 0)) return toast.error('Completa los modelos y cantidades');
+
+        // Filtrar filas completamente vacías (sin modelo y sin cantidad)
+        const filledItems = items.filter(item => item.modelName.trim() !== '' || item.quantity > 0);
+
+        if (filledItems.length === 0) {
+            return toast.error('Agrega al menos un producto con modelo y cantidad válidos');
+        }
+
+        if (filledItems.some(item => !item.modelName || item.quantity <= 0)) {
+            return toast.error('Completa los modelos y cantidades de los productos agregados');
+        }
 
         setIsSaving(true);
         if (formData.orderNumber && !initialOrder?.id) {
@@ -503,13 +513,13 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             if (initialOrder?.id) {
                 await api.patch(`/orders/${initialOrder.id}`, {
                     ...formData,
-                    items
+                    items: filledItems
                 });
                 toast.success('Nota de Pedido actualizada');
             } else {
                 await api.post('/orders', {
                     ...formData,
-                    items
+                    items: filledItems
                 });
                 toast.success('Nota de Pedido registrada con éxito');
             }
