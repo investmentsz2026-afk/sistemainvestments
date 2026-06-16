@@ -26,7 +26,8 @@ import {
     ShoppingBag,
     ShieldCheck,
     Calendar,
-    Loader2
+    Loader2,
+    Map
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useRouter } from 'next/navigation';
@@ -594,7 +595,7 @@ export default function ClientsPage() {
                                                 ID: {editingClient.id.slice(-6).toUpperCase()}
                                             </span>
                                             <span className="text-xs font-black text-emerald-400 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                                                {editingClient.documentType}: {editingClient.documentNumber}
+                                        {editingClient.documentType}: {editingClient.documentNumber}
                                             </span>
                                         </div>
                                     </div>
@@ -602,7 +603,7 @@ export default function ClientsPage() {
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-gray-50/50">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                                     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                                         <div className="w-12 h-12 text-blue-500 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
                                             <Mail className="w-5 h-5" />
@@ -623,6 +624,13 @@ export default function ClientsPage() {
                                         </div>
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dirección</p>
                                         <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.address || 'No registrado'}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                                        <div className="w-12 h-12 text-violet-500 bg-violet-50 rounded-2xl flex items-center justify-center mb-4">
+                                            <Map className="w-5 h-5" />
+                                        </div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Zona de Ventas</p>
+                                        <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.zone || 'Sin zona'}</p>
                                     </div>
                                     <div className="bg-white p-6 rounded-[2rem] border border-indigo-50 shadow-sm ring-1 ring-indigo-50 ring-inset">
                                         <div className="w-12 h-12 text-indigo-500 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
