@@ -101,6 +101,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Auditoría', href: '/audit', icon: FileSearch }
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE' ? [
+      { name: 'Ver Stock', href: '/commercial/stock', icon: Package },
       { name: 'Pedidos', href: '/orders', icon: ShoppingBag },
       { name: 'Ventas', href: '/sales', icon: ShoppingCart },
       { name: 'Cobranza', href: '/sales/collections', icon: CreditCard },
