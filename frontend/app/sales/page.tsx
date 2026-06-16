@@ -137,6 +137,7 @@ export default function SalesPage() {
     const totalProfit = totalRevenue - totalCost;
 
     const getExportData = () => {
+        const isComercial = user?.role === 'ADMIN' || user?.role === 'COMERCIAL';
         const data: any[] = [];
         filteredSales.forEach(sale => {
             const date = formatDate(sale.createdAt);
@@ -144,7 +145,7 @@ export default function SalesPage() {
             
             if (sale.items && sale.items.length > 0) {
                 sale.items.forEach((item: any) => {
-                    data.push({
+                    const row: any = {
                         'Factura/Boleta': sale.invoiceNumber || 'S/N',
                         'Fecha': date,
                         'Cliente': clientName,
@@ -156,16 +157,21 @@ export default function SalesPage() {
                         'Cant.': item.quantity,
                         'Precio U.': item.unitPrice,
                         'Subtotal': item.totalPrice,
-                        'Costo U.': item.variant?.product?.purchasePrice || 0,
-                        'Costo Total Item': (item.variant?.product?.purchasePrice || 0) * item.quantity,
-                        'Total Factura': sale.totalAmount,
-                        'Costo Total Factura': calcDynamicCost(sale),
-                        'Estado Factura': sale.status,
-                        'Estado Pago': sale.paymentStatus || 'PENDIENTE'
-                    });
+                    };
+                    if (isComercial) {
+                        row['Costo U.'] = item.variant?.product?.purchasePrice || 0;
+                        row['Costo Total Item'] = (item.variant?.product?.purchasePrice || 0) * item.quantity;
+                    }
+                    row['Total Factura'] = sale.totalAmount;
+                    if (isComercial) {
+                        row['Costo Total Factura'] = calcDynamicCost(sale);
+                    }
+                    row['Estado Factura'] = sale.status;
+                    row['Estado Pago'] = sale.paymentStatus || 'PENDIENTE';
+                    data.push(row);
                 });
             } else {
-                data.push({
+                const row: any = {
                     'Factura/Boleta': sale.invoiceNumber || 'S/N',
                     'Fecha': date,
                     'Cliente': clientName,
@@ -177,13 +183,18 @@ export default function SalesPage() {
                     'Cant.': 0,
                     'Precio U.': 0,
                     'Subtotal': 0,
-                    'Costo U.': 0,
-                    'Costo Total Item': 0,
-                    'Total Factura': sale.totalAmount,
-                    'Costo Total Factura': calcDynamicCost(sale),
-                    'Estado Factura': sale.status,
-                    'Estado Pago': sale.paymentStatus || 'PENDIENTE'
-                });
+                };
+                if (isComercial) {
+                    row['Costo U.'] = 0;
+                    row['Costo Total Item'] = 0;
+                }
+                row['Total Factura'] = sale.totalAmount;
+                if (isComercial) {
+                    row['Costo Total Factura'] = calcDynamicCost(sale);
+                }
+                row['Estado Factura'] = sale.status;
+                row['Estado Pago'] = sale.paymentStatus || 'PENDIENTE';
+                data.push(row);
             }
         });
         return data;
@@ -448,19 +459,21 @@ export default function SalesPage() {
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">SUNAT</th>
                                     <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
-                                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
+                                    {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                        <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-20 text-center">
+                                        <td colSpan={(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') ? 10 : 9} className="px-4 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
+                                        <td colSpan={(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') ? 10 : 9} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => (
@@ -560,9 +573,11 @@ export default function SalesPage() {
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4 text-right">
-                                                <span className="text-xs font-black text-rose-500 font-mono">S/ {calcDynamicCost(sale).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            </td>
+                                            {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                                <td className="px-4 py-4 text-right">
+                                                    <span className="text-xs font-black text-rose-500 font-mono">S/ {calcDynamicCost(sale).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))
                                 )}
