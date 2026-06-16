@@ -439,18 +439,19 @@ export default function SalesPage() {
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro</th>
                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">SUNAT</th>
                                     <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Acciones</th>
+                                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-20 text-center">
+                                        <td colSpan={10} className="px-4 py-20 text-center">
                                             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mx-auto"></div>
                                         </td>
                                     </tr>
                                 ) : filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
+                                        <td colSpan={10} className="px-4 py-20 text-center opacity-50 italic">No se encontraron ventas</td>
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => (
@@ -549,6 +550,9 @@ export default function SalesPage() {
                                                         <span className="text-[10px] font-black uppercase">Ver</span>
                                                     </button>
                                                 </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <span className="text-xs font-black text-rose-500 font-mono">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
                                         </tr>
                                     ))
