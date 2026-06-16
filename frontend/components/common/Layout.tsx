@@ -332,7 +332,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{user?.role || 'User'}</p>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                  {user?.role || 'User'} {user?.zone ? `(${user.zone})` : ''}
+                </p>
               </div>
               <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${showSidebarUserMenu ? 'rotate-180' : ''}`} />
             </button>

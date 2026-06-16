@@ -154,7 +154,10 @@ export default function ProfilePage() {
 
                             <h2 className="text-2xl font-bold text-gray-900 mb-1">{user?.name}</h2>
                             <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full mb-8 tracking-wider uppercase">
-                                {user?.role === 'ADMIN' ? 'Administrador' : 'Colaborador'}
+                                {user?.role === 'ADMIN' ? 'Administrador' : 
+                                 user?.role === 'VENDEDOR_LIMA' ? 'Vendedor Lima' :
+                                 user?.role === 'VENDEDOR_ORIENTE' ? 'Vendedor Oriente' :
+                                 user?.role === 'COMERCIAL' ? 'Comercial' : 'Colaborador'}
                             </span>
 
                             <div className="space-y-4 pt-8 border-t border-gray-50 text-left">
@@ -174,9 +177,27 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Rol del Sistema</p>
-                                        <p className="text-sm text-gray-700 font-medium">{user?.role === 'ADMIN' ? 'Gestión Total' : 'Operativo'}</p>
+                                        <p className="text-sm text-gray-700 font-medium">
+                                            {user?.role === 'ADMIN' ? 'Gestión Total' : 
+                                             user?.role === 'VENDEDOR_LIMA' ? 'Vendedor Lima (Acceso Restringido)' :
+                                             user?.role === 'VENDEDOR_ORIENTE' ? 'Vendedor Oriente (Acceso Restringido)' : 'Operativo'}
+                                        </p>
                                     </div>
                                 </div>
+
+                                {user?.zone && (
+                                    <div className="flex items-center gap-4 group/item">
+                                        <div className="p-2 bg-gray-50 rounded-xl group-hover/item:bg-blue-50 transition-colors">
+                                            <Shield className="w-4 h-4 text-gray-400 group-hover/item:text-blue-500" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Zona Asignada</p>
+                                            <p className="text-sm text-gray-700 font-medium">
+                                                {user.zone} (Solo info de su zona)
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

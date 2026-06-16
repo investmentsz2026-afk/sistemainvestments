@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
@@ -18,6 +18,7 @@ import { AgenciesModule } from './modules/agencies/agencies.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ProductionOrdersModule } from './modules/production-orders/production-orders.module';
 import { AppController } from './app.controller';
+import { PrismaService } from './database/prisma.service';
 
 @Module({
   imports: [
@@ -45,4 +46,32 @@ import { AppController } from './app.controller';
   controllers: [AppController],
   providers: [],
 })
-export class AppModule { }
+export class AppModule implements OnApplicationBootstrap {
+  constructor(private prisma: PrismaService) {}
+
+  async onApplicationBootstrap() {
+    try {
+      const roles = [
+        { name: 'ADMIN', description: 'Acceso total al sistema' },
+        { name: 'CLIENTE', description: 'Módulo de clientes' },
+        { name: 'COMERCIAL', description: 'Módulo de ventas y comercial' },
+        { name: 'CONTABILIDAD', description: 'Módulo contable' },
+        { name: 'LOGISTICA', description: 'Módulo de compras e inventario' },
+        { name: 'UDP', description: 'Módulo de calidad y auditoría' },
+        { name: 'VENDEDOR_LIMA', description: 'Vendedor exclusivo zona Lima' },
+        { name: 'VENDEDOR_ORIENTE', description: 'Vendedor exclusivo zona Oriente' },
+      ];
+
+      for (const role of roles) {
+        await this.prisma.role.upsert({
+          where: { name: role.name },
+          update: {},
+          create: role,
+        });
+      }
+      console.log('✅ Roles synchronized successfully in Database');
+    } catch (error) {
+      console.error('❌ Error synchronizing roles in Database on startup:', error);
+    }
+  }
+}
