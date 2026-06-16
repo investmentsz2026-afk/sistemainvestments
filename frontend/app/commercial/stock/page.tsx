@@ -34,21 +34,70 @@ export default function StockQueryPage() {
         return Array.from(new Set(cats));
     }, [products]);
 
-    // Filter products
-    const filteredProducts = useMemo(() => {
+    // Group all active TERMINADOS products by name (aggregating variants, skus and ops)
+    const groupedProducts = useMemo(() => {
         if (!products) return [];
-        return products.filter(p => {
+        
+        const activeTerminados = products.filter(p => p.inventoryType === 'TERMINADOS' && p.isActive);
+        const groups: { [name: string]: any } = {};
+
+        activeTerminados.forEach(p => {
+            const normalizedName = p.name.trim().toUpperCase();
+            if (!groups[normalizedName]) {
+                groups[normalizedName] = {
+                    id: p.id, // reference id
+                    name: p.name.trim(),
+                    category: p.category,
+                    skus: [p.sku].filter(Boolean),
+                    ops: [p.op].filter(Boolean),
+                    variants: [] as any[],
+                    minStock: p.minStock || 5,
+                };
+            } else {
+                if (p.sku && !groups[normalizedName].skus.includes(p.sku)) {
+                    groups[normalizedName].skus.push(p.sku);
+                }
+                if (p.op && !groups[normalizedName].ops.includes(p.op)) {
+                    groups[normalizedName].ops.push(p.op);
+                }
+            }
+
+            // Merge variants
+            p.variants.forEach((v: any) => {
+                const existingVariant = groups[normalizedName].variants.find(
+                    (ev: any) => ev.size.trim().toUpperCase() === v.size.trim().toUpperCase() &&
+                                 ev.color.trim().toUpperCase() === v.color.trim().toUpperCase()
+                );
+                if (existingVariant) {
+                    existingVariant.stock += v.stock;
+                } else {
+                    groups[normalizedName].variants.push({
+                        id: v.id,
+                        size: v.size,
+                        color: v.color,
+                        stock: v.stock
+                    });
+                }
+            });
+        });
+
+        return Object.values(groups);
+    }, [products]);
+
+    // Filter grouped products
+    const filteredProducts = useMemo(() => {
+        return groupedProducts.filter(p => {
             const matchesSearch = 
                 p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (p.op && p.op.toLowerCase().includes(searchTerm.toLowerCase()));
+                p.skus.some((sku: string) => sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                p.ops.some((op: string) => op.toLowerCase().includes(searchTerm.toLowerCase()));
             
             const matchesCategory = 
                 selectedCategory === 'ALL' || p.category === selectedCategory;
 
-            return p.inventoryType === 'TERMINADOS' && p.isActive && matchesSearch && matchesCategory;
+            return matchesSearch && matchesCategory;
         });
-    }, [products, searchTerm, selectedCategory]);
+    }, [groupedProducts, searchTerm, selectedCategory]);
 
     const cardClass = "bg-white rounded-3xl border border-gray-100 shadow-md shadow-gray-200/10 overflow-hidden";
 
@@ -110,10 +159,10 @@ export default function StockQueryPage() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {filteredProducts.map(product => {
-                            // Extract unique sizes and colors from variants
-                            const uniqueColors = Array.from(new Set(product.variants.map(v => v.color)));
-                            const uniqueSizes = sortSizes(Array.from(new Set(product.variants.map(v => v.size))));
-                            const totalProductStock = product.variants.reduce((acc, v) => acc + v.stock, 0);
+                             // Extract unique sizes and colors from variants
+                             const uniqueColors = Array.from(new Set(product.variants.map((v: any) => v.color))) as string[];
+                             const uniqueSizes = sortSizes(Array.from(new Set(product.variants.map((v: any) => v.size))) as string[]);
+                             const totalProductStock = product.variants.reduce((acc: number, v: any) => acc + v.stock, 0);
 
                             return (
                                 <motion.div
@@ -135,14 +184,14 @@ export default function StockQueryPage() {
                                                 </h3>
                                                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                                                     <span className="text-[8px] font-black text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                        SKU: {product.sku || 'N/A'}
+                                                        SKU: {product.skus.join(' / ') || 'N/A'}
                                                     </span>
                                                     <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                                         {product.category}
                                                     </span>
-                                                    {product.op && (
+                                                    {product.ops.length > 0 && (
                                                         <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                                            OP: {product.op}
+                                                            OP: {product.ops.join(' / ')}
                                                         </span>
                                                     )}
                                                 </div>
