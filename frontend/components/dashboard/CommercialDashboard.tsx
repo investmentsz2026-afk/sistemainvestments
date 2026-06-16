@@ -76,7 +76,8 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
         api.get('/orders')
       ]);
 
-      const sales = salesResp.data || [];
+      const rawSales = salesResp.data || [];
+      const sales = rawSales.filter((s: any) => s.status !== 'ANULADO');
       const audits = auditsResp.data || [];
       const clients = Array.isArray(clientsResp.data.data) ? clientsResp.data.data : (clientsResp.data || []);
       const orders = ordersResp.data || [];

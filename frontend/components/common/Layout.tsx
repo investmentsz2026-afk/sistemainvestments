@@ -174,7 +174,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   className="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 relative transition-all duration-200"
                   title="Aprobación de Cobros"
                 >
-                  <DollarSign className="w-5 h-5" />
+                  <span className="text-sm font-black select-none tracking-tighter">S/</span>
                   {pendingApprovals > 0 && (
                     <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-pulse">
                       {pendingApprovals}

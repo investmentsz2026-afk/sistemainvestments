@@ -297,7 +297,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 ? 'bg-rose-100 text-rose-500' 
                                                                 : 'bg-slate-50 text-indigo-500'
                                                         }`}>
-                                                            <DollarSign className="w-5 h-5" />
+                                                            <span className="text-xs font-black">S/</span>
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-0.5">
