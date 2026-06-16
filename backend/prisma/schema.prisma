@@ -422,6 +422,7 @@ model Sale {
   sunatPdfUrl     String?    @map("sunat_pdf_url")
   sunatCdrUrl     String?    @map("sunat_cdr_url")
   sunatGuidePdfUrl String?    @map("sunat_guide_pdf_url")
+  cargoUrl        String?    @map("cargo_url")
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 

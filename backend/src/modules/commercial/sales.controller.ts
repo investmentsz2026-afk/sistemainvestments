@@ -72,6 +72,11 @@ export class SalesController {
     return this.salesService.updateReferralGuide(id, data.referralGuide);
   }
 
+  @Patch(':id/cargo')
+  updateCargoUrl(@Param('id') id: string, @Body() data: { cargoUrl: string }) {
+    return this.salesService.updateCargoUrl(id, data.cargoUrl);
+  }
+
   @Patch(':id/invoice-number')
   updateInvoiceNumber(@Param('id') id: string, @Body() data: { invoiceNumber: string }) {
     return this.salesService.updateInvoiceNumber(id, data.invoiceNumber);

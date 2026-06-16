@@ -17,7 +17,8 @@ import {
     Download,
     Eye,
     Truck,
-    AlertCircle
+    AlertCircle,
+    Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -30,6 +31,8 @@ const formatDate = (dateString: string) => {
     }
     return new Date(dateString).toLocaleDateString('es-PE');
 };
+
+const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
 
 interface SaleDetailsModalProps {
     saleId: string;
@@ -50,6 +53,8 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const [isSavingInvoice, setIsSavingInvoice] = useState(false);
     const [showGreForm, setShowGreForm] = useState(false);
     const [isConsultingGuia, setIsConsultingGuia] = useState(false);
+    const [isUploadingCargo, setIsUploadingCargo] = useState(false);
+    const [showCargoPreview, setShowCargoPreview] = useState(false);
     const [greData, setGreData] = useState({
         peso_bruto_total: '0.00',
         numero_de_bultos: '1',
@@ -197,6 +202,31 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             toast.error(error.response?.data?.message || 'Error al actualizar la guía');
         } finally {
             setIsSavingGuide(false);
+        }
+    };
+
+    const handleCargoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingCargo(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const uploadResp = await api.post('/uploads', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const url = uploadResp.data.url;
+
+            await api.patch(`/sales/${saleId}/cargo`, { cargoUrl: url });
+            toast.success('Cargo de entrega subido correctamente');
+            fetchSaleDetails();
+        } catch (error) {
+            console.error('Error uploading cargo:', error);
+            toast.error('Error al subir el cargo');
+        } finally {
+            setIsUploadingCargo(false);
         }
     };
 
@@ -450,7 +480,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                             ) : sale && (
                                 <>
                                     {/* INFO CARDS */}
-                                    <div className={`grid grid-cols-1 ${sale.invoiceNumber ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                                         <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <div className="w-7 h-7 bg-white rounded-lg shadow-sm flex items-center justify-center text-gray-400">
@@ -638,6 +668,77 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                 </div>
                                             </div>
                                         )}
+
+                                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-7 h-7 bg-white rounded-lg shadow-sm flex items-center justify-center text-gray-400">
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Cargo del Cliente</span>
+                                                </div>
+                                                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-2">
+                                                    Recibo de conformidad de la agencia
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {sale.cargoUrl ? (
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 text-xs font-bold">
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                                            <span>Cargo cargado</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => setShowCargoPreview(true)}
+                                                                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition shadow-md shadow-indigo-100 flex items-center justify-center gap-1"
+                                                            >
+                                                                <Eye className="w-3 h-3" /> Ver Cargo
+                                                            </button>
+                                                            <div className="relative flex-1">
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    onChange={handleCargoUpload}
+                                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                                    disabled={isUploadingCargo}
+                                                                />
+                                                                <button
+                                                                    disabled={isUploadingCargo}
+                                                                    className="w-full py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-[9px] font-black uppercase tracking-widest transition flex items-center justify-center gap-1"
+                                                                >
+                                                                    {isUploadingCargo ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Cambiar'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="relative group">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleCargoUpload}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                            disabled={isUploadingCargo}
+                                                        />
+                                                        <button
+                                                            disabled={isUploadingCargo}
+                                                            className="w-full py-3 bg-white hover:bg-gray-50 border border-gray-200 hover:border-indigo-300 rounded-xl text-[10px] font-black text-indigo-600 uppercase tracking-widest transition flex flex-col items-center justify-center gap-1 shadow-sm"
+                                                        >
+                                                            {isUploadingCargo ? (
+                                                                <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <Upload className="w-4 h-4 text-indigo-500" />
+                                                                    <span>Subir Cargo</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* PRODUCTS TABLE */}
@@ -967,6 +1068,48 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                 >
                                     {isSavingGuide ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                                     Emitir y Guardar Guía
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Cargo Preview Modal */}
+            <AnimatePresence>
+                {showCargoPreview && sale?.cargoUrl && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white max-w-4xl w-full rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+                        >
+                            <div className="bg-gray-900 px-6 py-4 text-white flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-tight text-white">Cargo de Conformidad</h3>
+                                    <p className="text-indigo-400 text-[8px] font-black uppercase tracking-widest mt-0.5">Recibo de Agencia</p>
+                                </div>
+                                <button 
+                                    onClick={() => setShowCargoPreview(false)}
+                                    className="p-2 hover:bg-white/10 rounded-full transition text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="p-6 flex justify-center bg-gray-50 overflow-auto max-h-[75vh]">
+                                <img 
+                                    src={`${SERVER_URL}${sale.cargoUrl}`} 
+                                    alt="Cargo del Cliente" 
+                                    className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md border border-gray-200" 
+                                />
+                            </div>
+                            <div className="bg-gray-100 p-4 flex justify-end">
+                                <button
+                                    onClick={() => setShowCargoPreview(false)}
+                                    className="px-6 py-2.5 bg-gray-900 text-white font-black rounded-xl text-xs uppercase tracking-wider hover:bg-black transition active:scale-95 shadow-md"
+                                >
+                                    Cerrar Vista
                                 </button>
                             </div>
                         </motion.div>

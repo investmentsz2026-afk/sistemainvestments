@@ -740,6 +740,18 @@ export class SalesService {
     });
   }
 
+  async updateCargoUrl(saleId: string, cargoUrl: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId }
+    });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    return this.prisma.sale.update({
+      where: { id: saleId },
+      data: { cargoUrl: cargoUrl || null }
+    });
+  }
+
   async updateInvoiceNumber(saleId: string, invoiceNumber: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId }
