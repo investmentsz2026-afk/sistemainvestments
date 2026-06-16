@@ -124,7 +124,16 @@ export default function SalesPage() {
     const annualRevenue = activeSales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
-    const totalCost = filteredSales.reduce((acc, s) => acc + (s.totalCost || 0), 0);
+
+    // Dynamic cost: always uses the CURRENT product purchasePrice, not the stored cost
+    const calcDynamicCost = (sale: any) => {
+        return (sale.items || []).reduce((acc: number, item: any) => {
+            const currentCost = item.variant?.product?.purchasePrice || 0;
+            return acc + (currentCost * item.quantity);
+        }, 0);
+    };
+
+    const totalCost = filteredSales.reduce((acc, s) => acc + calcDynamicCost(s), 0);
     const totalProfit = totalRevenue - totalCost;
 
     const getExportData = () => {
@@ -147,10 +156,10 @@ export default function SalesPage() {
                         'Cant.': item.quantity,
                         'Precio U.': item.unitPrice,
                         'Subtotal': item.totalPrice,
-                        'Costo U.': item.costPrice || 0,
-                        'Costo Total Item': (item.costPrice || 0) * item.quantity,
+                        'Costo U.': item.variant?.product?.purchasePrice || 0,
+                        'Costo Total Item': (item.variant?.product?.purchasePrice || 0) * item.quantity,
                         'Total Factura': sale.totalAmount,
-                        'Costo Total Factura': sale.totalCost || 0,
+                        'Costo Total Factura': calcDynamicCost(sale),
                         'Estado Factura': sale.status,
                         'Estado Pago': sale.paymentStatus || 'PENDIENTE'
                     });
@@ -171,7 +180,7 @@ export default function SalesPage() {
                     'Costo U.': 0,
                     'Costo Total Item': 0,
                     'Total Factura': sale.totalAmount,
-                    'Costo Total Factura': sale.totalCost || 0,
+                    'Costo Total Factura': calcDynamicCost(sale),
                     'Estado Factura': sale.status,
                     'Estado Pago': sale.paymentStatus || 'PENDIENTE'
                 });
@@ -552,7 +561,7 @@ export default function SalesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 text-right">
-                                                <span className="text-xs font-black text-rose-500 font-mono">S/ {(sale.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <span className="text-xs font-black text-rose-500 font-mono">S/ {calcDynamicCost(sale).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                             </td>
                                         </tr>
                                     ))
