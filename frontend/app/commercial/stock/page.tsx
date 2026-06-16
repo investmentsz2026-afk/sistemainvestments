@@ -50,37 +50,37 @@ export default function StockQueryPage() {
         });
     }, [products, searchTerm, selectedCategory]);
 
-    const cardClass = "bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden";
+    const cardClass = "bg-white rounded-3xl border border-gray-100 shadow-md shadow-gray-200/10 overflow-hidden";
 
     return (
         <Layout>
-            <div className="max-w-7xl mx-auto space-y-8 pb-20 px-4 md:px-0">
+            <div className="max-w-7xl mx-auto space-y-6 pb-20 px-4 md:px-0">
                 {/* HEADER */}
                 <div>
-                    <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">Consulta de Stock Comercial</h1>
-                    <p className="text-gray-500 font-medium text-lg mt-1">
+                    <h1 className="text-2xl font-black text-gray-900 tracking-tight uppercase">Consulta de Stock Comercial</h1>
+                    <p className="text-gray-500 font-medium text-xs mt-0.5">
                         Consulta rápida de inventario por modelo, color y talla en tiempo real.
                     </p>
                 </div>
 
                 {/* FILTERS PANEL */}
-                <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/10 flex flex-col md:flex-row gap-4 items-center justify-between">
-                    <div className="relative group w-full md:max-w-xl">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-indigo-600 transition" />
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-md shadow-gray-200/5 flex flex-col sm:flex-row gap-3 items-center justify-between">
+                    <div className="relative group w-full sm:max-w-md">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-indigo-600 transition" />
                         <input
                             type="text"
                             placeholder="Buscar modelo o SKU..."
-                            className="w-full pl-16 pr-6 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:ring-4 focus:ring-indigo-50 focus:bg-white focus:border-indigo-500 transition font-semibold text-gray-900"
+                            className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-xl outline-none focus:ring-4 focus:ring-indigo-50 focus:bg-white focus:border-indigo-500 transition font-semibold text-sm text-gray-900"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex gap-3 w-full md:w-auto">
-                        <div className="relative flex-1 md:flex-none">
+                    <div className="flex gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-none">
                             <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <select
-                                className="w-full pl-11 pr-8 py-4 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 outline-none focus:ring-4 focus:ring-indigo-50 focus:bg-white transition cursor-pointer appearance-none"
+                                className="w-full pl-11 pr-8 py-2.5 bg-gray-50 border border-transparent rounded-xl font-bold text-sm text-gray-700 outline-none focus:ring-4 focus:ring-indigo-50 focus:bg-white transition cursor-pointer appearance-none"
                                 value={selectedCategory}
                                 onChange={e => setSelectedCategory(e.target.value)}
                             >
@@ -108,7 +108,7 @@ export default function StockQueryPage() {
                         No se encontraron modelos con los filtros seleccionados
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {filteredProducts.map(product => {
                             // Extract unique sizes and colors from variants
                             const uniqueColors = Array.from(new Set(product.variants.map(v => v.color)));
@@ -124,22 +124,24 @@ export default function StockQueryPage() {
                                     className={cardClass}
                                 >
                                     {/* Product Header */}
-                                    <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center border border-indigo-100">
-                                                <Package className="w-7 h-7" />
+                                    <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100 flex-shrink-0">
+                                                <Package className="w-5 h-5" />
                                             </div>
-                                            <div>
-                                                <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">{product.name}</h3>
-                                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                    <span className="text-[9px] font-black text-gray-400 bg-white border border-gray-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                            <div className="min-w-0">
+                                                <h3 className="text-base font-black text-gray-900 uppercase tracking-tight truncate" title={product.name}>
+                                                    {product.name}
+                                                </h3>
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                    <span className="text-[8px] font-black text-gray-400 bg-white border border-gray-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                                         SKU: {product.sku || 'N/A'}
                                                     </span>
-                                                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                                    <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                                         {product.category}
                                                     </span>
                                                     {product.op && (
-                                                        <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                                             OP: {product.op}
                                                         </span>
                                                     )}
@@ -147,31 +149,31 @@ export default function StockQueryPage() {
                                             </div>
                                         </div>
 
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Total Disponible</p>
-                                            <p className={`text-3xl font-black mt-0.5 ${totalProductStock > product.minStock ? 'text-emerald-600' : totalProductStock > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
-                                                {totalProductStock} <span className="text-sm font-bold text-gray-500">unidades</span>
+                                        <div className="text-left sm:text-right flex-shrink-0">
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Stock Total</p>
+                                            <p className={`text-xl font-black mt-0.5 ${totalProductStock > product.minStock ? 'text-emerald-600' : totalProductStock > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                                {totalProductStock} <span className="text-[10px] font-bold text-gray-500">unds</span>
                                             </p>
                                         </div>
                                     </div>
 
                                     {/* Product Variants Matrix */}
-                                    <div className="p-8 overflow-x-auto">
+                                    <div className="p-4 overflow-x-auto">
                                         {product.variants.length === 0 ? (
-                                            <div className="py-10 text-center text-xs text-gray-400 font-bold uppercase tracking-widest italic">
-                                                No hay variantes o tallas registradas para este producto
+                                            <div className="py-6 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">
+                                                No hay variantes registradas
                                             </div>
                                         ) : (
-                                            <table className="w-full text-left min-w-[600px]">
+                                            <table className="w-full text-left table-auto">
                                                 <thead>
                                                     <tr className="border-b border-gray-100">
-                                                        <th className="pb-4 font-black text-[10px] text-gray-400 uppercase tracking-widest w-1/4">Color</th>
+                                                        <th className="pb-2 font-black text-[9px] text-gray-400 uppercase tracking-widest w-1/4">Color</th>
                                                         {uniqueSizes.map(size => (
-                                                            <th key={size} className="pb-4 text-center font-black text-[10px] text-gray-400 uppercase tracking-widest">
+                                                            <th key={size} className="pb-2 text-center font-black text-[9px] text-gray-400 uppercase tracking-widest">
                                                                 {size}
                                                             </th>
                                                         ))}
-                                                        <th className="pb-4 text-right font-black text-[10px] text-gray-400 uppercase tracking-widest w-24">Total</th>
+                                                        <th className="pb-2 text-right font-black text-[9px] text-gray-400 uppercase tracking-widest w-16">Total</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-50">
@@ -181,7 +183,7 @@ export default function StockQueryPage() {
 
                                                         return (
                                                             <tr key={color} className="hover:bg-gray-50/30 transition-colors">
-                                                                <td className="py-4 font-black text-gray-800 uppercase tracking-wider text-xs">
+                                                                <td className="py-1.5 pr-2 font-bold text-gray-800 uppercase tracking-tight text-[11px] truncate max-w-[80px]">
                                                                     {color}
                                                                 </td>
                                                                 {uniqueSizes.map(size => {
@@ -189,7 +191,7 @@ export default function StockQueryPage() {
                                                                     const stock = variant ? variant.stock : null;
 
                                                                     return (
-                                                                        <td key={size} className="py-4 text-center font-semibold text-sm">
+                                                                        <td key={size} className="py-1.5 text-center font-semibold text-xs">
                                                                             {stock === null ? (
                                                                                 <span className="text-gray-300">-</span>
                                                                             ) : stock === 0 ? (
@@ -200,7 +202,7 @@ export default function StockQueryPage() {
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                <td className="py-4 text-right font-black text-xs text-indigo-600">
+                                                                <td className="py-1.5 pl-2 text-right font-black text-[11px] text-indigo-600">
                                                                     {colorTotalStock}
                                                                 </td>
                                                             </tr>
