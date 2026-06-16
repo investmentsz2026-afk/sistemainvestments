@@ -55,7 +55,7 @@ export default function ClientsPage() {
 
     // New client form state
     const [newClient, setNewClient] = useState({
-        documentType: 'DNI',
+        documentType: 'RUC',
         documentNumber: '',
         name: '',
         email: '',
@@ -88,7 +88,7 @@ export default function ClientsPage() {
             await api.post('/sales/clients', newClient);
             setShowAddModal(false);
             fetchClients();
-            setNewClient({ documentType: 'DNI', documentNumber: '', name: '', email: '', phone: '', address: '', address2: '', zone: '' });
+            setNewClient({ documentType: 'RUC', documentNumber: '', name: '', email: '', phone: '', address: '', address2: '', zone: '' });
             toast.success('Cliente registrado correctamente');
         } catch (error) {
             console.error('Error adding client:', error);
@@ -230,7 +230,7 @@ export default function ClientsPage() {
                         </div>
                     </div>
                     <button 
-                        onClick={() => setShowSelectionModal(true)}
+                        onClick={() => setShowAddModal(true)}
                         className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-indigo-700 transition active:scale-95"
                     >
                         <Plus className="w-5 h-5" /> Nuevo Cliente
@@ -453,8 +453,8 @@ export default function ClientsPage() {
                                             value={newClient.documentType}
                                             onChange={(e) => setNewClient({ ...newClient, documentType: e.target.value })}
                                         >
-                                            <option value="DNI">DNI (Persona)</option>
                                             <option value="RUC">RUC (Empresa)</option>
+                                            <option value="DNI">DNI (Persona)</option>
                                         </select>
                                     </div>
                                     <div className="space-y-2">
