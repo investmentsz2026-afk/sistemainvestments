@@ -170,9 +170,9 @@ export class SalesService {
 
     // Filter by zone if the user is a zone-specific vendor
     if (user.role === 'VENDEDOR_LIMA') {
-      where.seller = { zone: 'LIMA' };
+      where.client = { zone: 'LIMA' };
     } else if (user.role === 'VENDEDOR_ORIENTE') {
-      where.seller = { zone: 'ORIENTE' };
+      where.client = { zone: 'ORIENTE' };
     } else if (zone && zone !== 'ALL') {
       where.seller = { zone: zone };
     }

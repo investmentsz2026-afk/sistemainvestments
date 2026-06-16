@@ -109,8 +109,8 @@ export class OrdersService {
     if (status) where.status = status;
     
     // Zonal filtering for vendors
-    if (user.role === 'VENDEDOR_LIMA') where.zone = 'LIMA';
-    else if (user.role === 'VENDEDOR_ORIENTE') where.zone = 'ORIENTE';
+    if (user.role === 'VENDEDOR_LIMA') where.client = { zone: 'LIMA' };
+    else if (user.role === 'VENDEDOR_ORIENTE') where.client = { zone: 'ORIENTE' };
     else if (zone) where.zone = zone; // Commercial/Admin filter
 
     return (this.prisma as any).order.findMany({
