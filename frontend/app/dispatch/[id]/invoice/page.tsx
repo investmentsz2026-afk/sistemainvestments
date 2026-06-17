@@ -92,9 +92,11 @@ export default function InvoicePage() {
         order.items?.forEach((item: any) => {
             const qty = item.dispQuantity || 0;
             if (qty <= 0) return;
-            const category = productCategories[item.modelName.toLowerCase().trim()] || '';
+            const modelName = item.modelName || '';
+            const category = productCategories[modelName.toLowerCase().trim()] || '';
             const isBermuda = category.toLowerCase().includes('bermuda') || category.toLowerCase().includes('short');
-            const itemWeight = isBermuda ? 0.5 : 0.6;
+            const isBalance = modelName.toLowerCase().includes('balance');
+            const itemWeight = (isBermuda || isBalance) ? 0.5 : 0.6;
             totalWeight += qty * itemWeight;
         });
         setGreData(prev => ({

@@ -89,8 +89,10 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             resp.data.items?.forEach((item: any) => {
                 const qty = item.quantity || 0;
                 const category = item.variant?.product?.category || '';
+                const productName = item.variant?.product?.name || '';
                 const isBermuda = category.toLowerCase().includes('bermuda') || category.toLowerCase().includes('short');
-                const itemWeight = isBermuda ? 0.5 : 0.6;
+                const isBalance = productName.toLowerCase().includes('balance');
+                const itemWeight = (isBermuda || isBalance) ? 0.5 : 0.6;
                 totalWeight += qty * itemWeight;
             });
 
