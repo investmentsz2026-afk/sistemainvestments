@@ -96,7 +96,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
 
             setGreData(prev => ({
                 ...prev,
-                punto_de_llegada_direccion: resp.data.client?.address || '',
+                punto_de_llegada_direccion: resp.data.deliveryAddress || resp.data.client?.address || '',
                 punto_de_llegada_ubigeo: '150101',
                 peso_bruto_total: totalWeight.toFixed(2)
             }));
@@ -494,7 +494,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                             <p className="text-[10px] font-bold text-gray-500">{sale.client?.documentType}: {sale.client?.documentNumber || '---------'}</p>
                                             <div className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-400">
                                                 <MapPin className="w-2.5 h-2.5" />
-                                                <span className="font-medium line-clamp-1">{sale.client?.address || 'Sin dirección registrada'}</span>
+                                                <span className="font-medium line-clamp-1">{sale.deliveryAddress || sale.client?.address || 'Sin dirección registrada'}</span>
                                             </div>
                                         </div>
 

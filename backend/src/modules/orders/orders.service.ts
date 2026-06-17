@@ -567,6 +567,7 @@ export class OrdersService {
         notes: `VENTA DESDE PEDIDO #${order.orderNumber || order.id.slice(-6)}. Tránsito: ${order.agency || 'N/A'}. (Precios Inc. IGV)`,
         referralGuide: finalReferralGuide || null,
         sunatStatus: 'PENDIENTE',
+        deliveryAddress: order.deliveryAddress,
         items: {
           create: saleItems
         }

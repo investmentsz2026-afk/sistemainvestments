@@ -63,9 +63,10 @@ export class SalesService {
       throw new BadRequestException('La venta debe tener al menos un producto');
     }
 
+    const client = clientId ? await this.prisma.client.findUnique({ where: { id: clientId } }) : null;
+
     // Auto-generate invoiceNumber if not provided
     if (!invoiceNumber) {
-      const client = clientId ? await this.prisma.client.findUnique({ where: { id: clientId } }) : null;
       const type = client?.documentType === 'RUC' ? 'FACTURA' : 'BOLETA';
       invoiceNumber = await this.getNextInvoiceNumber(type);
     }
@@ -119,6 +120,7 @@ export class SalesService {
           referralGuide,
           sellerId: userId,
           sunatStatus: 'PENDIENTE',
+          deliveryAddress: client?.address || null,
           items: {
             create: saleItemsData,
           },
@@ -465,7 +467,7 @@ export class SalesService {
         cliente_tipo_de_documento: sale.client?.documentType === 'RUC' ? 6 : (sale.client?.documentType === 'DNI' ? 1 : "-"),
         cliente_numero_de_documento: sale.client?.documentNumber || "00000000",
         cliente_denominacion: sale.client?.name || "PÚBLICO GENERAL",
-        cliente_direccion: sale.client?.address || "",
+        cliente_direccion: sale.deliveryAddress || sale.client?.address || "",
         cliente_email: sale.client?.email || "",
         fecha_de_emision: fechaEmision,
         condicion_de_pago: sale.paymentMethod === 'CREDITO' ? 2 : 1,
@@ -896,7 +898,7 @@ export class SalesService {
     const clientDocType = sale.client?.documentType === 'RUC' ? 6 : (sale.client?.documentType === 'DNI' ? 1 : "-");
     const clientDocNum = sale.client?.documentNumber || "00000000";
     const clientDenominacion = sale.client?.name || "PÚBLICO GENERAL";
-    const clientDireccion = sale.client?.address || "";
+    const clientDireccion = sale.deliveryAddress || sale.client?.address || "";
     const clientEmail = sale.client?.email || "";
 
     const peso = parseFloat(greData.peso_bruto_total) || 1.0;
