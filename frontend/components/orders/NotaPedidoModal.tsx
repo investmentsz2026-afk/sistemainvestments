@@ -620,7 +620,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
         // Construct rows
         const itemsList = order.items || [];
-        const minRows = 12;
+        const minRows = 8;
         let itemsHTML = '';
         
         let totalQuantity = 0;
@@ -693,29 +693,29 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             font-family: Arial, sans-serif;
             color: #000;
             margin: 0;
-            padding: 20px;
+            padding: 10px;
         }
         .header-title {
             text-align: center;
-            font-size: 20px;
+            font-size: 15px;
             font-weight: bold;
             background-color: #eaeaea;
-            padding: 8px;
+            padding: 4px;
             border: 1px solid #000;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 2px;
         }
         .meta-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
         .meta-table td {
             border: 1px solid #000;
-            padding: 6px 10px;
-            font-size: 11px;
-            height: 30px;
+            padding: 3px 6px;
+            font-size: 9px;
+            height: 18px;
             vertical-align: middle;
         }
         .meta-label {
@@ -732,14 +732,14 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
         .items-table th, .items-table td {
             border: 1px solid #000;
-            padding: 6px 4px;
-            font-size: 11px;
+            padding: 3px 2px;
+            font-size: 9px;
             text-align: center;
-            height: 24px;
+            height: 18px;
         }
         .items-table th {
             font-weight: bold;
@@ -766,6 +766,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         @media print {
             body {
                 padding: 0;
+                margin: 0;
             }
             .bg-yellow {
                 background-color: transparent !important;
@@ -817,7 +818,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             <td class="meta-value font-bold">---</td>
         </tr>
     </table>
-
+    
     <table class="items-table">
         <thead>
             <tr>
@@ -849,10 +850,10 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         <tbody>
             ${itemsHTML}
             <tr>
-                <td colspan="12" class="font-bold text-right" style="border-right: 1px solid #000; height: 26px;">TOTAL</td>
-                <td class="font-bold" style="height: 26px;">${totalQuantity}</td>
-                <td style="height: 26px;"></td>
-                <td class="bg-yellow font-bold text-right" style="height: 26px;">S/ ${totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
+                <td colspan="12" class="font-bold text-right" style="border-right: 1px solid #000; height: 18px;">TOTAL</td>
+                <td class="font-bold" style="height: 18px;">${totalQuantity}</td>
+                <td style="height: 18px;"></td>
+                <td class="bg-yellow font-bold text-right" style="height: 18px;">S/ ${totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
             </tr>
         </tbody>
     </table>
