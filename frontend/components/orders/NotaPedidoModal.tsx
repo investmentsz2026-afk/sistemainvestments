@@ -68,6 +68,57 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
     // Filtered Products Search State
     const { products } = useProducts();
+
+    const groupedProducts = useMemo(() => {
+        if (!products) return [];
+        
+        const groups: { [key: string]: Product[] } = {};
+        products.forEach(p => {
+            if (p.inventoryType !== 'TERMINADOS') return;
+            const normName = p.name.trim().toUpperCase();
+            if (!groups[normName]) {
+                groups[normName] = [];
+            }
+            groups[normName].push(p);
+        });
+
+        return Object.entries(groups).map(([nameKey, groupProds]) => {
+            const rep = groupProds[0];
+            
+            const allColorsSet = new Set<string>();
+            groupProds.forEach(p => {
+                if (p.colors) p.colors.forEach(c => allColorsSet.add(c.trim().toUpperCase()));
+                if (p.variants) p.variants.forEach(v => allColorsSet.add(v.color.trim().toUpperCase()));
+            });
+            const colors = Array.from(allColorsSet).filter(Boolean).map(c => c.toUpperCase());
+
+            const allSizesSet = new Set<string>();
+            groupProds.forEach(p => {
+                if (p.sizes) p.sizes.forEach(s => allSizesSet.add(s.trim().toUpperCase()));
+                if (p.variants) p.variants.forEach(v => allSizesSet.add(v.size.trim().toUpperCase()));
+            });
+            const sizes = Array.from(allSizesSet).filter(Boolean);
+
+            const variants = groupProds.flatMap(p => p.variants || []);
+            const ops = Array.from(new Set(groupProds.map(p => p.op).filter(Boolean)));
+            const skus = Array.from(new Set(groupProds.map(p => p.sku).filter(Boolean)));
+
+            return {
+                id: rep.id,
+                name: rep.name,
+                category: rep.category,
+                inventoryType: rep.inventoryType,
+                sellingPrice: rep.sellingPrice,
+                sizes,
+                colors,
+                variants,
+                ops,
+                skus,
+                productIds: groupProds.map(p => p.id)
+            };
+        });
+    }, [products]);
+
     const [productSearch, setProductSearch] = useState<{ index: number; query: string } | null>(null);
     const [colorSearch, setColorSearch] = useState<{ index: number; query: string } | null>(null);
 
@@ -92,7 +143,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     };
 
     const getProductSizes = (productId: string): string[] => {
-        const prod = products?.find(p => p.id === productId);
+        const prod = groupedProducts.find(p => p.id === productId);
         if (!prod) return [];
         return prod.sizes || [];
     };
@@ -148,31 +199,19 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     };
 
     const getFilteredProducts = (query: string) => {
-        return (products || [])
+        return (groupedProducts || [])
             .filter(p => 
-                p.inventoryType === 'TERMINADOS' && (
-                    p.name.toLowerCase().includes(query.toLowerCase()) || 
-                    (p.sku && p.sku.toLowerCase().includes(query.toLowerCase())) ||
-                    (p.op && p.op.toLowerCase().includes(query.toLowerCase()))
-                )
+                p.name.toLowerCase().includes(query.toLowerCase()) || 
+                p.skus.some(sku => sku && sku.toLowerCase().includes(query.toLowerCase())) ||
+                p.ops.some(op => op && op.toLowerCase().includes(query.toLowerCase()))
             )
             .slice(0, 10);
     };
 
     const getColorOptions = (productId: string, query: string) => {
-        const prod = products?.find(p => p.id === productId);
+        const prod = groupedProducts.find(p => p.id === productId);
         if (!prod) return [];
 
-        // Si tiene variantes creadas por OP, usamos sus colores
-        if (prod.variants && prod.variants.length > 0) {
-            return Array.from(new Set(
-                prod.variants
-                    .map((v: any) => v.color)
-                    .filter((c: any) => c.toLowerCase().includes(query.toLowerCase()))
-            ));
-        }
-
-        // Si no tiene variantes (OP pendiente), usamos los colores base del producto
         if (prod.colors && prod.colors.length > 0) {
             return prod.colors.filter((c: any) => c.toLowerCase().includes(query.toLowerCase()));
         }
@@ -399,7 +438,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
     // Stock analysis for view mode (By Model, Color and Size)
     const stockAnalysis = useMemo(() => {
-        if (!readOnly || !products || !items) return [];
+        if (!readOnly || !groupedProducts || !items) return [];
         
         const summary: { 
             [key: string]: { 
@@ -425,7 +464,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         items.forEach(item => {
             if (!item.modelName || !item.color) return;
             
-            const p = products.find(prod => 
+            const p = groupedProducts.find(prod => 
                 (item.productId && prod.id === item.productId) || 
                 prod.name.trim().toUpperCase() === item.modelName.trim().toUpperCase()
             );
@@ -434,7 +473,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             const pid = p.id;
             
             if (!summary[pid]) {
-                summary[pid] = { name: p.name, sku: p.sku || '', variants: {} };
+                summary[pid] = { name: p.name, sku: p.skus?.join(', ') || '', variants: {} };
             }
 
             sizeKeys.forEach(key => {
@@ -444,8 +483,8 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     const vKey = `${item.color}-${label}`;
                     
                     if (!summary[pid].variants[vKey]) {
-                        // Find match in product variants - Flexible matching for numeric sizes
-                        const variantInStock = p.variants?.find(v => {
+                        // Find matches in product variants of the entire group and sum the stock
+                        const matchingVariants = p.variants?.filter(v => {
                             const vColor = v.color.trim().toUpperCase();
                             const vSize = v.size.trim().toUpperCase();
                             const targetColor = item.color.trim().toUpperCase();
@@ -458,11 +497,13 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                             );
                         });
                         
+                        const totalStock = matchingVariants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0;
+                        
                         summary[pid].variants[vKey] = {
                             color: item.color,
                             size: label,
                             requested: 0,
-                            stock: variantInStock?.stock || 0
+                            stock: totalStock
                         };
                     }
                     summary[pid].variants[vKey].requested += requestedQty;
@@ -471,7 +512,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         });
         
         return Object.values(summary);
-    }, [readOnly, items, products]);
+    }, [readOnly, items, groupedProducts]);
 
     const totalAvailableInPedido = stockAnalysis.reduce((acc, p) => 
         acc + Object.values(p.variants).reduce((vAcc, v) => vAcc + Math.min(v.stock, v.requested), 0), 0
@@ -1242,30 +1283,30 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                         setActiveAgencyIndex(-1);
                                                     }}
                                                     onKeyDown={(e) => {
-                                                                                        if (readOnly) return;
-                                                                                        if (!showAgencyPicker || filteredAgencies.length === 0) return;
-                                                                                        
-                                                                                        if (e.key === 'ArrowDown') {
-                                                                                            e.preventDefault();
-                                                                                            setActiveAgencyIndex(prev => (prev + 1) % filteredAgencies.length);
-                                                                                        } else if (e.key === 'ArrowUp') {
-                                                                                            e.preventDefault();
-                                                                                            setActiveAgencyIndex(prev => (prev - 1 + filteredAgencies.length) % filteredAgencies.length);
-                                                                                        } else if (e.key === 'Enter') {
-                                                                                            e.preventDefault();
-                                                                                            if (activeAgencyIndex >= 0 && activeAgencyIndex < filteredAgencies.length) {
-                                                                                                const agency = filteredAgencies[activeAgencyIndex];
-                                                                                                setFormData({ ...formData, agency: agency.name });
-                                                                                                setShowAgencyPicker(false);
-                                                                                            } else if (filteredAgencies.length > 0) {
-                                                                                                const agency = filteredAgencies[0];
-                                                                                                setFormData({ ...formData, agency: agency.name });
-                                                                                                setShowAgencyPicker(false);
-                                                                                            }
-                                                                                        } else if (e.key === 'Escape') {
-                                                                                            setShowAgencyPicker(false);
-                                                                                        }
-                                                                                    }}
+                                                        if (readOnly) return;
+                                                        if (!showAgencyPicker || filteredAgencies.length === 0) return;
+                                                        
+                                                        if (e.key === 'ArrowDown') {
+                                                            e.preventDefault();
+                                                            setActiveAgencyIndex(prev => (prev + 1) % filteredAgencies.length);
+                                                        } else if (e.key === 'ArrowUp') {
+                                                            e.preventDefault();
+                                                            setActiveAgencyIndex(prev => (prev - 1 + filteredAgencies.length) % filteredAgencies.length);
+                                                        } else if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            if (activeAgencyIndex >= 0 && activeAgencyIndex < filteredAgencies.length) {
+                                                                const agency = filteredAgencies[activeAgencyIndex];
+                                                                setFormData({ ...formData, agency: agency.name });
+                                                                setShowAgencyPicker(false);
+                                                            } else if (filteredAgencies.length > 0) {
+                                                                const agency = filteredAgencies[0];
+                                                                setFormData({ ...formData, agency: agency.name });
+                                                                setShowAgencyPicker(false);
+                                                            }
+                                                        } else if (e.key === 'Escape') {
+                                                            setShowAgencyPicker(false);
+                                                        }
+                                                    }}
                                                     placeholder="Buscar agencia..."
                                                 />
                                                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 group-focus-within:rotate-180 transition-transform" />
@@ -1401,7 +1442,9 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                                                         }`}>{p.name}</span>
                                                                                         <span className={`text-[8px] font-bold ${
                                                                                             idx === activeProductIndex ? 'text-blue-200' : 'text-slate-400'
-                                                                                        }`}>{p.sku} {p.op ? `• OP:${p.op}` : ''}</span>
+                                                                                        }`}>
+                                                                                             {p.ops && p.ops.length > 0 ? `OPs: ${p.ops.join(', ')}` : 'Sin OP'}
+                                                                                         </span>
                                                                                     </button>
                                                                                 ))
                                                                             }
