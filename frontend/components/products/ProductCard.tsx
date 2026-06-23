@@ -18,6 +18,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const totalStock = product.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
   const hasLowStock = product.variants.some((v: any) => v.stock <= product.minStock);
 
+  const getInventoryTypeBadge = (type: string) => {
+    switch (type) {
+      case 'TERMINADOS':
+        return { label: 'Primera', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+      case 'SEGUNDA':
+        return { label: 'Segunda', className: 'bg-amber-50 text-amber-700 border-amber-100' };
+      case 'PROCESO':
+        return { label: 'En Proceso', className: 'bg-indigo-50 text-indigo-700 border-indigo-100' };
+      case 'AVIOS':
+        return { label: 'Avíos', className: 'bg-purple-50 text-purple-700 border-purple-100' };
+      case 'MATERIALES':
+        return { label: 'Materiales', className: 'bg-blue-50 text-blue-700 border-blue-100' };
+      default:
+        return { label: type, className: 'bg-gray-50 text-gray-700 border-gray-100' };
+    }
+  };
+
+  const badge = getInventoryTypeBadge(product.inventoryType);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition group">
       <div className="p-5">
@@ -30,6 +49,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate max-w-[100px]">
                 {product.category}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold truncate ${badge.className}`}>
+                {badge.label}
               </span>
               <span className="text-xs text-gray-400 truncate">SKU: {product.sku}</span>
             </div>

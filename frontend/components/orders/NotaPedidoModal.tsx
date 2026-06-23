@@ -17,7 +17,8 @@ import {
     ChevronDown,
     Package,
     CheckCircle,
-    Printer
+    Printer,
+    RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -37,6 +38,7 @@ interface NotaPedidoModalProps {
 
 export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder, readOnly }: NotaPedidoModalProps) {
     const [clients, setClients] = useState<any[]>([]);
+    const [isSecondInventory, setIsSecondInventory] = useState(false);
     const [formData, setFormData] = useState({
         clientId: '',
         condition: 'FACTURA/CREDITO 45 DIAS',
@@ -74,7 +76,8 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         
         const groups: { [key: string]: Product[] } = {};
         products.forEach(p => {
-            if (p.inventoryType !== 'TERMINADOS') return;
+            const targetType = isSecondInventory ? 'SEGUNDA' : 'TERMINADOS';
+            if (p.inventoryType !== targetType) return;
             const normName = p.name.trim().toUpperCase();
             if (!groups[normName]) {
                 groups[normName] = [];
@@ -117,7 +120,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                 productIds: groupProds.map(p => p.id)
             };
         });
-    }, [products]);
+    }, [products, isSecondInventory]);
 
     const [productSearch, setProductSearch] = useState<{ index: number; query: string } | null>(null);
     const [colorSearch, setColorSearch] = useState<{ index: number; query: string } | null>(null);
@@ -242,6 +245,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         if (isOpen) {
             fetchClients();
             fetchAgencies();
+            setIsSecondInventory(false);
             if (initialOrder) {
                 setFormData({
                     clientId: initialOrder.clientId || '',
@@ -1375,6 +1379,39 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                 />
                             </div>
                         </div>
+
+                        {/* Selector de tipo de inventario - Solo para Comercial/Admin */}
+                        {!readOnly && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSecondInventory(false);
+                                        // Reset items so they don't accidentally mix models of primera and segunda without knowing
+                                        // or leave them to allow custom combinations
+                                    }}
+                                    className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                        !isSecondInventory
+                                            ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    Inventario de Primera
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSecondInventory(true)}
+                                    className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                        isSecondInventory
+                                            ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-500/20'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isSecondInventory ? 'animate-spin' : ''}`} />
+                                    Inventario de Segunda
+                                </button>
+                            </div>
+                        )}
 
                         {/* TABLE SECTION */}
                         <div className="bg-white rounded-2xl border-2 border-slate-900 shadow-md overflow-hidden">

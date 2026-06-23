@@ -6,7 +6,7 @@ import { Layout } from '../../components/common/Layout';
 import { ProductCard } from '../../components/products/ProductCard';
 import { BarcodeModal } from '../../components/products/BarcodeModal';
 import { useProducts } from '../../hooks/useProducts';
-import { Plus, Search, Package, Barcode, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Package, Barcode, AlertTriangle, CheckCircle, RefreshCw, Clock, Boxes, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ProductsPage() {
@@ -15,14 +15,28 @@ export default function ProductsPage() {
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any>(null);
+  const [selectedInventoryType, setSelectedInventoryType] = useState('TODOS');
   const { products, isLoading, deleteProduct, isDeleting } = useProducts();
 
-  const filteredProducts = products?.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.inventoryType.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const productTabs = [
+    { id: 'TODOS', label: 'Todos', icon: Package },
+    { id: 'TERMINADOS', label: 'Productos de Primera', icon: CheckCircle },
+    { id: 'SEGUNDA', label: 'Productos de Segunda', icon: RefreshCw },
+    { id: 'PROCESO', label: 'En Proceso', icon: Clock },
+    { id: 'AVIOS', label: 'Avíos', icon: Boxes },
+    { id: 'MATERIALES', label: 'Materiales', icon: FileText },
+  ];
+
+  const filteredProducts = products?.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.inventoryType.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesTab = selectedInventoryType === 'TODOS' || p.inventoryType === selectedInventoryType;
+    
+    return matchesSearch && matchesTab;
+  }) || [];
 
   const handleViewBarcodes = (product: any) => {
     setSelectedProduct(product);
@@ -70,6 +84,34 @@ export default function ProductsPage() {
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white"
           />
         </div>
+      </div>
+
+      {/* Inventory Type Tabs */}
+      <div className="flex flex-wrap gap-2 mb-8">
+        {productTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = selectedInventoryType === tab.id;
+          const count = products?.filter(p => tab.id === 'TODOS' ? true : p.inventoryType === tab.id).length || 0;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setSelectedInventoryType(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-sm border ${isActive
+                ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+              <span className={`ml-1 text-xs px-2 py-0.5 rounded-full font-bold transition-colors ${isActive
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'
+                }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Product Grid */}
