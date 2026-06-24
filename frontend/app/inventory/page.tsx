@@ -259,46 +259,114 @@ export default function InventoryPage() {
     const activeTypeLabel = inventoryTypes.find(t => t.id === selectedInventoryType)?.label || 'Todos';
     const cleanLabel = activeTypeLabel.toLowerCase().replace(/\s+/g, '_');
 
-    const data = sortedProducts.flatMap(product =>
-      product.variants.map(variant => ({
-        'Producto': product.name,
-        'OP': product.op || '--',
-        'SKU': variant.variantSku || '--',
-        'Categoría': product.category || '--',
-        'Tipo de Inventario': translateInventoryType(product.inventoryType),
-        'Talla': variant.size || '--',
-        'Color': variant.color || '--',
-        'Stock': Number(variant.stock || 0),
-        'Stock Mínimo': Number(product.minStock || 0),
-        'Costo / P. Compra': Number(product.purchasePrice || 0),
-        'Precio de Venta': Number(product.sellingPrice || 0),
-        'Valor Total': Number((variant.stock || 0) * (product.purchasePrice || 0))
-      }))
-    );
+    // Sorting scores for clothing sizes
+    const sizeOrder = [
+      'U', 'ÚNICA', 'UNICA', 'SIN TALLA',
+      '2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', 'XXXXL',
+      'T/28', 'T/30', 'T/32', 'T/34', 'T/36', 'T/38', 'T/40', 'T/42', 'T/44', 'T/46', 'T/48',
+      'S/28', 'M/30', 'L/32', 'XL/34', 'XXL/36'
+    ];
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const getSizeScore = (sz: string) => {
+      const clean = sz.toUpperCase().trim();
+      const num = parseFloat(clean);
+      if (!isNaN(num)) return num;
 
-    // Column widths
-    ws['!cols'] = [
+      const idx = sizeOrder.indexOf(clean);
+      if (idx !== -1) return 1000 + idx;
+
+      const parts = clean.split('/');
+      if (parts.length === 2) {
+        const prefix = parts[0];
+        const suffixNum = parseFloat(parts[1]);
+        const prefixIdx = sizeOrder.indexOf(prefix);
+        if (prefixIdx !== -1) {
+          return 1000 + prefixIdx * 10 + (isNaN(suffixNum) ? 0 : suffixNum / 100);
+        }
+      }
+      return 10000;
+    };
+
+    // Group variants by Product + OP + Color
+    interface GroupRow {
+      product: any;
+      op: string;
+      color: string;
+      stocks: Record<string, number>;
+    }
+    const groups: Record<string, GroupRow> = {};
+    const allSizesSet = new Set<string>();
+
+    sortedProducts.forEach(product => {
+      product.variants?.forEach((variant: any) => {
+        const op = product.op || '--';
+        const color = variant.color || 'Sin Color';
+        const sizeKey = variant.size || 'Única';
+        allSizesSet.add(sizeKey);
+
+        const key = `${product.id}_${op}_${color}`;
+        if (!groups[key]) {
+          groups[key] = {
+            product,
+            op,
+            color,
+            stocks: {}
+          };
+        }
+        groups[key].stocks[sizeKey] = (groups[key].stocks[sizeKey] || 0) + (variant.stock || 0);
+      });
+    });
+
+    const sortedSizes = Array.from(allSizesSet).sort((a, b) => getSizeScore(a) - getSizeScore(b));
+
+    const excelRows = Object.values(groups).map(g => {
+      const row: Record<string, any> = {
+        'Producto': g.product.name,
+        'OP': g.op,
+        'Categoría': g.product.category || '--',
+        'Tipo de Inventario': translateInventoryType(g.product.inventoryType),
+        'Color': g.color
+      };
+
+      let rowStockTotal = 0;
+      sortedSizes.forEach(size => {
+        const qty = g.stocks[size] || 0;
+        row[size] = Number(qty);
+        rowStockTotal += qty;
+      });
+
+      row['Stock Total'] = Number(rowStockTotal);
+      row['Stock Mínimo'] = Number(g.product.minStock || 0);
+      row['Costo / P. Compra'] = Number(g.product.purchasePrice || 0);
+      row['Precio de Venta'] = Number(g.product.sellingPrice || 0);
+      row['Valor Total'] = Number(rowStockTotal * (g.product.purchasePrice || 0));
+
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(excelRows);
+
+    const sizeCount = sortedSizes.length;
+    const startCols = [
       { wch: 30 }, // Producto
       { wch: 12 }, // OP
-      { wch: 18 }, // SKU
       { wch: 16 }, // Categoría
       { wch: 18 }, // Tipo de Inventario
-      { wch: 10 }, // Talla
-      { wch: 12 }, // Color
-      { wch: 10 }, // Stock
+      { wch: 12 }  // Color
+    ];
+    const sizeCols = sortedSizes.map(() => ({ wch: 8 }));
+    const tailCols = [
+      { wch: 14 }, // Stock Total
       { wch: 14 }, // Stock Mínimo
       { wch: 18 }, // Costo / P. Compra
       { wch: 16 }, // Precio de Venta
       { wch: 18 }  // Valor Total
     ];
+    ws['!cols'] = [...startCols, ...sizeCols, ...tailCols];
 
-    // Auto-filter for all columns to allow easy filtering
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:L1');
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
     ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
 
-    // Freeze top row (headers)
     ws['!views'] = [
       {
         state: 'frozen',
@@ -309,7 +377,12 @@ export default function InventoryPage() {
       }
     ];
 
-    // Format cells (numeric alignment, currency, numbers)
+    const colIdxStockTotal = 5 + sizeCount;
+    const colIdxStockMin = 6 + sizeCount;
+    const colIdxCosto = 7 + sizeCount;
+    const colIdxPrecioVenta = 8 + sizeCount;
+    const colIdxValorTotal = 9 + sizeCount;
+
     for (const cellAddress in ws) {
       if (cellAddress.startsWith('!')) continue;
       const cell = ws[cellAddress];
@@ -317,17 +390,22 @@ export default function InventoryPage() {
       const colIndex = decoded.c;
       const rowIndex = decoded.r;
 
-      // Skip header row
       if (rowIndex === 0) continue;
 
-      // Stock & Stock Mínimo (col 7 & 8) -> Integer formatting
-      if (colIndex === 7 || colIndex === 8) {
+      // Sizes columns
+      if (colIndex >= 5 && colIndex < 5 + sizeCount) {
         cell.t = 'n';
         cell.z = '#,##0';
       }
 
-      // Costo, Precio Venta & Valor Total (col 9, 10 & 11) -> Currency formatting (S/)
-      if (colIndex === 9 || colIndex === 10 || colIndex === 11) {
+      // Stock totals & min stock
+      if (colIndex === colIdxStockTotal || colIndex === colIdxStockMin) {
+        cell.t = 'n';
+        cell.z = '#,##0';
+      }
+
+      // Cost & price currency formatting
+      if (colIndex === colIdxCosto || colIndex === colIdxPrecioVenta || colIndex === colIdxValorTotal) {
         cell.t = 'n';
         cell.z = '"S/"#,##0.00';
       }
@@ -349,22 +427,99 @@ export default function InventoryPage() {
     doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 14, 25);
     doc.text(`Total productos: ${totalProducts} | Stock total: ${totalStock} | Valor: S/ ${totalValue.toLocaleString()}`, 14, 30);
 
-    const headers = [['Producto', 'OP', 'SKU', 'Categoría', 'Tipo', 'Talla', 'Color', 'Stock', 'Costo/Compra', 'P. Venta', 'Valor']];
-    const body = sortedProducts.flatMap(product =>
-      product.variants.map(variant => [
-        product.name,
-        product.op || '--',
-        variant.variantSku,
-        product.category,
-        translateInventoryType(product.inventoryType),
-        variant.size,
-        variant.color,
-        variant.stock,
-        `S/ ${product.purchasePrice.toFixed(2)}`,
-        `S/ ${product.sellingPrice.toFixed(2)}`,
-        `S/ ${(variant.stock * product.purchasePrice).toFixed(2)}`
-      ])
-    );
+    const sizeOrder = [
+      'U', 'ÚNICA', 'UNICA', 'SIN TALLA',
+      '2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', 'XXXXL',
+      'T/28', 'T/30', 'T/32', 'T/34', 'T/36', 'T/38', 'T/40', 'T/42', 'T/44', 'T/46', 'T/48',
+      'S/28', 'M/30', 'L/32', 'XL/34', 'XXL/36'
+    ];
+
+    const getSizeScore = (sz: string) => {
+      const clean = sz.toUpperCase().trim();
+      const num = parseFloat(clean);
+      if (!isNaN(num)) return num;
+      const idx = sizeOrder.indexOf(clean);
+      if (idx !== -1) return 1000 + idx;
+      const parts = clean.split('/');
+      if (parts.length === 2) {
+        const prefix = parts[0];
+        const suffixNum = parseFloat(parts[1]);
+        const prefixIdx = sizeOrder.indexOf(prefix);
+        if (prefixIdx !== -1) {
+          return 1000 + prefixIdx * 10 + (isNaN(suffixNum) ? 0 : suffixNum / 100);
+        }
+      }
+      return 10000;
+    };
+
+    interface GroupRow {
+      product: any;
+      op: string;
+      color: string;
+      stocks: Record<string, number>;
+    }
+    const groups: Record<string, GroupRow> = {};
+    const allSizesSet = new Set<string>();
+
+    sortedProducts.forEach(product => {
+      product.variants?.forEach((variant: any) => {
+        const op = product.op || '--';
+        const color = variant.color || 'Sin Color';
+        const sizeKey = variant.size || 'Única';
+        allSizesSet.add(sizeKey);
+
+        const key = `${product.id}_${op}_${color}`;
+        if (!groups[key]) {
+          groups[key] = {
+            product,
+            op,
+            color,
+            stocks: {}
+          };
+        }
+        groups[key].stocks[sizeKey] = (groups[key].stocks[sizeKey] || 0) + (variant.stock || 0);
+      });
+    });
+
+    const sortedSizes = Array.from(allSizesSet).sort((a, b) => getSizeScore(a) - getSizeScore(b));
+
+    const headers = [[
+      'Producto', 'OP', 'Categoría', 'Tipo', 'Color',
+      ...sortedSizes,
+      'Total', 'Costo', 'Venta', 'Valor'
+    ]];
+
+    const body = Object.values(groups).map(g => {
+      let rowStockTotal = 0;
+      const sizeCells = sortedSizes.map(size => {
+        const qty = g.stocks[size] || 0;
+        rowStockTotal += qty;
+        return qty.toString();
+      });
+
+      return [
+        g.product.name,
+        g.op,
+        g.product.category || '--',
+        translateInventoryType(g.product.inventoryType),
+        g.color,
+        ...sizeCells,
+        rowStockTotal.toString(),
+        `S/ ${(g.product.purchasePrice || 0).toFixed(2)}`,
+        `S/ ${(g.product.sellingPrice || 0).toFixed(2)}`,
+        `S/ ${(rowStockTotal * (g.product.purchasePrice || 0)).toFixed(2)}`
+      ];
+    });
+
+    const sizeCount = sortedSizes.length;
+    const columnStyles: Record<number, any> = {};
+    for (let i = 5; i < 5 + sizeCount; i++) {
+      columnStyles[i] = { halign: 'center' };
+    }
+    columnStyles[5 + sizeCount] = { halign: 'right', fontStyle: 'bold' };
+    columnStyles[6 + sizeCount] = { halign: 'right' };
+    columnStyles[7 + sizeCount] = { halign: 'right' };
+    columnStyles[8 + sizeCount] = { halign: 'right', fontStyle: 'bold' };
 
     autoTable(doc, {
       startY: 36,
@@ -374,12 +529,7 @@ export default function InventoryPage() {
       headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       styles: { fontSize: 7, cellPadding: 2.5 },
       alternateRowStyles: { fillColor: [245, 247, 250] },
-      columnStyles: {
-        6: { halign: 'center', fontStyle: 'bold' },
-        7: { halign: 'right' },
-        8: { halign: 'right' },
-        9: { halign: 'right', fontStyle: 'bold' }
-      },
+      columnStyles: columnStyles,
       didDrawPage: (data) => {
         doc.setFontSize(7);
         doc.setTextColor(150);
