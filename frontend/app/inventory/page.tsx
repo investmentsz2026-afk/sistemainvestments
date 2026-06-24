@@ -344,7 +344,21 @@ export default function InventoryPage() {
       return row;
     });
 
-    const ws = XLSX.utils.json_to_sheet(excelRows);
+    const headersOrder = [
+      'Producto',
+      'OP',
+      'Categoría',
+      'Tipo de Inventario',
+      'Color',
+      ...sortedSizes,
+      'Stock Total',
+      'Stock Mínimo',
+      'Costo / P. Compra',
+      'Precio de Venta',
+      'Valor Total'
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(excelRows, { header: headersOrder });
 
     const sizeCount = sortedSizes.length;
     const startCols = [
