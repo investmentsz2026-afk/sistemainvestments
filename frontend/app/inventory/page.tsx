@@ -242,34 +242,100 @@ export default function InventoryPage() {
     }
   };
 
+  const translateInventoryType = (type: string) => {
+    const map: Record<string, string> = {
+      'TERMINADOS': 'Terminados',
+      'PROCESO': 'En Proceso',
+      'SEGUNDA': 'De Segunda',
+      'MATERIALES': 'Materiales',
+      'MAQUINARIA': 'Maquinaria',
+      'AVIOS': 'Avíos',
+      'OTROS': 'Otros'
+    };
+    return map[type] || type;
+  };
+
   const exportToExcel = () => {
+    const activeTypeLabel = inventoryTypes.find(t => t.id === selectedInventoryType)?.label || 'Todos';
+    const cleanLabel = activeTypeLabel.toLowerCase().replace(/\s+/g, '_');
+
     const data = sortedProducts.flatMap(product =>
       product.variants.map(variant => ({
         'Producto': product.name,
         'OP': product.op || '--',
-        'SKU': variant.variantSku,
-        'Categoría': product.category,
-        'Tipo': product.inventoryType,
-        'Talla': variant.size,
-        'Color': variant.color,
-        'Stock': variant.stock,
-        'Stock Mín.': product.minStock,
-        'P. Venta': product.sellingPrice,
-        [['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(product.inventoryType) ? 'Costo de Producción' : 'P. Compra']: product.purchasePrice,
-        'Valor Total': (variant.stock * product.purchasePrice)
+        'SKU': variant.variantSku || '--',
+        'Categoría': product.category || '--',
+        'Tipo de Inventario': translateInventoryType(product.inventoryType),
+        'Talla': variant.size || '--',
+        'Color': variant.color || '--',
+        'Stock': Number(variant.stock || 0),
+        'Stock Mínimo': Number(product.minStock || 0),
+        'Costo / P. Compra': Number(product.purchasePrice || 0),
+        'Precio de Venta': Number(product.sellingPrice || 0),
+        'Valor Total': Number((variant.stock || 0) * (product.purchasePrice || 0))
       }))
     );
 
     const ws = XLSX.utils.json_to_sheet(data);
+
     // Column widths
     ws['!cols'] = [
-      { wch: 25 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
-      { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 8 },
-      { wch: 12 }, { wch: 12 }, { wch: 14 }
+      { wch: 30 }, // Producto
+      { wch: 12 }, // OP
+      { wch: 18 }, // SKU
+      { wch: 16 }, // Categoría
+      { wch: 18 }, // Tipo de Inventario
+      { wch: 10 }, // Talla
+      { wch: 12 }, // Color
+      { wch: 10 }, // Stock
+      { wch: 14 }, // Stock Mínimo
+      { wch: 18 }, // Costo / P. Compra
+      { wch: 16 }, // Precio de Venta
+      { wch: 18 }  // Valor Total
     ];
+
+    // Auto-filter for all columns to allow easy filtering
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:L1');
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+
+    // Freeze top row (headers)
+    ws['!views'] = [
+      {
+        state: 'frozen',
+        ySplit: 1,
+        xSplit: 0,
+        topLeftCell: 'A2',
+        activePane: 'bottomLeft'
+      }
+    ];
+
+    // Format cells (numeric alignment, currency, numbers)
+    for (const cellAddress in ws) {
+      if (cellAddress.startsWith('!')) continue;
+      const cell = ws[cellAddress];
+      const decoded = XLSX.utils.decode_cell(cellAddress);
+      const colIndex = decoded.c;
+      const rowIndex = decoded.r;
+
+      // Skip header row
+      if (rowIndex === 0) continue;
+
+      // Stock & Stock Mínimo (col 7 & 8) -> Integer formatting
+      if (colIndex === 7 || colIndex === 8) {
+        cell.t = 'n';
+        cell.z = '#,##0';
+      }
+
+      // Costo, Precio Venta & Valor Total (col 9, 10 & 11) -> Currency formatting (S/)
+      if (colIndex === 9 || colIndex === 10 || colIndex === 11) {
+        cell.t = 'n';
+        cell.z = '"S/"#,##0.00';
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
-    XLSX.writeFile(wb, `INVENTARIO_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+    XLSX.writeFile(wb, `INVENTARIO_${cleanLabel.toUpperCase()}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     setShowExportModal(false);
   };
 
@@ -290,7 +356,7 @@ export default function InventoryPage() {
         product.op || '--',
         variant.variantSku,
         product.category,
-        product.inventoryType,
+        translateInventoryType(product.inventoryType),
         variant.size,
         variant.color,
         variant.stock,
@@ -321,7 +387,9 @@ export default function InventoryPage() {
       }
     });
 
-    doc.save(`INVENTARIO_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    const activeTypeLabel = inventoryTypes.find(t => t.id === selectedInventoryType)?.label || 'Todos';
+    const cleanLabel = activeTypeLabel.toLowerCase().replace(/\s+/g, '_');
+    doc.save(`INVENTARIO_${cleanLabel.toUpperCase()}_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
     setShowExportModal(false);
   };
 
