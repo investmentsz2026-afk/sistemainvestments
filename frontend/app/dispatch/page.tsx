@@ -20,7 +20,8 @@ import {
     Eye,
     ShoppingCart,
     Tag,
-    XCircle
+    XCircle,
+    FileSpreadsheet
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,6 +29,7 @@ import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
 import { NotaPedidoModal } from '../../components/orders/NotaPedidoModal';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -115,6 +117,102 @@ export default function DispatchPage() {
     const handleView = (order: any) => {
         setSelectedOrder(order);
         setShowModal(true);
+    };
+
+    const exportToExcel = () => {
+        const activeLabelMap: Record<string, string> = {
+            'POR_DESPACHAR': 'Por Despachar',
+            'DESPACHADOS': 'Despachados',
+            'COMPLETADOS': 'Boletas Generadas',
+            'ANULADOS': 'Anulados',
+            'TODOS': 'Todos'
+        };
+        const activeLabel = activeLabelMap[viewMode] || 'Despacho';
+        const cleanLabel = activeLabel.toLowerCase().replace(/\s+/g, '_');
+
+        const data = dispatchOrders.map(order => {
+            const qty = (order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO') && Array.isArray(order.dispatchDetails) && order.dispatchDetails.length > 0 
+                ? order.dispatchDetails.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+                : order.totalQuantity;
+
+            const total = (order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO') && Array.isArray(order.items) && order.items.length > 0
+                ? order.items.reduce((sum: number, item: any) => sum + ((item.dispQuantity || 0) * (item.unitPrice || 0)), 0)
+                : order.totalAmount;
+
+            let statusText = 'POR DESPACHAR';
+            if (order.status === 'DESPACHADO') statusText = 'DESPACHADO';
+            else if (order.status === 'COMPLETADO' || order.status === 'ENTREGADO') statusText = 'COMPLETADO / ENTREGADO';
+            else if (order.status === 'ANULADO') statusText = 'ANULADO';
+
+            return {
+                'Nro Pedido': `#${order.orderNumber || order.id.slice(-6).toUpperCase()}`,
+                'Fecha de Aprobación': order.createdAt ? formatDate(order.createdAt) : '--',
+                'Cliente': order.client?.name || '--',
+                'Zona': order.client?.zone || order.zone || 'OFICINA',
+                'Dirección de Entrega': order.deliveryAddress || order.client?.address || '--',
+                'Estado': statusText,
+                'Cantidad Prendas': Number(qty || 0),
+                'Total Pedido': Number(total || 0)
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        // Column widths
+        ws['!cols'] = [
+            { wch: 15 }, // Nro Pedido
+            { wch: 22 }, // Fecha de Aprobación
+            { wch: 30 }, // Cliente
+            { wch: 16 }, // Zona
+            { wch: 45 }, // Dirección
+            { wch: 25 }, // Estado
+            { wch: 18 }, // Cantidad Prendas
+            { wch: 18 }  // Total Pedido
+        ];
+
+        // Auto-filter
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+        ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+
+        // Freeze top row
+        ws['!views'] = [
+            {
+                state: 'frozen',
+                ySplit: 1,
+                xSplit: 0,
+                topLeftCell: 'A2',
+                activePane: 'bottomLeft'
+            }
+        ];
+
+        // Format cell values
+        for (const cellAddress in ws) {
+            if (cellAddress.startsWith('!')) continue;
+            const cell = ws[cellAddress];
+            const decoded = XLSX.utils.decode_cell(cellAddress);
+            const colIndex = decoded.c;
+            const rowIndex = decoded.r;
+
+            if (rowIndex === 0) continue;
+
+            // Cantidad Prendas (col 6) -> Integer
+            if (colIndex === 6) {
+                cell.t = 'n';
+                cell.z = '#,##0';
+            }
+
+            // Total Pedido (col 7) -> Currency (S/)
+            if (colIndex === 7) {
+                cell.t = 'n';
+                cell.z = '"S/"#,##0.00';
+            }
+        }
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Despachos');
+        
+        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '') + '_' + new Date().toTimeString().slice(0, 5).replace(/:/g, '');
+        XLSX.writeFile(wb, `DESPACHOS_${cleanLabel.toUpperCase()}_${timestamp}.xlsx`);
     };
 
     const dispatchOrders = orders
@@ -287,6 +385,14 @@ export default function DispatchPage() {
                         />
                     </div>
                     <div className="flex items-center gap-3 w-full md:w-auto">
+                        <button 
+                            onClick={exportToExcel}
+                            disabled={dispatchOrders.length === 0}
+                            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:hover:bg-emerald-50 rounded-2xl text-sm font-black text-emerald-600 transition-all uppercase tracking-widest"
+                            title="Exportar listado a Excel"
+                        >
+                            <FileSpreadsheet className="w-5 h-5" /> Exportar Excel
+                        </button>
                         <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-4 bg-gray-50 hover:bg-gray-100 rounded-2xl text-sm font-black text-gray-600 transition-all uppercase tracking-widest">
                             <Filter className="w-5 h-5" /> Filtros
                         </button>
