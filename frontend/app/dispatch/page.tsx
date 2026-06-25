@@ -42,7 +42,7 @@ export default function DispatchPage() {
     const [orders, setOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<'ACTIVOS' | 'ANULADOS'>('ACTIVOS');
+    const [viewMode, setViewMode] = useState<'POR_DESPACHAR' | 'DESPACHADOS' | 'COMPLETADOS' | 'ANULADOS' | 'TODOS'>('POR_DESPACHAR');
     
     // Modal state
     const [showModal, setShowModal] = useState(false);
@@ -121,10 +121,18 @@ export default function DispatchPage() {
         .filter(o => {
             const matchesSearch = o.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                   o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-            if (viewMode === 'ACTIVOS') {
-                return (o.status === 'EN_LOGISTICA' || o.status === 'DESPACHADO' || o.status === 'COMPLETADO' || o.status === 'ENTREGADO') && matchesSearch;
+            if (!matchesSearch) return false;
+
+            if (viewMode === 'POR_DESPACHAR') {
+                return o.status === 'EN_LOGISTICA';
+            } else if (viewMode === 'DESPACHADOS') {
+                return o.status === 'DESPACHADO';
+            } else if (viewMode === 'COMPLETADOS') {
+                return o.status === 'COMPLETADO' || o.status === 'ENTREGADO';
+            } else if (viewMode === 'ANULADOS') {
+                return o.status === 'ANULADO';
             } else {
-                return o.status === 'ANULADO' && matchesSearch;
+                return true; // TODOS
             }
         })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -135,28 +143,32 @@ export default function DispatchPage() {
             value: orders.filter(o => o.status === 'EN_LOGISTICA').length.toString(), 
             icon: Clock, 
             color: 'text-amber-600', 
-            bg: 'bg-amber-100' 
+            bg: 'bg-amber-100',
+            mode: 'POR_DESPACHAR' as const
         },
         { 
             label: 'Despachados', 
             value: orders.filter(o => o.status === 'DESPACHADO').length.toString(), 
             icon: Truck, 
             color: 'text-blue-600', 
-            bg: 'bg-blue-100' 
+            bg: 'bg-blue-100',
+            mode: 'DESPACHADOS' as const
         },
         { 
             label: 'Completados', 
             value: orders.filter(o => o.status === 'ENTREGADO' || o.status === 'COMPLETADO').length.toString(), 
             icon: CheckCircle, 
             color: 'text-emerald-600', 
-            bg: 'bg-emerald-100' 
+            bg: 'bg-emerald-100',
+            mode: 'COMPLETADOS' as const
         },
         { 
             label: 'Anulados', 
             value: orders.filter(o => o.status === 'ANULADO').length.toString(), 
             icon: XCircle, 
             color: 'text-rose-600', 
-            bg: 'bg-rose-100' 
+            bg: 'bg-rose-100',
+            mode: 'ANULADOS' as const
         },
     ];
 
@@ -178,49 +190,87 @@ export default function DispatchPage() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {stats.map((stat, idx) => (
-                        <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.1 }}
-                            className="bg-white p-6 rounded-[2rem] shadow-xl shadow-gray-200/20 border border-gray-100 hover:shadow-indigo-100 transition-all group"
-                        >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className={`p-4 ${stat.bg} rounded-2xl ${stat.color} group-hover:scale-110 transition-transform`}>
-                                    <stat.icon className="w-6 h-6" />
+                    {stats.map((stat, idx) => {
+                        const isActive = viewMode === stat.mode;
+                        return (
+                            <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.1 }}
+                                onClick={() => setViewMode(stat.mode)}
+                                className={`p-6 rounded-[2rem] border transition-all duration-350 cursor-pointer flex flex-col justify-between group ${
+                                    isActive
+                                        ? 'bg-indigo-50/40 border-indigo-200 shadow-xl shadow-indigo-100/50 ring-1 ring-indigo-500/10'
+                                        : 'bg-white border-gray-100 shadow-xl shadow-gray-200/20 hover:shadow-indigo-100/50'
+                                }`}
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`p-4 ${stat.bg} rounded-2xl ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
+                                        <stat.icon className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
                                 </div>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-4xl font-black text-gray-900">{stat.value}</span>
-                                <span className="text-xs text-gray-400 font-bold uppercase tracking-tight">Pedidos</span>
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-black text-gray-900">{stat.value}</span>
+                                    <span className="text-xs text-gray-400 font-bold uppercase tracking-tight">Pedidos</span>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-gray-100">
+                <div className="flex flex-wrap border-b border-gray-100 gap-y-2">
                     <button
-                        onClick={() => setViewMode('ACTIVOS')}
-                        className={`px-8 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
-                            viewMode === 'ACTIVOS'
+                        onClick={() => setViewMode('POR_DESPACHAR')}
+                        className={`px-6 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'POR_DESPACHAR'
+                                ? 'border-amber-500 text-amber-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Por Despachar ({orders.filter(o => o.status === 'EN_LOGISTICA').length})
+                    </button>
+                    <button
+                        onClick={() => setViewMode('DESPACHADOS')}
+                        className={`px-6 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'DESPACHADOS'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Despachados ({orders.filter(o => o.status === 'DESPACHADO').length})
+                    </button>
+                    <button
+                        onClick={() => setViewMode('COMPLETADOS')}
+                        className={`px-6 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'COMPLETADOS'
+                                ? 'border-emerald-500 text-emerald-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Boletas Generadas ({orders.filter(o => o.status === 'ENTREGADO' || o.status === 'COMPLETADO').length})
+                    </button>
+                    <button
+                        onClick={() => setViewMode('ANULADOS')}
+                        className={`px-6 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'ANULADOS'
+                                ? 'border-rose-500 text-rose-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        Anulados ({orders.filter(o => o.status === 'ANULADO').length})
+                    </button>
+                    <button
+                        onClick={() => setViewMode('TODOS')}
+                        className={`px-6 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
+                            viewMode === 'TODOS'
                                 ? 'border-indigo-600 text-indigo-600'
                                 : 'border-transparent text-gray-400 hover:text-gray-600'
                         }`}
                     >
-                        Pedidos Activos
-                    </button>
-                    <button
-                        onClick={() => setViewMode('ANULADOS')}
-                        className={`px-8 py-3.5 font-black text-sm uppercase tracking-wider border-b-2 transition-all ${
-                            viewMode === 'ANULADOS'
-                                ? 'border-rose-600 text-rose-600'
-                                : 'border-transparent text-gray-400 hover:text-gray-600'
-                        }`}
-                    >
-                        Pedidos Anulados
+                        Todos ({orders.length})
                     </button>
                 </div>
 

@@ -336,7 +336,6 @@ export default function InventoryPage() {
       });
 
       row['Stock Total'] = Number(rowStockTotal);
-      row['Stock Mínimo'] = Number(g.product.minStock || 0);
       row['Costo / P. Compra'] = Number(g.product.purchasePrice || 0);
       row['Precio de Venta'] = Number(g.product.sellingPrice || 0);
       row['Valor Total'] = Number(rowStockTotal * (g.product.purchasePrice || 0));
@@ -352,7 +351,6 @@ export default function InventoryPage() {
       'Color',
       ...sortedSizes,
       'Stock Total',
-      'Stock Mínimo',
       'Costo / P. Compra',
       'Precio de Venta',
       'Valor Total'
@@ -371,7 +369,6 @@ export default function InventoryPage() {
     const sizeCols = sortedSizes.map(() => ({ wch: 8 }));
     const tailCols = [
       { wch: 14 }, // Stock Total
-      { wch: 14 }, // Stock Mínimo
       { wch: 18 }, // Costo / P. Compra
       { wch: 16 }, // Precio de Venta
       { wch: 18 }  // Valor Total
@@ -392,10 +389,9 @@ export default function InventoryPage() {
     ];
 
     const colIdxStockTotal = 5 + sizeCount;
-    const colIdxStockMin = 6 + sizeCount;
-    const colIdxCosto = 7 + sizeCount;
-    const colIdxPrecioVenta = 8 + sizeCount;
-    const colIdxValorTotal = 9 + sizeCount;
+    const colIdxCosto = 6 + sizeCount;
+    const colIdxPrecioVenta = 7 + sizeCount;
+    const colIdxValorTotal = 8 + sizeCount;
 
     for (const cellAddress in ws) {
       if (cellAddress.startsWith('!')) continue;
@@ -412,8 +408,8 @@ export default function InventoryPage() {
         cell.z = '#,##0';
       }
 
-      // Stock totals & min stock
-      if (colIndex === colIdxStockTotal || colIndex === colIdxStockMin) {
+      // Stock totals
+      if (colIndex === colIdxStockTotal) {
         cell.t = 'n';
         cell.z = '#,##0';
       }
