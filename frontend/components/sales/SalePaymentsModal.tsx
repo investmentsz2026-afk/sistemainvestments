@@ -347,7 +347,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 method,
                 paymentDate,
                 notes,
-                evidenceUrl: method === 'NOTA_CREDITO' && isElectronic ? '' : evidenceUrl,
+                evidenceUrl,
                 creditNoteMotive: method === 'NOTA_CREDITO' ? creditNoteMotive : undefined,
                 creditNoteNumber: method === 'NOTA_CREDITO' && !isElectronic ? creditNoteNumber : undefined,
                 isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined
@@ -820,40 +820,38 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                         />
                                     </div>
 
-                                    {((method !== 'NOTA_CREDITO') || (method === 'NOTA_CREDITO' && !isElectronic)) && (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Subir Evidencia</label>
-                                            <div className="relative group">
-                                                <input 
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleFileUpload}
-                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
-                                                    disabled={isUploading}
-                                                />
-                                                <div className={`w-full min-h-[90px] border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center transition-all px-6 py-4 ${
-                                                    evidenceUrl ? 'border-emerald-200 bg-emerald-50/10' : 
-                                                    isUploading ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-100 bg-slate-50 group-hover:bg-slate-100 group-hover:border-indigo-300'
-                                                }`}>
-                                                    {isUploading ? (
-                                                        <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-                                                    ) : evidenceUrl ? (
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-md overflow-hidden border border-emerald-300">
-                                                                <img src={`${SERVER_URL}${evidenceUrl}`} className="w-full h-full object-cover rounded-lg" />
-                                                            </div>
-                                                            <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-tight">✓ Foto<br/>Cargada</span>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Subir Evidencia</label>
+                                        <div className="relative group">
+                                            <input 
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleFileUpload}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+                                                disabled={isUploading}
+                                            />
+                                            <div className={`w-full min-h-[90px] border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center transition-all px-6 py-4 ${
+                                                evidenceUrl ? 'border-emerald-200 bg-emerald-50/10' : 
+                                                isUploading ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-100 bg-slate-50 group-hover:bg-slate-100 group-hover:border-indigo-300'
+                                            }`}>
+                                                {isUploading ? (
+                                                    <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                                                ) : evidenceUrl ? (
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-md overflow-hidden border border-emerald-300">
+                                                            <img src={`${SERVER_URL}${evidenceUrl}`} className="w-full h-full object-cover rounded-lg" />
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex flex-col items-center gap-2">
-                                                            <Upload className="w-3.5 h-3.5 text-indigo-500" />
-                                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.15em]">Adjuntar Boucher</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-tight">✓ Foto<br/>Cargada</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.15em]">Adjuntar Boucher</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
 
                                     <div className="pt-4 flex gap-3">
                                         <button 

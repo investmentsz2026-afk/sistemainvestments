@@ -377,8 +377,8 @@ export class SalesService {
       let updateData: any = { status: 'APROBADO' };
 
       if (payment.method === 'NOTA_CREDITO') {
-        // If it was requested as electronic (no uploaded voucher and no credit note number)
-        const isElectronic = !payment.evidenceUrl && !payment.creditNoteNumber && payment.creditNoteMotive;
+        // If it was requested as electronic (has motive and doesn't have credit note number yet)
+        const isElectronic = payment.creditNoteMotive && payment.creditNoteMotive !== 'Manual' && !payment.creditNoteNumber;
         if (isElectronic) {
           // Generate in Nubefact on approval
           const sunatResult = await this.sendCreditNoteToSunat(tx, payment.saleId, payment.amount, payment.creditNoteMotive || '4', payment.notes || 'Nota de crédito');
