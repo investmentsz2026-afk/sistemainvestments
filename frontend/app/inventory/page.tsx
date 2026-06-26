@@ -321,10 +321,10 @@ export default function InventoryPage() {
 
     const excelRows = Object.values(groups).map(g => {
       const row: Record<string, any> = {
-        'Producto': g.product.name,
-        'OP': g.op,
-        'Categoría': g.product.category || '--',
         'Tipo de Inventario': translateInventoryType(g.product.inventoryType),
+        'Categoría': g.product.category || '--',
+        'OP': g.op,
+        'Producto': g.product.name,
         'Color': g.color
       };
 
@@ -336,6 +336,7 @@ export default function InventoryPage() {
       });
 
       row['Stock Total'] = Number(rowStockTotal);
+      row['Stock Mínimo'] = Number(g.product.minStock || 0);
       row['Costo / P. Compra'] = Number(g.product.purchasePrice || 0);
       row['Precio de Venta'] = Number(g.product.sellingPrice || 0);
       row['Valor Total'] = Number(rowStockTotal * (g.product.purchasePrice || 0));
@@ -344,13 +345,14 @@ export default function InventoryPage() {
     });
 
     const headersOrder = [
-      'Producto',
-      'OP',
-      'Categoría',
       'Tipo de Inventario',
+      'Categoría',
+      'OP',
+      'Producto',
       'Color',
       ...sortedSizes,
       'Stock Total',
+      'Stock Mínimo',
       'Costo / P. Compra',
       'Precio de Venta',
       'Valor Total'
@@ -360,15 +362,16 @@ export default function InventoryPage() {
 
     const sizeCount = sortedSizes.length;
     const startCols = [
-      { wch: 30 }, // Producto
-      { wch: 12 }, // OP
-      { wch: 16 }, // Categoría
       { wch: 18 }, // Tipo de Inventario
+      { wch: 16 }, // Categoría
+      { wch: 12 }, // OP
+      { wch: 30 }, // Producto
       { wch: 12 }  // Color
     ];
     const sizeCols = sortedSizes.map(() => ({ wch: 8 }));
     const tailCols = [
       { wch: 14 }, // Stock Total
+      { wch: 14 }, // Stock Mínimo
       { wch: 18 }, // Costo / P. Compra
       { wch: 16 }, // Precio de Venta
       { wch: 18 }  // Valor Total
@@ -389,9 +392,10 @@ export default function InventoryPage() {
     ];
 
     const colIdxStockTotal = 5 + sizeCount;
-    const colIdxCosto = 6 + sizeCount;
-    const colIdxPrecioVenta = 7 + sizeCount;
-    const colIdxValorTotal = 8 + sizeCount;
+    const colIdxStockMinimo = 6 + sizeCount;
+    const colIdxCosto = 7 + sizeCount;
+    const colIdxPrecioVenta = 8 + sizeCount;
+    const colIdxValorTotal = 9 + sizeCount;
 
     for (const cellAddress in ws) {
       if (cellAddress.startsWith('!')) continue;
@@ -408,8 +412,8 @@ export default function InventoryPage() {
         cell.z = '#,##0';
       }
 
-      // Stock totals
-      if (colIndex === colIdxStockTotal) {
+      // Stock totals & minimum
+      if (colIndex === colIdxStockTotal || colIndex === colIdxStockMinimo) {
         cell.t = 'n';
         cell.z = '#,##0';
       }
@@ -494,9 +498,9 @@ export default function InventoryPage() {
     const sortedSizes = Array.from(allSizesSet).sort((a, b) => getSizeScore(a) - getSizeScore(b));
 
     const headers = [[
-      'Producto', 'OP', 'Categoría', 'Tipo', 'Color',
+      'Tipo de Inventario', 'Categoría', 'OP', 'Producto', 'Color',
       ...sortedSizes,
-      'Total', 'Costo', 'Venta', 'Valor'
+      'Total', 'Mínimo', 'Costo', 'Venta', 'Valor'
     ]];
 
     const body = Object.values(groups).map(g => {
@@ -508,13 +512,14 @@ export default function InventoryPage() {
       });
 
       return [
-        g.product.name,
-        g.op,
-        g.product.category || '--',
         translateInventoryType(g.product.inventoryType),
+        g.product.category || '--',
+        g.op,
+        g.product.name,
         g.color,
         ...sizeCells,
         rowStockTotal.toString(),
+        (g.product.minStock || 0).toString(),
         `S/ ${(g.product.purchasePrice || 0).toFixed(2)}`,
         `S/ ${(g.product.sellingPrice || 0).toFixed(2)}`,
         `S/ ${(rowStockTotal * (g.product.purchasePrice || 0)).toFixed(2)}`
@@ -529,7 +534,8 @@ export default function InventoryPage() {
     columnStyles[5 + sizeCount] = { halign: 'right', fontStyle: 'bold' };
     columnStyles[6 + sizeCount] = { halign: 'right' };
     columnStyles[7 + sizeCount] = { halign: 'right' };
-    columnStyles[8 + sizeCount] = { halign: 'right', fontStyle: 'bold' };
+    columnStyles[8 + sizeCount] = { halign: 'right' };
+    columnStyles[9 + sizeCount] = { halign: 'right', fontStyle: 'bold' };
 
     autoTable(doc, {
       startY: 36,
