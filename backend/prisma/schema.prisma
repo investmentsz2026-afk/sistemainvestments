@@ -442,6 +442,16 @@ model SalePayment {
   status          String   @default("APROBADO") // APROBADO, PENDIENTE, RECHAZADO
   registeredById  String?  @map("registered_by_id")
   registeredByName String? @map("registered_by_name")
+  
+  // Credit Note and SUNAT details
+  creditNoteNumber  String?  @map("credit_note_number")
+  creditNoteMotive  String?  @map("credit_note_motive")
+  sunatStatus       String?  @map("sunat_status")
+  sunatResponse     String?  @map("sunat_response") @db.Text
+  sunatXmlUrl       String?  @map("sunat_xml_url")
+  sunatPdfUrl       String?  @map("sunat_pdf_url")
+  sunatCdrUrl       String?  @map("sunat_cdr_url")
+
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

@@ -35,6 +35,206 @@ const formatDate = (dateString: string) => {
 
 const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
 
+const getCreditNoteVoucherHTML = (payment: any, sale: any) => {
+    if (!sale) return '';
+    const today = formatDate(payment.createdAt || new Date().toISOString());
+    const total = payment.amount;
+    const subtotal = total / 1.18;
+    const igv = total - subtotal;
+    
+    // Motive label map
+    const motiveMap: Record<string, string> = {
+        '1': 'ANULACIÓN DE LA OPERACIÓN',
+        '4': 'DESCUENTO GLOBAL / DISMINUCIÓN DEL TOTAL',
+        '6': 'DEVOLUCIÓN TOTAL DE PRODUCTOS',
+        '10': 'OTROS CONCEPTOS'
+    };
+    const motiveDesc = motiveMap[payment.creditNoteMotive] || payment.notes || 'DESCUENTO GLOBAL';
+
+    // Convert number to words (simple helper)
+    const formatSolesInWords = (num: number) => {
+        const integerPart = Math.floor(num);
+        const decimalPart = Math.round((num - integerPart) * 100);
+        
+        // Simple integer to Spanish words (for typical values)
+        const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+        const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+        const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+        const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+        
+        const convertLessThanThousand = (n: number): string => {
+            if (n === 0) return '';
+            if (n === 100) return 'CIEN';
+            const h = Math.floor(n / 100);
+            const t = Math.floor((n % 100) / 10);
+            const u = n % 10;
+            
+            let res = hundreds[h] ? hundreds[h] + ' ' : '';
+            if (t === 1) {
+                res += teens[u] + ' ';
+            } else {
+                res += (tens[t] ? tens[t] + ' ' : '');
+                if (u > 0) {
+                    res += (tens[t] ? 'Y ' : '') + units[u] + ' ';
+                }
+            }
+            return res.trim();
+        };
+
+        const convertToWords = (n: number): string => {
+            if (n === 0) return 'CERO';
+            let word = '';
+            
+            if (Math.floor(n / 1000000) > 0) {
+                const mill = Math.floor(n / 1000000);
+                word += (mill === 1 ? 'UN MILLÓN' : convertLessThanThousand(mill) + ' MILLONES') + ' ';
+                n %= 1000000;
+            }
+            
+            if (Math.floor(n / 1000) > 0) {
+                const thousands = Math.floor(n / 1000);
+                word += (thousands === 1 ? 'MIL' : convertLessThanThousand(thousands) + ' MIL') + ' ';
+                n %= 1000;
+            }
+            
+            if (n > 0) {
+                word += convertLessThanThousand(n) + ' ';
+            }
+            
+            return word.trim();
+        };
+
+        const words = convertToWords(integerPart);
+        const centsStr = decimalPart.toString().padStart(2, '0');
+        return `SON: ${words} Y ${centsStr}/100 SOLES`;
+    };
+
+    const docTitle = sale.invoiceNumber?.startsWith('F') ? 'Factura Electrónica' : 'Boleta de Venta';
+    const docNum = sale.invoiceNumber || 'S/N';
+    const clientDocType = sale.client?.documentType || 'RUC';
+    const clientDocNum = sale.client?.documentNumber || '00000000';
+
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Inter', sans-serif; color: #111; padding: 25px; font-size: 10px; line-height: 1.4; }
+                
+                .top-container { display: flex; justify-content: space-between; margin-bottom: 20px; }
+                .company-info { width: 55%; }
+                .company-name { font-size: 13px; font-weight: 900; margin-bottom: 4px; color: #111; }
+                .company-details { font-size: 8px; color: #555; font-weight: 500; }
+                
+                .ruc-box { width: 40%; border: 2.5px solid #111; padding: 12px; text-align: center; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; }
+                .ruc-box .title { font-size: 10px; font-weight: 900; letter-spacing: 0.5px; }
+                .ruc-box .ruc { font-size: 10px; font-weight: 900; margin: 4px 0; }
+                .ruc-box .number { font-size: 12px; font-weight: 900; color: #111; }
+                
+                .section-title { font-size: 11px; font-weight: 900; border-bottom: 1.5px solid #111; padding-bottom: 4px; margin-bottom: 10px; text-transform: uppercase; }
+                
+                .grid-details { display: grid; grid-template-columns: 140px 1fr; row-gap: 5px; margin-bottom: 18px; font-size: 9px; }
+                .grid-details .label { font-weight: 700; color: #333; }
+                .grid-details .value { font-weight: 500; }
+                
+                table { width: 100%; border-collapse: collapse; margin-bottom: 15px; margin-top: 10px; }
+                th { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #444; border-bottom: 2px solid #111; padding: 6px 4px; text-align: left; }
+                td { padding: 8px 4px; border-bottom: 1px solid #ddd; font-size: 9px; }
+                
+                .bottom-section { display: flex; justify-content: space-between; margin-top: 15px; }
+                .words-amount { width: 60%; font-weight: 700; font-size: 9px; text-transform: uppercase; border: 1px solid #eee; padding: 10px; border-radius: 6px; background: #fafafa; display: flex; align-items: center; }
+                
+                .totals-box { width: 35%; }
+                .totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 9px; }
+                .totals-row.grand-total { border-top: 2px solid #111; font-weight: 900; font-size: 11px; padding-top: 6px; margin-top: 4px; }
+                
+                .footer-msg { border: 1px solid #111; border-radius: 4px; padding: 8px; font-size: 7.5px; font-style: italic; margin-top: 30px; text-align: center; }
+                
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <div class="top-container">
+                <div class="company-info">
+                    <div class="company-name">INVESTMENTS Z & G S.A.</div>
+                    <div class="company-details">
+                        MZA. E DPTO. 201 LOTE. 11 CND. LAS PRADERAS BLOCK 18 - COMAS-LIMA-LIMA<br>
+                        Fecha de Emisión: ${today}
+                    </div>
+                </div>
+                <div class="ruc-box">
+                    <div class="title">NOTA DE CREDITO ELECTRONICA</div>
+                    <div class="ruc">RUC: 20611188715</div>
+                    <div class="number">${payment.creditNoteNumber || 'E001-PENDIENTE'}</div>
+                </div>
+            </div>
+
+            <div class="section-title">Documento que modifies:</div>
+            <div class="grid-details">
+                <div class="label">${docTitle}</div>
+                <div class="value">: ${docNum}</div>
+                
+                <div class="label">Señor(es)</div>
+                <div class="value">: ${sale.client?.name || 'PÚBLICO GENERAL'}</div>
+                
+                <div class="label">${clientDocType}</div>
+                <div class="value">: ${clientDocNum}</div>
+                
+                <div class="label">Tipo de Moneda</div>
+                <div class="value">: SOLES</div>
+                
+                <div class="label">Motivo o Sustento</div>
+                <div class="value">: ${motiveDesc.toUpperCase()}</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 10%; text-align: center;">Cantidad</th>
+                        <th style="width: 70%;">Descripción</th>
+                        <th style="width: 20%; text-align: right;">Valor Unitario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align: center; font-weight: 700;">1</td>
+                        <td style="font-weight: 500;">${motiveDesc.toUpperCase()}</td>
+                        <td style="text-align: right; font-weight: 700;">S/ ${subtotal.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="bottom-section">
+                <div class="words-amount">
+                    ${formatSolesInWords(total)}
+                </div>
+                <div class="totals-box">
+                    <div class="totals-row">
+                        <span>Valor Venta</span>
+                        <span style="font-weight: 700;">S/ ${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="totals-row">
+                        <span>IGV (18%)</span>
+                        <span style="font-weight: 700;">S/ ${igv.toFixed(2)}</span>
+                    </div>
+                    <div class="totals-row grand-total">
+                        <span>Importe Total</span>
+                        <span>S/ ${total.toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-msg">
+                Esta es una representación impresa de la nota de crédito electrónica, generada en el Sistema de SUNAT. Puede verificarla utilizando su clave SOL.
+            </div>
+        </body>
+        </html>
+    `;
+};
+
 interface SalePaymentsModalProps {
     saleId: string;
     isOpen: boolean;
@@ -58,6 +258,22 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
     const [evidenceUrl, setEvidenceUrl] = useState('');
+
+    // Credit Note specific form state
+    const [isElectronic, setIsElectronic] = useState(true);
+    const [creditNoteMotive, setCreditNoteMotive] = useState('4');
+    const [creditNoteNumber, setCreditNoteNumber] = useState('');
+
+    const handlePrintCreditNote = (payment: any) => {
+        const printWindow = window.open('', '_blank', 'width=850,height=1100');
+        if (printWindow) {
+            printWindow.document.write(getCreditNoteVoucherHTML(payment, sale));
+            printWindow.document.close();
+            printWindow.onload = () => {
+                setTimeout(() => { printWindow.print(); }, 500);
+            };
+        }
+    };
 
     useEffect(() => {
         if (isOpen && saleId) {
@@ -113,6 +329,16 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             return;
         }
 
+        if (method === 'NOTA_CREDITO' && !notes) {
+            setErrorMsg('El motivo o sustento de la nota de crédito es obligatorio.');
+            return;
+        }
+
+        if (method === 'NOTA_CREDITO' && !isElectronic && !creditNoteNumber) {
+            setErrorMsg('El número de nota de crédito es obligatorio para registro manual.');
+            return;
+        }
+
         setIsSubmitting(true);
         const isVendor = user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
         try {
@@ -121,19 +347,25 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 method,
                 paymentDate,
                 notes,
-                evidenceUrl
+                evidenceUrl: method === 'NOTA_CREDITO' && isElectronic ? '' : evidenceUrl,
+                creditNoteMotive: method === 'NOTA_CREDITO' ? creditNoteMotive : undefined,
+                creditNoteNumber: method === 'NOTA_CREDITO' && !isElectronic ? creditNoteNumber : undefined,
+                isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined
             });
             
             // Reset form
             setAmount('');
             setNotes('');
             setEvidenceUrl('');
+            setCreditNoteNumber('');
+            setCreditNoteMotive('4');
+            setIsElectronic(true);
             setShowAddForm(false);
             
             if (isVendor) {
-                toast.success('Abono registrado. En espera de confirmación por el área Comercial.', { duration: 6000 });
+                toast.success('Nota de Crédito registrada. En espera de confirmación por el área Comercial.', { duration: 6000 });
             } else {
-                toast.success('Abono registrado correctamente.');
+                toast.success('Nota de Crédito procesada correctamente.');
             }
 
             // Refresh data
@@ -141,7 +373,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             if (onUpdate) onUpdate();
         } catch (error) {
             console.error('Error adding payment:', error);
-            toast.error('Error al registrar el pago');
+            toast.error('Error al registrar la operación');
         } finally {
             setIsSubmitting(false);
         }
@@ -303,9 +535,11 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             <div className="flex items-center gap-2 mb-0.5">
                                                                 <span className="text-sm font-black text-slate-900 font-mono">S/ {payment.amount.toLocaleString()}</span>
                                                                 <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                                                    payment.method === 'NOTA_CREDITO' ? 'bg-violet-100 text-violet-700 border border-violet-200' :
                                                                     payment.method === 'LIQUIDACION' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
                                                                 }`}>
-                                                                    {payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
+                                                                    {payment.method === 'NOTA_CREDITO' ? 'NOTA DE CRÉDITO' :
+                                                                     payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
                                                                 </span>
                                                                 <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase border ${
                                                                     payment.status === 'APROBADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -318,18 +552,43 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             </div>
                                                             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest" suppressHydrationWarning>
                                                                 {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                                                                {payment.method === 'NOTA_CREDITO' && payment.creditNoteNumber && (
+                                                                    <span className="ml-2 text-indigo-600 font-black">N° {payment.creditNoteNumber}</span>
+                                                                )}
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    {payment.evidenceUrl && (
-                                                        <a 
-                                                            href={`${SERVER_URL}${payment.evidenceUrl}`} 
-                                                            target="_blank" 
-                                                            className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all flex items-center justify-center shadow-sm"
-                                                        >
-                                                            <ImageIcon className="w-4 h-4" />
-                                                        </a>
-                                                    )}
+                                                    <div className="flex items-center gap-1.5">
+                                                        {payment.method === 'NOTA_CREDITO' && (
+                                                            <button
+                                                                onClick={() => handlePrintCreditNote(payment)}
+                                                                className="w-10 h-10 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                                title="Imprimir Nota de Crédito"
+                                                            >
+                                                                <FileText className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {payment.method === 'NOTA_CREDITO' && payment.sunatPdfUrl && (
+                                                            <a 
+                                                                href={payment.sunatPdfUrl} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="w-10 h-10 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                                title="Ver Nota de Crédito SUNAT"
+                                                            >
+                                                                <HelpCircle className="w-4 h-4" />
+                                                            </a>
+                                                        )}
+                                                        {payment.evidenceUrl && (
+                                                            <a 
+                                                                href={`${SERVER_URL}${payment.evidenceUrl}`} 
+                                                                target="_blank" 
+                                                                className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                            >
+                                                                <ImageIcon className="w-4 h-4" />
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 {payment.status === 'RECHAZADO' && (
                                                     <div className="mt-3 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5">
@@ -460,59 +719,141 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                             <select 
                                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black focus:bg-white focus:border-indigo-600 transition-all outline-none appearance-none cursor-pointer"
                                                 value={method}
-                                                onChange={(e) => setMethod(e.target.value)}
+                                                onChange={(e) => {
+                                                    setMethod(e.target.value);
+                                                    if (e.target.value === 'NOTA_CREDITO') {
+                                                        // Automatically set notes to make it easy for user
+                                                        setNotes('Descuento global al total de ventas');
+                                                    } else {
+                                                        setNotes('');
+                                                    }
+                                                }}
                                             >
                                                 <option value="EFECTIVO">EFECTIVO</option>
                                                 <option value="TRANSFERENCIA">TRANSFERENCIA</option>
                                                 <option value="YAPE/PLIN">YAPE/PLIN</option>
                                                 <option value="TARJETA">TARJETA</option>
+                                                <option value="NOTA_CREDITO">NOTA DE CRÉDITO</option>
                                                 <option value="OTRO">OTRO</option>
                                             </select>
                                         </div>
                                     </div>
 
+                                    {method === 'NOTA_CREDITO' && (
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Tipo de Nota de Crédito</span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsElectronic(true);
+                                                            setErrorMsg(null);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition ${
+                                                            isElectronic 
+                                                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        Electrónica
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsElectronic(false);
+                                                            setErrorMsg(null);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition ${
+                                                            !isElectronic 
+                                                                ? 'bg-indigo-600 text-white shadow-sm' 
+                                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        Manual
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {isElectronic ? (
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Motivo SUNAT</label>
+                                                        <select
+                                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none"
+                                                            value={creditNoteMotive}
+                                                            onChange={(e) => setCreditNoteMotive(e.target.value)}
+                                                        >
+                                                            <option value="1">Anulación de la operación (Anulación Total)</option>
+                                                            <option value="4">Descuento global / Disminución del total</option>
+                                                            <option value="6">Devolución total de productos</option>
+                                                            <option value="10">Otros conceptos</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Número de Nota de Crédito</label>
+                                                        <input
+                                                            required
+                                                            placeholder="E001-90"
+                                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none"
+                                                            value={creditNoteNumber}
+                                                            onChange={(e) => setCreditNoteNumber(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="space-y-1.5">
-                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Referencia</label>
+                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
+                                            {method === 'NOTA_CREDITO' ? 'Motivo o Sustento' : 'Referencia'}
+                                        </label>
                                         <input 
-                                            placeholder="Detalles del pago..."
+                                            placeholder={method === 'NOTA_CREDITO' ? 'Describa el motivo del descuento...' : 'Detalles del pago...'}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-bold focus:bg-white focus:border-indigo-600 transition-all outline-none"
                                             value={notes}
                                             onChange={(e) => setNotes(e.target.value)}
                                         />
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Subir Evidencia</label>
-                                        <div className="relative group">
-                                            <input 
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleFileUpload}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
-                                                disabled={isUploading}
-                                            />
-                                            <div className={`w-full min-h-[90px] border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center transition-all px-6 py-4 ${
-                                                evidenceUrl ? 'border-emerald-200 bg-emerald-50/10' : 
-                                                isUploading ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-100 bg-slate-50 group-hover:bg-slate-100 group-hover:border-indigo-300'
-                                            }`}>
-                                                {isUploading ? (
-                                                    <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-                                                ) : evidenceUrl ? (
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-md overflow-hidden border border-emerald-300">
-                                                            <img src={`${SERVER_URL}${evidenceUrl}`} className="w-full h-full object-cover rounded-lg" />
+                                    {((method !== 'NOTA_CREDITO') || (method === 'NOTA_CREDITO' && !isElectronic)) && (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Subir Evidencia</label>
+                                            <div className="relative group">
+                                                <input 
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleFileUpload}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+                                                    disabled={isUploading}
+                                                />
+                                                <div className={`w-full min-h-[90px] border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center transition-all px-6 py-4 ${
+                                                    evidenceUrl ? 'border-emerald-200 bg-emerald-50/10' : 
+                                                    isUploading ? 'border-indigo-200 bg-indigo-50/20' : 'border-slate-100 bg-slate-50 group-hover:bg-slate-100 group-hover:border-indigo-300'
+                                                }`}>
+                                                    {isUploading ? (
+                                                        <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                                                    ) : evidenceUrl ? (
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 bg-white rounded-xl p-1 shadow-md overflow-hidden border border-emerald-300">
+                                                                <img src={`${SERVER_URL}${evidenceUrl}`} className="w-full h-full object-cover rounded-lg" />
+                                                            </div>
+                                                            <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-tight">✓ Foto<br/>Cargada</span>
                                                         </div>
-                                                        <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-tight">✓ Foto<br/>Cargada</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center gap-2">
-                                                        <Upload className="w-3.5 h-3.5 text-indigo-500" />
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.15em]">Adjuntar Boucher</span>
-                                                    </div>
-                                                )}
+                                                    ) : (
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.15em]">Adjuntar Boucher</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <div className="pt-4 flex gap-3">
                                         <button 

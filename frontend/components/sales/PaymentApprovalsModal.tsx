@@ -185,9 +185,22 @@ export default function PaymentApprovalsModal({ isOpen, onClose, onUpdate }: Pay
                                                         Doc: {payment.sale.invoiceNumber}
                                                     </span>
                                                 )}
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                                                    {payment.method}
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                                    payment.method === 'NOTA_CREDITO'
+                                                        ? 'bg-violet-50 text-violet-700 border-violet-100 font-extrabold'
+                                                        : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                }`}>
+                                                    {payment.method === 'NOTA_CREDITO' ? 'NOTA DE CRÉDITO' : payment.method}
                                                 </span>
+                                                {payment.method === 'NOTA_CREDITO' && (
+                                                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                                        !payment.evidenceUrl && !payment.creditNoteNumber
+                                                            ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                                            : 'bg-slate-50 text-slate-600 border-slate-100'
+                                                    }`}>
+                                                        {!payment.evidenceUrl && !payment.creditNoteNumber ? 'Emisión Electrónica SUNAT' : 'Registro Manual'}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             {/* Client and amount */}

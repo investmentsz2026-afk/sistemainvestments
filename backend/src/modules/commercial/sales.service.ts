@@ -23,7 +23,9 @@ export class SalesService {
     const configs = [
       { type: 'FACTURA', series: 'F001' },
       { type: 'BOLETA', series: 'B001' },
-      { type: 'GUIA', series: 'TTT1' }
+      { type: 'GUIA', series: 'TTT1' },
+      { type: 'NOTA_CREDITO_FACTURA', series: 'FC01' },
+      { type: 'NOTA_CREDITO_BOLETA', series: 'BC01' }
     ];
 
     for (const config of configs) {
@@ -35,7 +37,7 @@ export class SalesService {
     }
   }
 
-  async getNextInvoiceNumber(type: 'FACTURA' | 'BOLETA' | 'GUIA') {
+  async getNextInvoiceNumber(type: 'FACTURA' | 'BOLETA' | 'GUIA' | 'NOTA_CREDITO_FACTURA' | 'NOTA_CREDITO_BOLETA') {
     return await this.prisma.$transaction(async (tx) => {
       const config = await tx.invoiceConfig.findUnique({
         where: { type }
@@ -226,7 +228,7 @@ export class SalesService {
   }
 
   async addPayment(saleId: string, data: any, currentUser?: any) {
-    const { amount, method, notes, evidenceUrl } = data;
+    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic } = data;
 
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -236,20 +238,49 @@ export class SalesService {
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
     const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
+    const isElecCN = isElectronic === true || isElectronic === 'true';
 
     return await this.prisma.$transaction(async (tx) => {
+      let paymentData: any = {
+        saleId,
+        amount: parseFloat(amount),
+        method: method || 'EFECTIVO',
+        notes,
+        evidenceUrl,
+        status: isVendor ? 'PENDIENTE' : 'APROBADO',
+        registeredById: currentUser?.id || null,
+        registeredByName: currentUser?.name || null,
+      };
+
+      if (method === 'NOTA_CREDITO') {
+        paymentData.creditNoteMotive = creditNoteMotive;
+        if (isVendor) {
+          // Keep it pending, wait for Commercial approval
+          paymentData.status = 'PENDIENTE';
+          paymentData.creditNoteNumber = creditNoteNumber || null;
+        } else {
+          // Approved automatically
+          paymentData.status = 'APROBADO';
+          if (isElecCN) {
+            // Generate in Nubefact immediately
+            const sunatResult = await this.sendCreditNoteToSunat(tx, saleId, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito');
+            paymentData.creditNoteNumber = sunatResult.creditNoteNumber;
+            paymentData.sunatStatus = sunatResult.sunatStatus;
+            paymentData.sunatResponse = sunatResult.sunatResponse;
+            paymentData.sunatXmlUrl = sunatResult.sunatXmlUrl;
+            paymentData.sunatPdfUrl = sunatResult.sunatPdfUrl;
+            paymentData.sunatCdrUrl = sunatResult.sunatCdrUrl;
+          } else {
+            // Manual credit note registration
+            paymentData.creditNoteNumber = creditNoteNumber || null;
+            paymentData.creditNoteMotive = creditNoteMotive || 'Manual';
+          }
+        }
+      }
+
       // Create payment
       const payment = await tx.salePayment.create({
-        data: {
-          saleId,
-          amount: parseFloat(amount),
-          method: method || 'EFECTIVO',
-          notes,
-          evidenceUrl,
-          status: isVendor ? 'PENDIENTE' : 'APROBADO',
-          registeredById: currentUser?.id || null,
-          registeredByName: currentUser?.name || null,
-        }
+        data: paymentData
       });
 
       // If registered by a vendor, the payment remains pending and doesn't update sale status
@@ -343,10 +374,27 @@ export class SalesService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
+      let updateData: any = { status: 'APROBADO' };
+
+      if (payment.method === 'NOTA_CREDITO') {
+        // If it was requested as electronic (no uploaded voucher and no credit note number)
+        const isElectronic = !payment.evidenceUrl && !payment.creditNoteNumber && payment.creditNoteMotive;
+        if (isElectronic) {
+          // Generate in Nubefact on approval
+          const sunatResult = await this.sendCreditNoteToSunat(tx, payment.saleId, payment.amount, payment.creditNoteMotive || '4', payment.notes || 'Nota de crédito');
+          updateData.creditNoteNumber = sunatResult.creditNoteNumber;
+          updateData.sunatStatus = sunatResult.sunatStatus;
+          updateData.sunatResponse = sunatResult.sunatResponse;
+          updateData.sunatXmlUrl = sunatResult.sunatXmlUrl;
+          updateData.sunatPdfUrl = sunatResult.sunatPdfUrl;
+          updateData.sunatCdrUrl = sunatResult.sunatCdrUrl;
+        }
+      }
+
       // Approve the payment
       const approvedPayment = await tx.salePayment.update({
         where: { id: paymentId },
-        data: { status: 'APROBADO' },
+        data: updateData,
       });
 
       // Calculate total paid including this newly approved payment
@@ -383,6 +431,149 @@ export class SalesService {
       where: { id: paymentId },
       data: { status: 'RECHAZADO' },
     });
+  }
+
+  async sendCreditNoteToSunat(tx: any, saleId: string, amount: number, motiveCode: string, sustentoText: string) {
+    const sale = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { client: true }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+    if (!sale.invoiceNumber) throw new BadRequestException('La venta no tiene un comprobante de referencia');
+
+    const API_TOKEN = process.env.SUNAT_INVOICING_TOKEN;
+    const API_URL = process.env.SUNAT_INVOICING_URL;
+
+    if (!API_TOKEN || !API_URL) {
+      throw new BadRequestException('API de Facturación no configurada en el servidor');
+    }
+
+    // Determine type: modify Factura (1) or Boleta (2)
+    const isFactura = sale.invoiceNumber.startsWith('F');
+    const docModificaTipo = isFactura ? 1 : 2;
+    
+    // Split original invoice number (e.g. F001-000456)
+    const refParts = sale.invoiceNumber.split('-');
+    const refSerie = refParts[0];
+    const refNumero = parseInt(refParts[1]);
+
+    // Reserve credit note number
+    const configType = isFactura ? 'NOTA_CREDITO_FACTURA' : 'NOTA_CREDITO_BOLETA';
+    
+    const config = await tx.invoiceConfig.findUnique({
+      where: { type: configType }
+    });
+    if (!config) throw new BadRequestException(`Configuración no encontrada para ${configType}`);
+    const number = config.nextNumber;
+    const formattedCNNumber = `${config.series}-${number.toString().padStart(6, '0')}`;
+    
+    // Update config nextNumber
+    await tx.invoiceConfig.update({
+      where: { type: configType },
+      data: { nextNumber: number + 1 }
+    });
+
+    // Calculate subtotal and IGV for the credit note amount
+    const total = parseFloat(amount.toFixed(2));
+    const subtotal = parseFloat((total / 1.18).toFixed(2));
+    const igv = parseFloat((total - subtotal).toFixed(2));
+
+    const getFormattedDate = (d: Date) => {
+      const formatter = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const pts = formatter.formatToParts(d);
+      const day = pts.find(p => p.type === 'day')?.value;
+      const month = pts.find(p => p.type === 'month')?.value;
+      const year = pts.find(p => p.type === 'year')?.value;
+      return `${day}-${month}-${year}`;
+    };
+
+    const fechaEmision = getFormattedDate(new Date());
+
+    const payload = {
+      operacion: "generar_comprobante",
+      tipo_de_comprobante: 3, // Nota de Crédito
+      serie: config.series,
+      numero: number,
+      sunat_transaction: 1,
+      cliente_tipo_de_documento: sale.client?.documentType === 'RUC' ? 6 : (sale.client?.documentType === 'DNI' ? 1 : "-"),
+      cliente_numero_de_documento: sale.client?.documentNumber || "00000000",
+      cliente_denominacion: sale.client?.name || "PÚBLICO GENERAL",
+      cliente_direccion: sale.deliveryAddress || sale.client?.address || "",
+      cliente_email: sale.client?.email || "",
+      fecha_de_emision: fechaEmision,
+      moneda: 1, // Soles
+      tipo_de_cambio: null,
+      porcentaje_de_igv: 18.0,
+      total_descuento: null,
+      total_anticipo: null,
+      total_gravada: parseFloat(subtotal.toFixed(2)),
+      total_inafecta: null,
+      total_exonerada: null,
+      total_gratuita: null,
+      total_otros_cargos: null,
+      total_igv: parseFloat(igv.toFixed(2)),
+      total_pago_otros: null,
+      total_pago_con_monto_fijo_por_item: null,
+      total: parseFloat(total.toFixed(2)),
+      enviar_a_sunat: true,
+      documento_que_modifica_tipo: docModificaTipo,
+      documento_que_modifica_serie: refSerie,
+      documento_que_modifica_numero: refNumero,
+      tipo_de_nota_de_credito: parseInt(motiveCode) || 4, // Descuento global por defecto
+      motivo_o_sustento: sustentoText,
+      items: [
+        {
+          unidad_de_medida: "ZZ",
+          codigo: "",
+          descripcion: sustentoText || `NOTA DE CRÉDITO POR MODIFICACIÓN DE COMPROBANTE ${sale.invoiceNumber}`,
+          cantidad: 1,
+          valor_unitario: parseFloat(subtotal.toFixed(2)),
+          precio_unitario: parseFloat(total.toFixed(2)),
+          subtotal: parseFloat(subtotal.toFixed(2)),
+          tipo_de_igv: 1,
+          igv: parseFloat(igv.toFixed(2)),
+          total: parseFloat(total.toFixed(2)),
+          anticipo_regularizacion: false,
+          anticipo_documento_serie: null,
+          anticipo_documento_numero: null
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': API_TOKEN
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.errors) {
+        throw new Error(result.errors);
+      }
+
+      return {
+        creditNoteNumber: formattedCNNumber,
+        sunatStatus: result.aceptada_por_sunat ? 'ACEPTADO' : 'ENVIADO',
+        sunatResponse: result.sunat_description || 'Nota de crédito generada correctamente',
+        sunatXmlUrl: result.enlace_del_xml,
+        sunatPdfUrl: result.enlace_del_pdf,
+        sunatCdrUrl: result.enlace_del_cdr,
+      };
+    } catch (error) {
+      console.error('Error generating Credit Note in Nubefact:', error);
+      throw new BadRequestException('Error de comunicación con Nubefact: ' + error.message);
+    }
   }
 
   async sendToSunat(saleId: string) {
