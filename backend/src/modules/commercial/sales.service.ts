@@ -237,6 +237,34 @@ export class SalesService {
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
+    const totalPaid = sale.payments
+      .filter(p => p.status === 'APROBADO')
+      .reduce((acc, p) => acc + p.amount, 0);
+
+    const totalPending = sale.payments
+      .filter(p => p.status === 'PENDIENTE')
+      .reduce((acc, p) => acc + p.amount, 0);
+
+    if (totalPaid >= sale.totalAmount) {
+      throw new BadRequestException('Esta venta ya está completamente pagada (Liquidada).');
+    }
+
+    const remainingToPay = sale.totalAmount - totalPaid;
+    const remainingToPayWithPending = remainingToPay - totalPending;
+
+    if (remainingToPayWithPending <= 0) {
+      throw new BadRequestException('Ya existen abonos pendientes de aprobación que cubren el saldo restante.');
+    }
+
+    const inputAmount = parseFloat(amount);
+    if (isNaN(inputAmount) || inputAmount <= 0) {
+      throw new BadRequestException('El monto debe ser mayor a cero.');
+    }
+
+    if (inputAmount > remainingToPayWithPending + 0.01) {
+      throw new BadRequestException(`El monto ingresado (S/ ${inputAmount}) supera el saldo pendiente real disponible de S/ ${remainingToPayWithPending.toFixed(2)}.`);
+    }
+
     const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
     const isElecCN = isElectronic === true || isElectronic === 'true';
 
@@ -317,17 +345,32 @@ export class SalesService {
     const totalPaid = sale.payments
       .filter(p => p.status === 'APROBADO')
       .reduce((acc, p) => acc + p.amount, 0);
+
+    const totalPending = sale.payments
+      .filter(p => p.status === 'PENDIENTE')
+      .reduce((acc, p) => acc + p.amount, 0);
+
     const pendingAmount = sale.totalAmount - totalPaid;
+    const remainingToPayWithPending = pendingAmount - totalPending;
+
+    if (pendingAmount <= 0) {
+      throw new BadRequestException('Esta venta ya está completamente pagada (Liquidada).');
+    }
+
+    if (remainingToPayWithPending <= 0) {
+      throw new BadRequestException('Ya existen abonos pendientes de aprobación que cubren el saldo restante.');
+    }
 
     const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
 
     return await this.prisma.$transaction(async (tx) => {
       // If there is a pending balance, record a liquidation payment
-      if (pendingAmount > 0) {
+      const liquidationAmount = remainingToPayWithPending;
+      if (liquidationAmount > 0) {
         await tx.salePayment.create({
           data: {
             saleId,
-            amount: pendingAmount,
+            amount: liquidationAmount,
             method: 'LIQUIDACION',
             notes: 'Liquidación manual de saldo pendiente',
             status: isVendor ? 'PENDIENTE' : 'APROBADO',
@@ -337,7 +380,7 @@ export class SalesService {
         });
       }
 
-      if (!isVendor) {
+      if (!isVendor && liquidationAmount === pendingAmount) {
         return await tx.sale.update({
           where: { id: saleId },
           data: { paymentStatus: 'CANCELADO' }
@@ -371,6 +414,19 @@ export class SalesService {
     if (!payment) throw new NotFoundException('Pago no encontrado');
     if (payment.status !== 'PENDIENTE') {
       throw new BadRequestException('El pago ya ha sido procesado');
+    }
+
+    const existingApprovedTotal = payment.sale.payments
+      .filter(p => p.status === 'APROBADO' && p.id !== paymentId)
+      .reduce((acc, p) => acc + p.amount, 0);
+
+    if (existingApprovedTotal >= payment.sale.totalAmount) {
+      throw new BadRequestException('Esta venta ya está completamente pagada.');
+    }
+
+    const remainingToPay = payment.sale.totalAmount - existingApprovedTotal;
+    if (payment.amount > remainingToPay + 0.01) {
+      throw new BadRequestException(`El monto de este abono (S/ ${payment.amount}) supera el saldo pendiente restante por pagar (S/ ${remainingToPay.toFixed(2)}).`);
     }
 
     return await this.prisma.$transaction(async (tx) => {

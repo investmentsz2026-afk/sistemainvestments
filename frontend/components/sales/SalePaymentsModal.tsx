@@ -19,7 +19,8 @@ import {
     ArrowRight,
     Search,
     Info,
-    HelpCircle
+    HelpCircle,
+    Clock
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -403,7 +404,9 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     if (!isOpen) return null;
 
     const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+    const totalPending = sale?.payments?.filter((p: any) => p.status === 'PENDIENTE').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
     const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
+    const pendingAmountWithPending = pendingAmount - totalPending;
     const isCompleted = sale?.paymentStatus === 'CANCELADO';
 
     return (
@@ -491,7 +494,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                 {/* SECTION TITLE */}
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 border-l-2 border-indigo-500 pl-3">Abonos Realizados</h3>
-                                    {!isCompleted && pendingAmount > 0 && (
+                                    {!isCompleted && pendingAmountWithPending > 0 && (
                                         <button 
                                             onClick={() => {
                                                 setShowAddForm(true);
@@ -503,6 +506,22 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                         </button>
                                     )}
                                 </div>
+
+                                {pendingAmountWithPending <= 0 && pendingAmount > 0 && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-amber-50 border border-amber-200 rounded-[1.5rem] p-4 flex items-start gap-3"
+                                    >
+                                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Saldo cubierto por abonos pendientes</p>
+                                            <p className="text-[9px] text-amber-600 font-bold leading-normal mt-1">
+                                                El saldo pendiente de esta venta está completamente cubierto por abonos pendientes de aprobación. Debe esperar a que el área comercial apruebe o rechace dichos abonos para poder realizar nuevos registros.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
 
                                 {/* PAYMENTS LIST - COMPACT CARDS */}
                                 <div className="grid grid-cols-1 gap-2.5">
@@ -623,20 +642,26 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                     {/* STICKY FOOTER - COMPACT */}
                     <div className="p-5 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
                         <div className="flex items-center gap-2.5">
-                            <div className={`w-2 h-2 rounded-full ${isCompleted ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-amber-500'}`} />
-                            <span className={`text-[9px] font-black uppercase tracking-[0.25em] ${isCompleted ? 'text-emerald-600' : 'text-amber-500'}`}>
-                                {isCompleted ? 'Venta Liquidada' : 'Adeudo Actual'}
+                            <div className={`w-2 h-2 rounded-full ${isCompleted ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : pendingAmountWithPending <= 0 ? 'bg-amber-400 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className={`text-[9px] font-black uppercase tracking-[0.25em] ${isCompleted ? 'text-emerald-600' : pendingAmountWithPending <= 0 ? 'text-amber-600' : 'text-amber-500'}`}>
+                                {isCompleted ? 'Venta Liquidada' : pendingAmountWithPending <= 0 ? 'Aprobación Pendiente' : 'Adeudo Actual'}
                             </span>
                         </div>
                         
                         {!isCompleted ? (
-                            <button 
-                                onClick={() => setShowConfirmLiquidation(true)}
-                                disabled={isSubmitting}
-                                className="w-full sm:w-auto bg-slate-900 text-white px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.25em] hover:bg-indigo-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                            >
-                                Liquidar Saldo
-                            </button>
+                            pendingAmountWithPending <= 0 ? (
+                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 bg-amber-50/50 px-5 py-3 rounded-full border border-amber-100 flex items-center gap-2">
+                                    <Clock className="w-3.5 h-3.5 animate-pulse" /> Aprobación Pendiente
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={() => setShowConfirmLiquidation(true)}
+                                    disabled={isSubmitting}
+                                    className="w-full sm:w-auto bg-slate-900 text-white px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.25em] hover:bg-indigo-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                    Liquidar Saldo
+                                </button>
+                            )
                         ) : (
                             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-5 py-3 rounded-full border border-emerald-100 flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 shadow-sm" /> Operación Completada
