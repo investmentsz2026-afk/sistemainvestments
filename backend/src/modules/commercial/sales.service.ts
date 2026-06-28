@@ -228,7 +228,7 @@ export class SalesService {
   }
 
   async addPayment(saleId: string, data: any, currentUser?: any) {
-    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic } = data;
+    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic, paymentDate } = data;
 
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -272,6 +272,7 @@ export class SalesService {
       let paymentData: any = {
         saleId,
         amount: parseFloat(amount),
+        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
         method: method || 'EFECTIVO',
         notes,
         evidenceUrl,

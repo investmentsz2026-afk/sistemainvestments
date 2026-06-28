@@ -361,6 +361,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             setCreditNoteNumber('');
             setCreditNoteMotive('4');
             setIsElectronic(true);
+            setPaymentDate(new Date().toISOString().split('T')[0]);
             setShowAddForm(false);
             
             if (isVendor) {
@@ -569,12 +570,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                      payment.status === 'RECHAZADO' ? 'RECHAZADO' : 'PENDIENTE'}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest" suppressHydrationWarning>
-                                                                {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-                                                                {payment.method === 'NOTA_CREDITO' && payment.creditNoteNumber && (
-                                                                    <span className="ml-2 text-indigo-600 font-black">N° {payment.creditNoteNumber}</span>
-                                                                )}
-                                                            </p>
+                                                            <div className="space-y-0.5" suppressHydrationWarning>
+                                                                <p className="text-[9px] font-bold text-slate-600 uppercase tracking-wider">
+                                                                    Abono: <span className="text-indigo-600 font-black">{formatDate(payment.paymentDate)}</span>
+                                                                </p>
+                                                                <p className="text-[7.5px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                    Registrado: {new Date(payment.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })} • {new Date(payment.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                                                                    {payment.method === 'NOTA_CREDITO' && payment.creditNoteNumber && (
+                                                                        <span className="ml-2 text-indigo-600 font-black">N° {payment.creditNoteNumber}</span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
@@ -762,6 +768,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <option value="OTRO">OTRO</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Fecha del Abono</label>
+                                        <input 
+                                            required
+                                            type="date"
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-bold focus:bg-white focus:border-indigo-600 transition-all outline-none"
+                                            value={paymentDate}
+                                            onChange={(e) => setPaymentDate(e.target.value)}
+                                        />
                                     </div>
 
                                     {method === 'NOTA_CREDITO' && (
