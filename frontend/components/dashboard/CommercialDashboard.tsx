@@ -56,7 +56,11 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
     orienteOrdersAmount: 0,
     oficinaOrdersCount: 0,
     oficinaOrdersAmount: 0,
-    pendingOrdersAmount: 0
+    pendingOrdersAmount: 0,
+    accountsReceivable: 0,
+    limaAR: 0,
+    orienteAR: 0,
+    oficinaAR: 0
   });
   const [salesData, setSalesData] = useState<any[]>([]);
   const [pendingAudits, setPendingAudits] = useState<any[]>([]);
@@ -84,25 +88,40 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
 
       const total = sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       
-      const limaSales = sales.filter((s: any) => s.seller?.zone === 'LIMA');
-      const orienteSales = sales.filter((s: any) => s.seller?.zone === 'ORIENTE');
-      const oficinaSales = sales.filter((s: any) => s.seller?.zone === 'OFICINA' || !s.seller?.zone);
+      const limaSales = sales.filter((s: any) => s.client?.zone === 'LIMA');
+      const orienteSales = sales.filter((s: any) => s.client?.zone === 'ORIENTE');
+      const oficinaSales = sales.filter((s: any) => s.client?.zone === 'OFICINA' || !s.client?.zone || s.client?.zone === '');
       
       const limaTotal = limaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const orienteTotal = orienteSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const oficinaTotal = oficinaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
 
+      // Calculate Accounts Receivable (Cuentas por Cobrar)
+      const calculateAR = (salesList: any[]) => {
+        return salesList.reduce((acc: number, s: any) => {
+          const paid = (s.payments || [])
+            .filter((p: any) => p.status === 'APROBADO')
+            .reduce((sum: number, p: any) => sum + p.amount, 0);
+          return acc + Math.max(0, s.totalAmount - paid);
+        }, 0);
+      };
+
+      const totalAR = calculateAR(sales);
+      const limaAR = calculateAR(limaSales);
+      const orienteAR = calculateAR(orienteSales);
+      const oficinaAR = calculateAR(oficinaSales);
+
       // Filter pending orders (status PENDIENTE or EN_LOGISTICA)
       const pendingOrders = orders.filter((o: any) => o.status === 'PENDIENTE' || o.status === 'EN_LOGISTICA');
       const pendingOrdersTotal = pendingOrders.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
-      const limaPending = pendingOrders.filter((o: any) => o.zone === 'LIMA');
+      const limaPending = pendingOrders.filter((o: any) => o.client?.zone === 'LIMA');
       const limaPendingAmount = limaPending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
-      const orientePending = pendingOrders.filter((o: any) => o.zone === 'ORIENTE');
+      const orientePending = pendingOrders.filter((o: any) => o.client?.zone === 'ORIENTE');
       const orientePendingAmount = orientePending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
-      const oficinaPending = pendingOrders.filter((o: any) => o.zone === 'OFICINA' || (!o.zone && o.client?.zone === 'OFICINA'));
+      const oficinaPending = pendingOrders.filter((o: any) => o.client?.zone === 'OFICINA' || !o.client?.zone || o.client?.zone === '');
       const oficinaPendingAmount = oficinaPending.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
 
       setStats({
@@ -119,7 +138,11 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
         orienteOrdersAmount: orientePendingAmount,
         oficinaOrdersCount: oficinaPending.length,
         oficinaOrdersAmount: oficinaPendingAmount,
-        pendingOrdersAmount: pendingOrdersTotal
+        pendingOrdersAmount: pendingOrdersTotal,
+        accountsReceivable: totalAR,
+        limaAR,
+        orienteAR,
+        oficinaAR
       });
 
       setPendingAudits(audits.slice(0, 5));
@@ -192,6 +215,10 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
           { 
             label: 'Ventas Totales', 
             value: `S/ ${stats.totalSales.toLocaleString()}`, 
+            subValue: (user?.role === 'COMERCIAL' || user?.role === 'ADMIN')
+              ? `Por Cobrar: S/ ${stats.accountsReceivable.toLocaleString()}`
+              : undefined,
+            subValueColor: 'text-rose-600',
             icon: DollarSign, 
             color: 'text-emerald-600', 
             bg: 'bg-emerald-50', 
@@ -200,7 +227,12 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
               { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()}` },
               { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()}` },
               { label: 'Oficina', value: `S/ ${stats.oficinaSalesTotal.toLocaleString()}` }
-            ]
+            ],
+            arExtraInfo: (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') ? [
+              { label: 'Cobrar Lima', value: `S/ ${stats.limaAR.toLocaleString()}` },
+              { label: 'Cobrar Oriente', value: `S/ ${stats.orienteAR.toLocaleString()}` },
+              { label: 'Cobrar Oficina', value: `S/ ${stats.oficinaAR.toLocaleString()}` }
+            ] : undefined
           },
           { 
             label: 'Pedidos Pendientes', 
@@ -237,7 +269,7 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{item.label}</p>
             <h3 className="text-3xl font-black text-gray-900">{item.value}</h3>
             {item.subValue && (
-              <p className="text-lg font-black text-indigo-600 mt-1">{item.subValue}</p>
+              <p className={`text-sm font-black mt-1 uppercase tracking-wider ${item.subValueColor || 'text-indigo-600'}`}>{item.subValue}</p>
             )}
             
             {item.extraInfo && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
@@ -248,6 +280,18 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
                     <span className="text-gray-900">{extra.value}</span>
                   </div>
                 ))}
+
+                {item.arExtraInfo && (
+                  <div className="mt-3 pt-3 border-t border-dashed border-gray-100 flex flex-col gap-1.5">
+                    <div className="text-[8px] font-black text-rose-500 tracking-wider">Cuentas por Cobrar</div>
+                    {item.arExtraInfo.map((extra: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between">
+                        <span className="text-gray-400">{extra.label}</span>
+                        <span className="text-rose-600 font-mono font-bold">{extra.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

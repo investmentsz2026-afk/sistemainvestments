@@ -539,7 +539,7 @@ export default function ClientsPage() {
                                             value={newClient.zone}
                                             onChange={(e) => setNewClient({ ...newClient, zone: e.target.value })}
                                         >
-                                            <option value="">Sin Zona Especificada</option>
+                                            <option value="">OFICINA</option>
                                             <option value="LIMA">LIMA</option>
                                             <option value="ORIENTE">ORIENTE</option>
                                         </select>
@@ -630,7 +630,7 @@ export default function ClientsPage() {
                                             <Map className="w-5 h-5" />
                                         </div>
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Zona de Ventas</p>
-                                        <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.zone || 'Sin zona'}</p>
+                                        <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.zone || 'OFICINA'}</p>
                                     </div>
                                     <div className="bg-white p-6 rounded-[2rem] border border-indigo-50 shadow-sm ring-1 ring-indigo-50 ring-inset">
                                         <div className="w-12 h-12 text-indigo-500 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
@@ -829,7 +829,7 @@ export default function ClientsPage() {
                                             value={editingClient.zone || ''}
                                             onChange={(e) => setEditingClient({ ...editingClient, zone: e.target.value })}
                                         >
-                                            <option value="">Sin Zona Especificada</option>
+                                            <option value="">OFICINA</option>
                                             <option value="LIMA">LIMA</option>
                                             <option value="ORIENTE">ORIENTE</option>
                                         </select>
