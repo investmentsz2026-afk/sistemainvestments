@@ -659,15 +659,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                 <div className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 bg-amber-50/50 px-5 py-3 rounded-full border border-amber-100 flex items-center gap-2">
                                     <Clock className="w-3.5 h-3.5 animate-pulse" /> Aprobación Pendiente
                                 </div>
-                            ) : (
-                                <button 
-                                    onClick={() => setShowConfirmLiquidation(true)}
-                                    disabled={isSubmitting}
-                                    className="w-full sm:w-auto bg-slate-900 text-white px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.25em] hover:bg-indigo-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                                >
-                                    Liquidar Saldo
-                                </button>
-                            )
+                            ) : null
                         ) : (
                             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-5 py-3 rounded-full border border-emerald-100 flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 shadow-sm" /> Operación Completada
