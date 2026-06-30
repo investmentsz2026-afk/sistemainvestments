@@ -547,6 +547,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       <option value="Devolución">Devolución de cliente</option>
                       <option value="Ajuste">Ajuste de inventario</option>
                       <option value="Transferencia">Transferencia</option>
+                      <option value="Cambio">Cambio</option>
                     </>
                   ) : (
                     <>
