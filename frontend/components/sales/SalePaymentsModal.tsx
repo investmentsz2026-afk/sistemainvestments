@@ -20,7 +20,8 @@ import {
     Search,
     Info,
     HelpCircle,
-    Clock
+    Clock,
+    RotateCw
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -459,12 +460,24 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                     CLIENTE <ArrowRight className="w-2.5 h-2.5 text-indigo-500" /> <span className="text-slate-300">{sale?.client?.name || 'Varios'}</span>
                                 </p>
                             </div>
-                            <button 
-                                onClick={onClose}
-                                className="p-2 sm:p-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all active:scale-95"
-                            >
-                                <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => fetchSaleDetails()}
+                                    disabled={isLoading}
+                                    title="Actualizar datos"
+                                    className="p-2 sm:p-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all active:scale-95 text-white/70 hover:text-white disabled:opacity-40"
+                                >
+                                    <RotateCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={onClose}
+                                    className="p-2 sm:p-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all active:scale-95"
+                                >
+                                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* SUMMARY CARDS - COMPACT */}

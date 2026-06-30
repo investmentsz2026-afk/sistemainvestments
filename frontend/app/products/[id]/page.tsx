@@ -554,6 +554,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       <option value="Merma">Merma</option>
                       <option value="Ajuste">Ajuste de inventario</option>
                       <option value="Transferencia">Transferencia</option>
+                      <option value="Cambio">Cambio</option>
                     </>
                   )}
                 </select>

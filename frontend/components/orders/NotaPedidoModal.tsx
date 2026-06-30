@@ -406,7 +406,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         if (field === 'productSelection') {
             const product = value as Product;
             newItems[index].modelName = product.name;
-            newItems[index].unitPrice = product.sellingPrice;
+            newItems[index].unitPrice = 0;
             newItems[index].productId = product.id;
             // Clear color if product changes
             newItems[index].color = '';
@@ -536,6 +536,10 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
         if (filledItems.some(item => !item.modelName || item.quantity <= 0)) {
             return toast.error('Completa los modelos y cantidades de los productos agregados');
+        }
+
+        if (filledItems.some(item => !item.unitPrice || parseFloat(String(item.unitPrice)) <= 0)) {
+            return toast.error('No se puede dejar el precio de los modelos en blanco o en 0. Por favor, ingrese un precio.');
         }
 
         setIsSaving(true);

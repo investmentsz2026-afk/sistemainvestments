@@ -949,6 +949,7 @@ export default function ScanPage() {
                         <option value="Ajuste">Ajuste de inventario</option>
                         <option value="Transferencia">Transferencia</option>
                         <option value="Muestras">Muestras</option>
+                        <option value="Cambio">Cambio</option>
                       </>
                     )}
                   </select>

@@ -60,7 +60,11 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
     accountsReceivable: 0,
     limaAR: 0,
     orienteAR: 0,
-    oficinaAR: 0
+    oficinaAR: 0,
+    totalGarments: 0,
+    limaGarments: 0,
+    orienteGarments: 0,
+    oficinaGarments: 0
   });
   const [salesData, setSalesData] = useState<any[]>([]);
   const [pendingAudits, setPendingAudits] = useState<any[]>([]);
@@ -111,6 +115,19 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
       const orienteAR = calculateAR(orienteSales);
       const oficinaAR = calculateAR(oficinaSales);
 
+      // Calculate total garments sold (Prendas Vendidas)
+      const calculateGarments = (salesList: any[]) => {
+        return salesList.reduce((acc: number, s: any) => {
+          const qty = (s.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0);
+          return acc + qty;
+        }, 0);
+      };
+
+      const totalGarments = calculateGarments(sales);
+      const limaGarments = calculateGarments(limaSales);
+      const orienteGarments = calculateGarments(orienteSales);
+      const oficinaGarments = calculateGarments(oficinaSales);
+
       // Filter pending orders (status PENDIENTE or EN_LOGISTICA)
       const pendingOrders = orders.filter((o: any) => o.status === 'PENDIENTE' || o.status === 'EN_LOGISTICA');
       const pendingOrdersTotal = pendingOrders.reduce((acc: number, o: any) => acc + o.totalAmount, 0);
@@ -142,7 +159,11 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
         accountsReceivable: totalAR,
         limaAR,
         orienteAR,
-        oficinaAR
+        oficinaAR,
+        totalGarments,
+        limaGarments,
+        orienteGarments,
+        oficinaGarments
       });
 
       setPendingAudits(audits.slice(0, 5));
@@ -219,14 +240,15 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
               ? `Por Cobrar: S/ ${stats.accountsReceivable.toLocaleString()}`
               : undefined,
             subValueColor: 'text-rose-600',
+            garmentsValue: `Prendas Vendidas: ${stats.totalGarments.toLocaleString()} uds.`,
             icon: DollarSign, 
             color: 'text-emerald-600', 
             bg: 'bg-emerald-50', 
             trend: '+15.4%',
             extraInfo: [
-              { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()}` },
-              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()}` },
-              { label: 'Oficina', value: `S/ ${stats.oficinaSalesTotal.toLocaleString()}` }
+              { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()} (${stats.limaGarments.toLocaleString()} uds.)` },
+              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()} (${stats.orienteGarments.toLocaleString()} uds.)` },
+              { label: 'Oficina', value: `S/ ${stats.oficinaSalesTotal.toLocaleString()} (${stats.oficinaGarments.toLocaleString()} uds.)` }
             ],
             arExtraInfo: (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') ? [
               { label: 'Cobrar Lima', value: `S/ ${stats.limaAR.toLocaleString()}` },
@@ -271,13 +293,16 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             {item.subValue && (
               <p className={`text-sm font-black mt-1 uppercase tracking-wider ${item.subValueColor || 'text-indigo-600'}`}>{item.subValue}</p>
             )}
+            {item.garmentsValue && (
+              <p className="text-[10px] font-black text-gray-500 mt-1 uppercase tracking-wider">{item.garmentsValue}</p>
+            )}
             
             {item.extraInfo && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
               <div className="mt-5 pt-4 border-t border-gray-50 flex flex-col gap-1.5 text-[10px] font-black uppercase tracking-widest">
                 {item.extraInfo.map((extra: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between">
                     <span className="text-gray-400">{extra.label}</span>
-                    <span className="text-gray-900">{extra.value}</span>
+                    <span className="text-gray-900 text-right">{extra.value}</span>
                   </div>
                 ))}
 
