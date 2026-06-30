@@ -53,6 +53,24 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const [isEditingInvoice, setIsEditingInvoice] = useState(false);
     const [invoiceValue, setInvoiceValue] = useState('');
     const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+    const [customFechaEmision, setCustomFechaEmision] = useState<string>('');
+
+    const getPeruDateStrings = () => {
+        const today = new Date();
+        const formatYYYYMMDD = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        const maxDate = formatYYYYMMDD(today);
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(today.getDate() - 3);
+        const minDate = formatYYYYMMDD(threeDaysAgo);
+        return { minDate, maxDate };
+    };
+
+    const { minDate, maxDate } = getPeruDateStrings();
     const [showGreForm, setShowGreForm] = useState(false);
     const [isConsultingGuia, setIsConsultingGuia] = useState(false);
     const [isUploadingCargo, setIsUploadingCargo] = useState(false);
@@ -179,9 +197,12 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const handleSendToSunat = async () => {
         setIsSending(true);
         try {
-            const resp = await api.post(`/sales/${saleId}/sunat`);
+            const resp = await api.post(`/sales/${saleId}/sunat`, {
+                customFechaEmision: customFechaEmision || undefined
+            });
             if (resp.data.success) {
                 toast.success('Documento enviado correctamente');
+                setCustomFechaEmision('');
                 fetchSaleDetails();
             } else {
                 toast.error(resp.data.message || 'Error al enviar a SUNAT');
@@ -649,27 +670,48 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                     </div>
                                                     
                                                     {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
-                                                        (!sale.sunatStatus || sale.sunatStatus === 'ERROR') ? (
-                                                            <button 
-                                                                onClick={handleSendToSunat}
-                                                                disabled={isSending}
-                                                                className="w-full py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-md shadow-indigo-100"
-                                                            >
-                                                                {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={() => {
-                                                                    if (window.confirm('¿Está seguro de reenviar este comprobante a SUNAT (Producción)? Se registrará en el entorno de producción de SUNAT y Nubefact. Si la venta tiene más de 3 días de antigüedad, se ajustará la fecha de emisión a la de hoy.')) {
-                                                                        handleSendToSunat();
-                                                                    }
-                                                                }}
-                                                                disabled={isSending}
-                                                                className="w-full py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition disabled:opacity-50 shadow-md shadow-amber-100"
-                                                            >
-                                                                {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Reenviar a SUNAT (Prod)'}
-                                                            </button>
-                                                        )
+                                                        <div className="space-y-2">
+                                                            {(sale.sunatStatus !== 'ACEPTADO' && sale.sunatStatus !== 'ENVIADO') && (
+                                                                <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-gray-100">
+                                                                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-wider">
+                                                                        Fecha Emisión Personalizada
+                                                                    </label>
+                                                                    <input
+                                                                        type="date"
+                                                                        value={customFechaEmision}
+                                                                        onChange={(e) => setCustomFechaEmision(e.target.value)}
+                                                                        min={minDate}
+                                                                        max={maxDate}
+                                                                        className="w-full px-2 py-1 border border-gray-200 rounded-lg text-[10px] text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                                                                    />
+                                                                    <span className="text-[7.5px] text-gray-400 italic leading-tight">
+                                                                        * SUNAT permite hasta 3 días calendario de antigüedad.
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {(!sale.sunatStatus || sale.sunatStatus === 'ERROR') ? (
+                                                                <button 
+                                                                    onClick={handleSendToSunat}
+                                                                    disabled={isSending}
+                                                                    className="w-full py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition disabled:opacity-50 shadow-md shadow-indigo-100"
+                                                                >
+                                                                    {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Enviar a SUNAT'}
+                                                                </button>
+                                                            ) : (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        if (window.confirm('¿Está seguro de reenviar este comprobante a SUNAT (Producción)? Se registrará en el entorno de producción de SUNAT y Nubefact. Si la venta tiene más de 3 días de antigüedad, se ajustará la fecha de emisión a la de hoy.')) {
+                                                                            handleSendToSunat();
+                                                                        }
+                                                                    }}
+                                                                    disabled={isSending}
+                                                                    className="w-full py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-700 transition disabled:opacity-50 shadow-md shadow-amber-100"
+                                                                >
+                                                                    {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" /> : 'Reenviar a SUNAT (Prod)'}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     )}
 
                                                     {sale.sunatResponse && (

@@ -633,7 +633,7 @@ export class SalesService {
     }
   }
 
-  async sendToSunat(saleId: string) {
+  async sendToSunat(saleId: string, customFechaEmision?: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: {
@@ -703,8 +703,15 @@ export class SalesService {
         return `${day}-${month}-${year}`;
       };
 
-      // La fecha de emisión siempre será la fecha actual en la que se envía a SUNAT
-      const fechaEmision = getFormattedDate(new Date());
+      // La fecha de emisión será la fecha personalizada si se provee (formato YYYY-MM-DD),
+      // formateada a DD-MM-YYYY para Nubefact. De lo contrario, la fecha actual.
+      let fechaEmision = getFormattedDate(new Date());
+      if (customFechaEmision) {
+        const dateParts = customFechaEmision.split('-');
+        if (dateParts.length === 3) {
+          fechaEmision = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+        }
+      }
 
       const payload = {
         operacion: "generar_comprobante",

@@ -78,8 +78,11 @@ export class SalesController {
   }
 
   @Post(':id/sunat')
-  sendToSunat(@Param('id') id: string) {
-    return this.salesService.sendToSunat(id);
+  sendToSunat(
+    @Param('id') id: string,
+    @Body() body?: { customFechaEmision?: string }
+  ) {
+    return this.salesService.sendToSunat(id, body?.customFechaEmision);
   }
 
   @Patch(':id/referral-guide')
