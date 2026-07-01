@@ -781,7 +781,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                 initial={{ opacity: 0, scale: 0.98, y: 10 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.98, y: 10 }}
-                                className="relative w-full max-w-[360px] bg-white rounded-[2rem] shadow-2xl p-7 sm:p-8 border border-slate-50 flex flex-col items-center"
+                                className={`relative w-full ${method === 'LETRAS' ? 'max-w-[760px]' : 'max-w-[380px]'} bg-white rounded-[2.5rem] shadow-2xl p-7 sm:p-8 border border-slate-50 flex flex-col items-center max-h-[92vh] overflow-y-auto transition-all duration-300`}
                             >
                                 {/* REFINED HEADER */}
                                 <div className="w-full flex justify-between items-start mb-6">
@@ -960,64 +960,69 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                     max="24"
                                                     value={cantidadLetras}
                                                     onChange={(e) => handleCantidadLetrasChange(parseInt(e.target.value) || 1)}
-                                                    className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-indigo-600"
+                                                    className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-indigo-600 animate-none"
                                                 />
                                             </div>
 
-                                            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar w-full">
-                                                {letrasList.map((letra, idx) => (
-                                                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200/60 space-y-2 w-full text-left">
-                                                        <div className="flex justify-between items-center text-[9px] font-black text-indigo-600 uppercase">
-                                                            <span>Letra {letra.number}</span>
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">F. Vencimiento</label>
-                                                                <input
-                                                                    required
-                                                                    type="date"
-                                                                    value={letra.dueDate}
-                                                                    onChange={(e) => handleLetraFieldChange(idx, 'dueDate', e.target.value)}
-                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">Importe (S/)</label>
-                                                                <input
-                                                                    required
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    placeholder="0.00"
-                                                                    value={letra.amount}
-                                                                    onChange={(e) => handleLetraFieldChange(idx, 'amount', e.target.value)}
-                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold font-mono outline-none focus:bg-white focus:border-indigo-600"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase"># Único (Opcional)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Código..."
-                                                                    value={letra.uniqueNumber}
-                                                                    onChange={(e) => handleLetraFieldChange(idx, 'uniqueNumber', e.target.value)}
-                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
-                                                                />
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">Observación (Opcional)</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Detalles..."
-                                                                    value={letra.observation}
-                                                                    onChange={(e) => handleLetraFieldChange(idx, 'observation', e.target.value)}
-                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                            <div className="overflow-x-auto w-full border border-slate-200/60 rounded-xl bg-white shadow-sm max-h-[250px] overflow-y-auto custom-scrollbar">
+                                                <table className="w-full text-left border-collapse min-w-[550px]">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 border-b border-slate-150">
+                                                            <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-wider w-[40px] text-center">#</th>
+                                                            <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-wider w-[125px]">F. Vencimiento</th>
+                                                            <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-wider w-[110px]">Importe (S/)</th>
+                                                            <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-wider w-[110px]"># Único (Opt)</th>
+                                                            <th className="px-3 py-2 text-[8px] font-black text-slate-400 uppercase tracking-wider">Observación (Opt)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {letrasList.map((letra, idx) => (
+                                                            <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-55/30 transition">
+                                                                <td className="px-3 py-2.5 text-center text-[10px] font-black text-indigo-600">
+                                                                    {letra.number}
+                                                                </td>
+                                                                <td className="px-2 py-2">
+                                                                    <input
+                                                                        required
+                                                                        type="date"
+                                                                        value={letra.dueDate}
+                                                                        onChange={(e) => handleLetraFieldChange(idx, 'dueDate', e.target.value)}
+                                                                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold focus:bg-white focus:border-indigo-500 transition outline-none"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-2 py-2">
+                                                                    <input
+                                                                        required
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        placeholder="0.00"
+                                                                        value={letra.amount}
+                                                                        onChange={(e) => handleLetraFieldChange(idx, 'amount', e.target.value)}
+                                                                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold font-mono focus:bg-white focus:border-indigo-500 transition outline-none"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-2 py-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Código..."
+                                                                        value={letra.uniqueNumber}
+                                                                        onChange={(e) => handleLetraFieldChange(idx, 'uniqueNumber', e.target.value)}
+                                                                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-semibold focus:bg-white focus:border-indigo-500 transition outline-none"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-2 py-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Detalles..."
+                                                                        value={letra.observation}
+                                                                        onChange={(e) => handleLetraFieldChange(idx, 'observation', e.target.value)}
+                                                                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-semibold focus:bg-white focus:border-indigo-500 transition outline-none"
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
                                     )}
