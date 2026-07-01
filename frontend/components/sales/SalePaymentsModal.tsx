@@ -275,15 +275,44 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const handleCantidadLetrasChange = (val: number) => {
         if (val < 1) return;
         setCantidadLetras(val);
-        const newList = [...letrasList];
-        if (val > newList.length) {
-            for (let i = newList.length; i < val; i++) {
-                newList.push({ number: i + 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' });
+
+        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+        const pending = sale ? sale.totalAmount - totalPaid : 0;
+
+        const splitList = (total: number, count: number) => {
+            const base = Math.floor((total / count) * 100) / 100;
+            const list: number[] = [];
+            let accumulated = 0;
+            for (let i = 0; i < count - 1; i++) {
+                list.push(base);
+                accumulated += base;
             }
-        } else if (val < newList.length) {
-            newList.splice(val);
+            list.push(parseFloat((total - accumulated).toFixed(2)));
+            return list;
+        };
+
+        const amounts = splitList(pending, val);
+        const newList: any[] = [];
+
+        const getDueDateForLetra = (letraNum: number) => {
+            const d = new Date();
+            d.setDate(d.getDate() + (letraNum * 30));
+            return d.toISOString().split('T')[0];
+        };
+
+        for (let i = 0; i < val; i++) {
+            const existing = letrasList[i];
+            newList.push({
+                number: i + 1,
+                dueDate: existing?.dueDate || getDueDateForLetra(i + 1),
+                amount: amounts[i].toFixed(2),
+                uniqueNumber: existing?.uniqueNumber || '',
+                observation: existing?.observation || ''
+            });
         }
+        
         setLetrasList(newList);
+        setAmount(pending.toFixed(2));
     };
 
     const handleLetraFieldChange = (idx: number, field: string, value: any) => {
@@ -357,9 +386,22 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
         const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
 
-        if (numericAmount > pendingAmount) {
-            setErrorMsg(`El saldo pendiente es de S/ ${pendingAmount.toLocaleString()}. No puede exceder este monto.`);
-            return;
+        if (method === 'LETRAS') {
+            const sumOfLetras = letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
+            if (Math.abs(sumOfLetras - pendingAmount) > 0.01) {
+                setErrorMsg(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) debe ser exactamente igual al saldo pendiente de la venta (S/ ${pendingAmount.toFixed(2)}).`);
+                return;
+            }
+            const invalidLetras = letrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
+            if (invalidLetras) {
+                setErrorMsg('Todas las letras deben tener una fecha de vencimiento y un importe válido.');
+                return;
+            }
+        } else {
+            if (numericAmount > pendingAmount) {
+                setErrorMsg(`El saldo pendiente es de S/ ${pendingAmount.toLocaleString()}. No puede exceder este monto.`);
+                return;
+            }
         }
 
         if (method === 'NOTA_CREDITO' && !notes) {
@@ -370,14 +412,6 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         if (method === 'NOTA_CREDITO' && !isElectronic && !creditNoteNumber) {
             setErrorMsg('El número de nota de crédito es obligatorio para registro manual.');
             return;
-        }
-
-        if (method === 'LETRAS') {
-            const invalidLetras = letrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
-            if (invalidLetras) {
-                setErrorMsg('Todas las letras deben tener una fecha de vencimiento y un importe válido.');
-                return;
-            }
         }
 
         setIsSubmitting(true);
@@ -850,10 +884,21 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                         setNotes('Descuento global al total de ventas');
                                                     } else if (e.target.value === 'LETRAS') {
                                                         setNotes('Pago en letras de cambio');
-                                                        // Reset letras list to default
+                                                        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+                                                        const pending = sale ? sale.totalAmount - totalPaid : 0;
+                                                        
+                                                        const defaultDueDate = new Date();
+                                                        defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+                                                        
                                                         setCantidadLetras(1);
-                                                        setLetrasList([{ number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }]);
-                                                        setAmount('');
+                                                        setLetrasList([{
+                                                            number: 1,
+                                                            dueDate: defaultDueDate.toISOString().split('T')[0],
+                                                            amount: pending.toFixed(2),
+                                                            uniqueNumber: '',
+                                                            observation: ''
+                                                        }]);
+                                                        setAmount(pending.toFixed(2));
                                                     } else {
                                                         setNotes('');
                                                     }
@@ -963,6 +1008,34 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                     className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-indigo-600 animate-none"
                                                 />
                                             </div>
+
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-white p-3.5 rounded-2xl border border-slate-200/50 w-full text-left">
+                                                <div>
+                                                    <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Suma de Letras</span>
+                                                    <span className={`text-sm font-mono font-black ${
+                                                        Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount) < 0.01 
+                                                            ? 'text-emerald-600' 
+                                                            : 'text-amber-500 animate-pulse'
+                                                    }`}>
+                                                        S/ {letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                                <div className="text-left sm:text-right w-full sm:w-auto">
+                                                    <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Saldo Pendiente Requerido</span>
+                                                    <span className="text-xs font-mono font-black text-slate-900">
+                                                        S/ {pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount) > 0.01 && (
+                                                <div className="bg-amber-50 border border-amber-200/60 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
+                                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                                    <p className="text-[8.5px] text-amber-600 font-bold leading-normal uppercase tracking-wider">
+                                                        La suma de las letras no coincide con el saldo de S/ {pendingAmount.toFixed(2)}. Diferencia: S/ {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount).toFixed(2)}.
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             <div className="overflow-x-auto w-full border border-slate-200/60 rounded-xl bg-white shadow-sm max-h-[250px] overflow-y-auto custom-scrollbar">
                                                 <table className="w-full text-left border-collapse min-w-[550px]">
