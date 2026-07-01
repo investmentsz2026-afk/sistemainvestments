@@ -266,6 +266,37 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const [creditNoteMotive, setCreditNoteMotive] = useState('4');
     const [creditNoteNumber, setCreditNoteNumber] = useState('');
 
+    // Letras specific form state
+    const [cantidadLetras, setCantidadLetras] = useState(1);
+    const [letrasList, setLetrasList] = useState<any[]>([
+        { number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }
+    ]);
+
+    const handleCantidadLetrasChange = (val: number) => {
+        if (val < 1) return;
+        setCantidadLetras(val);
+        const newList = [...letrasList];
+        if (val > newList.length) {
+            for (let i = newList.length; i < val; i++) {
+                newList.push({ number: i + 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' });
+            }
+        } else if (val < newList.length) {
+            newList.splice(val);
+        }
+        setLetrasList(newList);
+    };
+
+    const handleLetraFieldChange = (idx: number, field: string, value: any) => {
+        const newList = [...letrasList];
+        newList[idx] = { ...newList[idx], [field]: value };
+        setLetrasList(newList);
+        
+        if (field === 'amount') {
+            const total = newList.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+            setAmount(total > 0 ? total.toFixed(2) : '');
+        }
+    };
+
     const handlePrintCreditNote = (payment: any) => {
         const printWindow = window.open('', '_blank', 'width=850,height=1100');
         if (printWindow) {
@@ -341,6 +372,14 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             return;
         }
 
+        if (method === 'LETRAS') {
+            const invalidLetras = letrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
+            if (invalidLetras) {
+                setErrorMsg('Todas las letras deben tener una fecha de vencimiento y un importe válido.');
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         const isVendor = user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
         try {
@@ -352,7 +391,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 evidenceUrl,
                 creditNoteMotive: method === 'NOTA_CREDITO' ? creditNoteMotive : undefined,
                 creditNoteNumber: method === 'NOTA_CREDITO' && !isElectronic ? creditNoteNumber : undefined,
-                isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined
+                isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined,
+                letras: method === 'LETRAS' ? letrasList : undefined
             });
             
             // Reset form
@@ -363,12 +403,21 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             setCreditNoteMotive('4');
             setIsElectronic(true);
             setPaymentDate(new Date().toISOString().split('T')[0]);
+            setCantidadLetras(1);
+            setLetrasList([{ number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }]);
             setShowAddForm(false);
             
             if (isVendor) {
-                toast.success('Nota de Crédito registrada. En espera de confirmación por el área Comercial.', { duration: 6000 });
+                toast.success(method === 'LETRAS' 
+                    ? 'Letras registradas. En espera de confirmación por el área Comercial.' 
+                    : 'Abono registrado. En espera de confirmación por el área Comercial.', 
+                    { duration: 6000 }
+                );
             } else {
-                toast.success('Nota de Crédito procesada correctamente.');
+                toast.success(method === 'LETRAS' 
+                    ? 'Letras procesadas correctamente.' 
+                    : 'Abono procesado correctamente.'
+                );
             }
 
             // Refresh data
@@ -628,6 +677,32 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                         )}
                                                     </div>
                                                 </div>
+
+                                                {payment.method === 'LETRAS' && payment.letraDetails && payment.letraDetails.length > 0 && (
+                                                    <div className="mt-3 border-t border-slate-100 pt-2.5 w-full text-left">
+                                                        <p className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Detalle de Letras:</p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                            {payment.letraDetails.map((letra: any) => (
+                                                                <div key={letra.id} className="text-[9px] text-slate-600 font-medium bg-white px-2.5 py-1.5 rounded-lg border border-slate-150 shadow-sm flex flex-col gap-0.5">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="font-black text-indigo-600">Letra {letra.number}</span>
+                                                                        <span className="font-bold text-slate-850 font-mono">S/ {letra.amount.toFixed(2)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between text-[8px] text-slate-400">
+                                                                        <span>Vcto: {formatDate(letra.dueDate)}</span>
+                                                                        {letra.uniqueNumber && <span># Único: {letra.uniqueNumber}</span>}
+                                                                    </div>
+                                                                    {letra.observation && (
+                                                                        <span className="text-[8px] text-slate-450 italic mt-0.5 truncate" title={letra.observation}>
+                                                                            Obs: {letra.observation}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {payment.status === 'RECHAZADO' && (
                                                     <div className="mt-3 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5">
                                                         <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
@@ -667,17 +742,27 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                             </span>
                         </div>
                         
-                        {!isCompleted ? (
-                            pendingAmountWithPending <= 0 ? (
-                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 bg-amber-50/50 px-5 py-3 rounded-full border border-amber-100 flex items-center gap-2">
-                                    <Clock className="w-3.5 h-3.5 animate-pulse" /> Aprobación Pendiente
+                        <div className="flex items-center gap-3">
+                            {!isCompleted ? (
+                                pendingAmountWithPending <= 0 ? (
+                                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 bg-amber-50/50 px-5 py-3 rounded-full border border-amber-100 flex items-center gap-2">
+                                        <Clock className="w-3.5 h-3.5 animate-pulse" /> Aprobación Pendiente
+                                    </div>
+                                ) : null
+                            ) : (
+                                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-5 py-3 rounded-full border border-emerald-100 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 shadow-sm" /> Operación Completada
                                 </div>
-                            ) : null
-                        ) : (
-                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-5 py-3 rounded-full border border-emerald-100 flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 shadow-sm" /> Operación Completada
-                            </div>
-                        )}
+                            )}
+
+                            <button 
+                                type="button"
+                                onClick={onClose}
+                                className="px-5 py-3 bg-indigo-600 hover:bg-slate-900 text-white rounded-full text-[9px] font-black uppercase tracking-[0.2em] transition shadow-md active:scale-95 flex items-center gap-1.5"
+                            >
+                                Cerrar y Continuar
+                            </button>
+                        </div>
                     </div>
                 </motion.div>
 
@@ -734,13 +819,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
-                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Monto (S/)</label>
+                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">
+                                                Monto (S/) {method === 'LETRAS' && '(Autocalculado)'}
+                                            </label>
                                             <input 
                                                 required
                                                 type="number"
                                                 step="0.01"
                                                 placeholder="0.00"
+                                                readOnly={method === 'LETRAS'}
                                                 className={`w-full px-4 py-3 border rounded-2xl text-lg font-black font-mono transition-all outline-none ${
+                                                    method === 'LETRAS' ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed' :
                                                     errorMsg ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100 focus:bg-white focus:border-indigo-600'
                                                 }`}
                                                 value={amount}
@@ -758,8 +847,13 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 onChange={(e) => {
                                                     setMethod(e.target.value);
                                                     if (e.target.value === 'NOTA_CREDITO') {
-                                                        // Automatically set notes to make it easy for user
                                                         setNotes('Descuento global al total de ventas');
+                                                    } else if (e.target.value === 'LETRAS') {
+                                                        setNotes('Pago en letras de cambio');
+                                                        // Reset letras list to default
+                                                        setCantidadLetras(1);
+                                                        setLetrasList([{ number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }]);
+                                                        setAmount('');
                                                     } else {
                                                         setNotes('');
                                                     }
@@ -770,6 +864,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <option value="YAPE/PLIN">YAPE/PLIN</option>
                                                 <option value="TARJETA">TARJETA</option>
                                                 <option value="NOTA_CREDITO">NOTA DE CRÉDITO</option>
+                                                <option value="LETRAS">LETRAS</option>
                                                 <option value="OTRO">OTRO</option>
                                             </select>
                                         </div>
@@ -852,6 +947,78 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {method === 'LETRAS' && (
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-4 w-full">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Cantidad de Letras</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="24"
+                                                    value={cantidadLetras}
+                                                    onChange={(e) => handleCantidadLetrasChange(parseInt(e.target.value) || 1)}
+                                                    className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center outline-none focus:border-indigo-600"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar w-full">
+                                                {letrasList.map((letra, idx) => (
+                                                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200/60 space-y-2 w-full text-left">
+                                                        <div className="flex justify-between items-center text-[9px] font-black text-indigo-600 uppercase">
+                                                            <span>Letra {letra.number}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">F. Vencimiento</label>
+                                                                <input
+                                                                    required
+                                                                    type="date"
+                                                                    value={letra.dueDate}
+                                                                    onChange={(e) => handleLetraFieldChange(idx, 'dueDate', e.target.value)}
+                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">Importe (S/)</label>
+                                                                <input
+                                                                    required
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    placeholder="0.00"
+                                                                    value={letra.amount}
+                                                                    onChange={(e) => handleLetraFieldChange(idx, 'amount', e.target.value)}
+                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold font-mono outline-none focus:bg-white focus:border-indigo-600"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase"># Único (Opcional)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Código..."
+                                                                    value={letra.uniqueNumber}
+                                                                    onChange={(e) => handleLetraFieldChange(idx, 'uniqueNumber', e.target.value)}
+                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[7.5px] font-bold text-slate-400 uppercase">Observación (Opcional)</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Detalles..."
+                                                                    value={letra.observation}
+                                                                    onChange={(e) => handleLetraFieldChange(idx, 'observation', e.target.value)}
+                                                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-semibold outline-none focus:bg-white focus:border-indigo-600"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 

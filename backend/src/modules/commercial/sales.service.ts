@@ -193,7 +193,11 @@ export class SalesService {
       include: {
         client: true,
         seller: { select: { name: true, zone: true } },
-        payments: true,
+        payments: {
+          include: {
+            letraDetails: true
+          }
+        },
         items: {
           include: {
             variant: {
@@ -212,7 +216,11 @@ export class SalesService {
       include: {
         client: true,
         seller: { select: { name: true, zone: true } },
-        payments: true,
+        payments: {
+          include: {
+            letraDetails: true
+          }
+        },
         items: {
           include: {
             variant: {
@@ -265,6 +273,16 @@ export class SalesService {
       throw new BadRequestException(`El monto ingresado (S/ ${inputAmount}) supera el saldo pendiente real disponible de S/ ${remainingToPayWithPending.toFixed(2)}.`);
     }
 
+    if (method === 'LETRAS') {
+      if (!data.letras || !Array.isArray(data.letras) || data.letras.length === 0) {
+        throw new BadRequestException('Debe especificar al menos una letra.');
+      }
+      const sumOfLetras = data.letras.reduce((sum: number, l: any) => sum + parseFloat(l.amount || 0), 0);
+      if (Math.abs(sumOfLetras - inputAmount) > 0.01) {
+        throw new BadRequestException(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no coincide con el monto total del abono (S/ ${inputAmount.toFixed(2)}).`);
+      }
+    }
+
     const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
     const isElecCN = isElectronic === true || isElectronic === 'true';
 
@@ -280,6 +298,19 @@ export class SalesService {
         registeredById: currentUser?.id || null,
         registeredByName: currentUser?.name || null,
       };
+
+      if (method === 'LETRAS' && data.letras && Array.isArray(data.letras)) {
+        paymentData.letraDetails = {
+          create: data.letras.map((letra: any) => ({
+            number: parseInt(letra.number),
+            dueDate: new Date(letra.dueDate),
+            amount: parseFloat(letra.amount),
+            uniqueNumber: letra.uniqueNumber || null,
+            observation: letra.observation || null,
+            status: 'PENDIENTE',
+          })),
+        };
+      }
 
       if (method === 'NOTA_CREDITO') {
         paymentData.creditNoteMotive = creditNoteMotive;
@@ -309,7 +340,8 @@ export class SalesService {
 
       // Create payment
       const payment = await tx.salePayment.create({
-        data: paymentData
+        data: paymentData,
+        include: { letraDetails: true }
       });
 
       // If registered by a vendor, the payment remains pending and doesn't update sale status
@@ -338,7 +370,13 @@ export class SalesService {
   async finalizePayment(saleId: string, currentUser?: any) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
-      include: { payments: true }
+      include: {
+        payments: {
+          include: {
+            letraDetails: true
+          }
+        }
+      }
     });
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
@@ -396,6 +434,7 @@ export class SalesService {
     return this.prisma.salePayment.findMany({
       where: { status: 'PENDIENTE' },
       include: {
+        letraDetails: true,
         sale: {
           include: {
             client: true,

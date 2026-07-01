@@ -451,11 +451,28 @@ model SalePayment {
   sunatXmlUrl       String?  @map("sunat_xml_url")
   sunatPdfUrl       String?  @map("sunat_pdf_url")
   sunatCdrUrl       String?  @map("sunat_cdr_url")
+  letraDetails      LetraDetail[]
 
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("sale_payments")
+}
+
+model LetraDetail {
+  id              String      @id @default(cuid())
+  paymentId       String      @map("payment_id")
+  payment         SalePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  number          Int
+  dueDate         DateTime    @map("due_date")
+  amount          Float
+  uniqueNumber    String?     @map("unique_number")
+  observation     String?     @db.Text
+  status          String      @default("PENDIENTE") // PENDIENTE, PAGADO
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@map("letra_details")
 }
 
 model SaleItem {

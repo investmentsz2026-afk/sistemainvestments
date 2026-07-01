@@ -235,6 +235,31 @@ export default function PaymentApprovalsModal({ isOpen, onClose, onUpdate }: Pay
                                                     <span className="italic">"{payment.notes}"</span>
                                                 </div>
                                             )}
+
+                                            {payment.method === 'LETRAS' && payment.letraDetails && payment.letraDetails.length > 0 && (
+                                                <div className="mt-2.5 pt-2.5 border-t border-gray-100 w-full text-left">
+                                                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Detalle de Letras</p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-gray-50 p-3 rounded-2xl border border-gray-200/55">
+                                                        {payment.letraDetails.map((letra: any) => (
+                                                            <div key={letra.id} className="text-[10px] text-gray-600 font-medium bg-white px-3 py-2 rounded-xl border border-gray-150 shadow-sm flex flex-col gap-0.5">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="font-black text-indigo-600">Letra {letra.number}</span>
+                                                                    <span className="font-bold text-gray-900 font-mono">S/ {letra.amount.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-[9px] text-gray-400">
+                                                                    <span>Vcto: {new Date(letra.dueDate).toLocaleDateString('es-PE', { timeZone: 'UTC' })}</span>
+                                                                    {letra.uniqueNumber && <span># Único: {letra.uniqueNumber}</span>}
+                                                                </div>
+                                                                {letra.observation && (
+                                                                    <span className="text-[9px] text-gray-400 italic mt-0.5 truncate" title={letra.observation}>
+                                                                        Obs: {letra.observation}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Amount card & Actions */}
