@@ -21,7 +21,8 @@ import {
     Info,
     HelpCircle,
     Clock,
-    RotateCw
+    RotateCw,
+    Printer
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -237,6 +238,125 @@ const getCreditNoteVoucherHTML = (payment: any, sale: any) => {
     `;
 };
 
+const getLetrasVoucherHTML = (payment: any, sale: any) => {
+    if (!sale) return '';
+    const today = formatDate(payment.createdAt || new Date().toISOString());
+    const total = payment.amount;
+    
+    const docTitle = sale.invoiceNumber?.startsWith('F') ? 'Factura de Referencia' : 'Boleta de Referencia';
+    const docNum = sale.invoiceNumber || 'S/N';
+    const clientName = sale.client?.name || 'Varios';
+    const clientDocType = sale.client?.documentType || 'RUC';
+    const clientDocNum = sale.client?.documentNumber || '00000000';
+    const letters = payment.letraDetails || [];
+
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Inter', sans-serif; color: #111; padding: 30px; font-size: 10px; line-height: 1.4; }
+                
+                .top-container { display: flex; justify-content: space-between; margin-bottom: 20px; }
+                .company-info { width: 55%; }
+                .company-name { font-size: 14px; font-weight: 900; margin-bottom: 4px; color: #111; }
+                .company-details { font-size: 8.5px; color: #555; font-weight: 500; }
+                
+                .ruc-box { width: 40%; border: 2.5px solid #111; padding: 12px; text-align: center; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; }
+                .ruc-box .title { font-size: 9.5px; font-weight: 900; letter-spacing: 0.5px; }
+                .ruc-box .ruc { font-size: 10px; font-weight: 900; margin: 4px 0; }
+                .ruc-box .number { font-size: 11px; font-weight: 900; color: #111; }
+                
+                .section-title { font-size: 10.5px; font-weight: 900; border-bottom: 1.5px solid #111; padding-bottom: 4px; margin-bottom: 10px; text-transform: uppercase; }
+                
+                .grid-details { display: grid; grid-template-columns: 140px 1fr; row-gap: 5px; margin-bottom: 18px; font-size: 9.5px; }
+                .grid-details .label { font-weight: 700; color: #333; }
+                .grid-details .value { font-weight: 500; }
+                
+                table { width: 100%; border-collapse: collapse; margin-bottom: 25px; margin-top: 10px; }
+                th { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #444; border-bottom: 2px solid #111; padding: 6px 4px; text-align: left; }
+                td { padding: 8px 4px; border-bottom: 1px solid #ddd; font-size: 9.5px; }
+                
+                .signature-section { display: flex; justify-content: space-between; margin-top: 50px; padding: 0 20px; }
+                .signature-box { width: 40%; border-top: 1.5px solid #111; text-align: center; padding-top: 8px; font-weight: 700; font-size: 9px; }
+                
+                .footer-msg { border: 1px dashed #aaa; border-radius: 4px; padding: 8px; font-size: 7.5px; font-style: italic; margin-top: 35px; text-align: center; }
+                
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <div class="top-container">
+                <div class="company-info">
+                    <div class="company-name">INVESTMENTS Z & G S.A.</div>
+                    <div class="company-details">
+                        MZA. E DPTO. 201 LOTE. 11 CND. LAS PRADERAS BLOCK 18 - COMAS-LIMA-LIMA<br>
+                        Fecha de Registro: ${today}
+                    </div>
+                </div>
+                <div class="ruc-box">
+                    <div class="title">COMPROMISO DE PAGO (LETRAS)</div>
+                    <div class="ruc">RUC: 20611188715</div>
+                    <div class="number">REF: COBRO #${payment.id?.slice(-6).toUpperCase()}</div>
+                </div>
+            </div>
+
+            <div class="section-title">Datos del Cliente:</div>
+            <div class="grid-details">
+                <div class="label">Razón Social:</div>
+                <div class="value">${clientName}</div>
+                <div class="label">${clientDocType}:</div>
+                <div class="value">${clientDocNum}</div>
+                <div class="label">${docTitle}:</div>
+                <div class="value">${docNum}</div>
+                <div class="label">Monto Total del Abono:</div>
+                <div class="value" style="font-weight: 900;">S/ ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            </div>
+
+            <div class="section-title">Cronograma de Letras:</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 10%;">N°</th>
+                        <th style="width: 25%;">Fecha Vcto</th>
+                        <th style="width: 20%;">Importe (S/)</th>
+                        <th style="width: 20%;"># Único</th>
+                        <th style="width: 25%;">Observación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${letters.map((letra: any) => `
+                        <tr>
+                            <td style="font-weight: 700;">${letra.number}</td>
+                            <td>${formatDate(letra.dueDate)}</td>
+                            <td style="font-weight: 700; font-family: monospace;">S/ ${letra.amount.toFixed(2)}</td>
+                            <td>${letra.uniqueNumber || '-'}</td>
+                            <td>${letra.observation || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            <div class="signature-section">
+                <div class="signature-box">
+                    Aceptado por el Cliente<br>Firma / DNI / Sello
+                </div>
+                <div class="signature-box">
+                    Recibido por Comercial<br>Firma / Sello
+                </div>
+            </div>
+
+            <div class="footer-msg">
+                Este compromiso de pago formaliza las letras de cambio acordadas entre las partes. La deuda se extinguirá una vez canceladas la totalidad de las letras.
+            </div>
+        </body>
+        </html>
+    `;
+};
+
 interface SalePaymentsModalProps {
     saleId: string;
     isOpen: boolean;
@@ -337,6 +457,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         }
     };
 
+    const handlePrintLetras = (payment: any) => {
+        const printWindow = window.open('', '_blank', 'width=850,height=1100');
+        if (printWindow) {
+            printWindow.document.write(getLetrasVoucherHTML(payment, sale));
+            printWindow.document.close();
+            printWindow.onload = () => {
+                setTimeout(() => { printWindow.print(); }, 500);
+            };
+        }
+    };
+
     useEffect(() => {
         if (isOpen && saleId) {
             fetchSaleDetails();
@@ -388,8 +519,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
         if (method === 'LETRAS') {
             const sumOfLetras = letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
-            if (Math.abs(sumOfLetras - pendingAmount) > 0.01) {
-                setErrorMsg(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) debe ser exactamente igual al saldo pendiente de la venta (S/ ${pendingAmount.toFixed(2)}).`);
+            if (sumOfLetras > pendingAmount + 0.01) {
+                setErrorMsg(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no puede superar el saldo pendiente de la venta (S/ ${pendingAmount.toFixed(2)}).`);
                 return;
             }
             const invalidLetras = letrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
@@ -687,6 +818,15 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 title="Imprimir Nota de Crédito"
                                                             >
                                                                 <FileText className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {payment.method === 'LETRAS' && (
+                                                            <button
+                                                                onClick={() => handlePrintLetras(payment)}
+                                                                className="w-10 h-10 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                                title="Imprimir Letras de Cambio"
+                                                            >
+                                                                <Printer className="w-4 h-4" />
                                                             </button>
                                                         )}
                                                         {payment.method === 'NOTA_CREDITO' && payment.sunatPdfUrl && (
@@ -1012,27 +1152,36 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-white p-3.5 rounded-2xl border border-slate-200/50 w-full text-left">
                                                 <div>
                                                     <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Suma de Letras</span>
-                                                    <span className={`text-sm font-mono font-black ${
-                                                        Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount) < 0.01 
-                                                            ? 'text-emerald-600' 
-                                                            : 'text-amber-500 animate-pulse'
-                                                    }`}>
+                                                    <span className="text-sm font-mono font-black text-indigo-600">
                                                         S/ {letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
-                                                    <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Saldo Pendiente Requerido</span>
-                                                    <span className="text-xs font-mono font-black text-slate-900">
-                                                        S/ {pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Saldo Restante</span>
+                                                    <span className={`text-xs font-mono font-black ${
+                                                        pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 
+                                                            ? 'text-amber-500' 
+                                                            : 'text-emerald-600'
+                                                    }`}>
+                                                        S/ {Math.max(0, pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount) > 0.01 && (
-                                                <div className="bg-amber-50 border border-amber-200/60 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
-                                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                                                    <p className="text-[8.5px] text-amber-600 font-bold leading-normal uppercase tracking-wider">
-                                                        La suma de las letras no coincide con el saldo de S/ {pendingAmount.toFixed(2)}. Diferencia: S/ {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount).toFixed(2)}.
+                                            {letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > pendingAmount + 0.01 && (
+                                                <div className="bg-rose-50 border border-rose-250 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
+                                                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                                                    <p className="text-[8.5px] text-rose-600 font-bold leading-normal uppercase tracking-wider">
+                                                        La suma de las letras no puede superar el saldo pendiente de S/ {pendingAmount.toFixed(2)}. Diferencia excedida: S/ {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount).toFixed(2)}.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 && (
+                                                <div className="bg-sky-50 border border-sky-200/60 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
+                                                    <Info className="w-3.5 h-3.5 text-sky-500 shrink-0 mt-0.5" />
+                                                    <p className="text-[8.5px] text-sky-600 font-bold leading-normal uppercase tracking-wider">
+                                                        Abono parcial en letras. Quedará un saldo pendiente de S/ {(pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toFixed(2)} que se podrá cobrar después con otros métodos de pago.
                                                     </p>
                                                 </div>
                                             )}
