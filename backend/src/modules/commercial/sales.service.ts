@@ -878,6 +878,7 @@ export class SalesService {
 
     // Check for duplicate documentNumber
     if (clientData.documentNumber) {
+      clientData.documentNumber = clientData.documentNumber.trim();
       const existingClient = await (this.prisma.client as any).findFirst({
         where: { documentNumber: clientData.documentNumber },
       });
@@ -927,6 +928,9 @@ export class SalesService {
     const { id: _id, createdAt, createdBy, createdById, updatedAt, sales, ...updateData } = data;
 
     // Check for duplicate documentNumber on update
+    if (updateData.documentNumber) {
+      updateData.documentNumber = updateData.documentNumber.trim();
+    }
     if (updateData.documentNumber && updateData.documentNumber !== client.documentNumber) {
       const existingClient = await (this.prisma.client as any).findFirst({
         where: { documentNumber: updateData.documentNumber },
