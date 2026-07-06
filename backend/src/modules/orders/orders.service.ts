@@ -18,6 +18,24 @@ export class OrdersService {
       throw new BadRequestException('El pedido debe tener al menos un modelo');
     }
 
+    // Validate colors against the product catalog
+    for (const item of items) {
+      if (item.modelName && item.color) {
+        const product = await this.prisma.product.findFirst({
+          where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
+          include: { variants: true }
+        });
+        if (product) {
+          const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
+          const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
+          const allColors = Array.from(new Set([...prodColors, ...variantColors]));
+          if (!allColors.includes(item.color.trim().toUpperCase())) {
+            throw new BadRequestException(`El color "${item.color}" no está disponible para el modelo "${item.modelName}".`);
+          }
+        }
+      }
+    }
+
     // Sanitize and calculate
     const sanitizedItems = items.map((item: any) => {
       const quantity = [
@@ -137,7 +155,7 @@ export class OrdersService {
     return order;
   }
 
-  async update(id: string, user: any, data: any) {
+   async update(id: string, user: any, data: any) {
     const order = await this.findOne(id);
     
     if (order.status !== 'PENDIENTE' && order.status !== 'EN_LOGISTICA' && user.role !== 'ADMIN') {
@@ -145,6 +163,26 @@ export class OrdersService {
     }
 
     const { clientId, condition, agency, observations, items, orderNumber, createdAt, deliveryAddress } = data;
+
+    // Validate colors against the product catalog
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        if (item.modelName && item.color) {
+          const product = await this.prisma.product.findFirst({
+            where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
+            include: { variants: true }
+          });
+          if (product) {
+            const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
+            const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
+            const allColors = Array.from(new Set([...prodColors, ...variantColors]));
+            if (!allColors.includes(item.color.trim().toUpperCase())) {
+              throw new BadRequestException(`El color "${item.color}" no está disponible para el modelo "${item.modelName}".`);
+            }
+          }
+        }
+      }
+    }
 
     // Sanitize items
     const sanitizedItems = items.map((item: any) => {

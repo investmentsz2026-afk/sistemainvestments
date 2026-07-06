@@ -764,8 +764,8 @@ export class SalesService {
         cliente_direccion: sale.deliveryAddress || sale.client?.address || "",
         cliente_email: sale.client?.email || "",
         fecha_de_emision: fechaEmision,
-        condicion_de_pago: sale.paymentMethod === 'CREDITO' ? 2 : 1,
-        ...(sale.paymentMethod === 'CREDITO' ? {
+        condicion_de_pago: (sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? 2 : 1,
+        ...((sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? {
           cuotas: [
             {
               cuota: 1,

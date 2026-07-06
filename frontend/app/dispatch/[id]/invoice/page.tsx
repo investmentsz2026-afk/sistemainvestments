@@ -459,7 +459,9 @@ export default function InvoicePage() {
                                 <option value="TRANSFERENCIA">Transferencia</option>
                                 <option value="EFECTIVO">Efectivo</option>
                                 <option value="TARJETA">Tarjeta</option>
+                                <option value="CONTADO">Contado</option>
                                 <option value="CREDITO">Crédito</option>
+                                <option value="LETRAS">Letras</option>
                             </select>
                         </div>
                         <div className="space-y-2">

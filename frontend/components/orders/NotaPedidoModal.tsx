@@ -222,6 +222,21 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         return [];
     };
 
+    const isColorInvalid = (item: any, index: number) => {
+        const model = item.modelName;
+        if (!model) return false;
+        
+        const colorVal = (colorSearch?.index === index ? colorSearch.query : item.color) || '';
+        if (!colorVal) return false;
+
+        const prod = groupedProducts.find(p => 
+            (item.productId && p.id === item.productId) || 
+            p.name.trim().toUpperCase() === model.trim().toUpperCase()
+        );
+        if (!prod) return false;
+        return !prod.colors.includes(colorVal.trim().toUpperCase());
+    };
+
     const focusFirstAvailableSize = (rowIndex: number) => {
         setTimeout(() => {
             const activeFields = getRowActiveFields(rowIndex);
@@ -534,8 +549,15 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             return toast.error('Agrega al menos un producto con modelo y cantidad válidos');
         }
 
-        if (filledItems.some(item => !item.modelName || item.quantity <= 0)) {
-            return toast.error('Completa los modelos y cantidades de los productos agregados');
+        if (filledItems.some(item => !item.modelName || !item.color || item.color.trim() === '' || item.quantity <= 0)) {
+            return toast.error('Completa los modelos, colores y cantidades de los productos agregados');
+        }
+
+        for (const item of filledItems) {
+            const index = items.indexOf(item);
+            if (isColorInvalid(item, index)) {
+                return toast.error(`El color "${item.color}" no existe en el inventario para el modelo "${item.modelName}". Selecciona un color de la lista.`);
+            }
         }
 
         if (filledItems.some(item => !item.unitPrice || parseFloat(String(item.unitPrice)) <= 0)) {
@@ -1502,7 +1524,9 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                         <input
                                                             type="text" disabled={readOnly || !item.modelName}
                                                             data-row={index} data-col="color"
-                                                            className="w-full px-4 py-3.5 bg-transparent border-none outline-none font-bold text-slate-900 text-[10px] uppercase focus:bg-white transition-all placeholder:text-slate-300 disabled:opacity-30"
+                                                            className={`w-full px-4 py-3.5 bg-transparent border-none outline-none font-bold text-[10px] uppercase focus:bg-white transition-all placeholder:text-slate-300 disabled:opacity-30 ${
+                                                                isColorInvalid(item, index) ? 'text-rose-600 bg-rose-50/50 placeholder:text-rose-300' : 'text-slate-900'
+                                                            }`}
                                                             value={colorSearch?.index === index ? colorSearch.query : item.color}
                                                             onChange={(e) => {
                                                                 setColorSearch({ index, query: e.target.value });
@@ -1516,7 +1540,13 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                             }}
                                                             onKeyDown={(e) => handleKeyDown(e, index, 'color')}
                                                             placeholder="COLOR..."
+                                                            title={isColorInvalid(item, index) ? "Ese color no hay en el inventario, pon otro color" : undefined}
                                                         />
+                                                        {isColorInvalid(item, index) && (
+                                                            <div className="absolute left-1 right-1 bottom-0.5 bg-rose-600 text-white text-[7px] font-black text-center py-0.5 z-[10] rounded shadow-sm uppercase tracking-tight pointer-events-none select-none">
+                                                                Color no disponible
+                                                            </div>
+                                                        )}
                                                         <AnimatePresence>
                                                             {colorSearch?.index === index && (item.productId || products?.some(p => p.name.trim().toUpperCase() === item.modelName?.trim().toUpperCase())) && (
                                                                 <>
