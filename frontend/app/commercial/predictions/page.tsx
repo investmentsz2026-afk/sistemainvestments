@@ -509,11 +509,13 @@ export default function PredictionsPage() {
                                         <tr className="bg-slate-50 text-slate-400 border-b border-slate-100 uppercase tracking-wider text-[10px] font-black">
                                             <th className="px-6 py-4 text-center">Rango</th>
                                             <th className="px-6 py-4 text-left">Cliente</th>
-                                            <th className="px-6 py-4 text-center">Frecuencia de Compra</th>
+                                            <th className="px-6 py-4 text-center">Prenda Preferida</th>
+                                            <th className="px-6 py-4 text-center">Frecuencia</th>
                                             <th className="px-6 py-4 text-right">Volumen Comprado</th>
-                                            <th className="px-6 py-4 text-right">Monto Total Facturado</th>
-                                            <th className="px-6 py-4 text-center">Última Compra</th>
-                                            <th className="px-6 py-4 text-center">Estado Comercial</th>
+                                            <th className="px-6 py-4 text-right">Monto Facturado</th>
+                                            <th className="px-6 py-4 text-center">Devoluciones</th>
+                                            <th className="px-6 py-4 text-center">Calificación</th>
+                                            <th className="px-6 py-4 text-center">Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
@@ -536,12 +538,38 @@ export default function PredictionsPage() {
                                                             <div className="font-black text-slate-900 uppercase">{client.name}</div>
                                                             <div className="text-[10px] text-slate-400 font-bold">RUC/DNI: {client.docNumber}</div>
                                                         </td>
+                                                        <td className="px-6 py-4 text-center font-black text-slate-900 uppercase">
+                                                            {client.favoriteProduct || 'NINGUNO'}
+                                                        </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <span className="text-slate-900 font-black">{client.purchaseCount}</span> compras
                                                         </td>
                                                         <td className="px-6 py-4 text-right font-black text-slate-900">{client.totalQuantity} unds</td>
                                                         <td className="px-6 py-4 text-right text-indigo-700 font-black">S/. {client.totalAmount.toLocaleString()}</td>
-                                                        <td className="px-6 py-4 text-center text-slate-500">{client.lastPurchase}</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            {client.returnsQty > 0 ? (
+                                                                <span className="font-black text-rose-600 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100">
+                                                                    {client.returnsQty} unds ({client.returnRate}%)
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-400 font-bold">0 unds</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                                                client.qualification === 'EXCELENTE'
+                                                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 animate-pulse'
+                                                                    : client.qualification === 'BUEN CLIENTE'
+                                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                                        : client.qualification === 'REGULAR'
+                                                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                            : 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                                                            }`}>
+                                                                {client.qualification === 'EXCELENTE' && '👑 '}
+                                                                {client.qualification === 'CUIDADO (ALTO RETORNO)' && '⚠️ '}
+                                                                {client.qualification}
+                                                            </span>
+                                                        </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                                                                 client.status === 'ACTIVO' 
@@ -558,7 +586,7 @@ export default function PredictionsPage() {
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-black uppercase tracking-widest text-xs">
+                                                <td colSpan={9} className="px-6 py-12 text-center text-slate-400 font-black uppercase tracking-widest text-xs">
                                                     No hay compras registradas en el sistema
                                                 </td>
                                             </tr>

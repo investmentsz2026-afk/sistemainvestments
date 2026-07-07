@@ -1713,7 +1713,15 @@ export class SalesService {
       }
     });
 
-    // 2. Filter sales by year/month if provided
+    // 1b. Fetch all return requests with items and client
+    const returnRequests = await this.prisma.returnRequest.findMany({
+      include: {
+        client: true,
+        items: true
+      }
+    });
+
+    // 2. Filter sales and returns by year/month if provided
     const filteredSales = sales.filter(sale => {
       const saleDate = new Date(sale.createdAt);
       if (year && saleDate.getFullYear().toString() !== year) return false;
@@ -1721,10 +1729,17 @@ export class SalesService {
       return true;
     });
 
+    const filteredReturns = returnRequests.filter(ret => {
+      const retDate = new Date(ret.createdAt);
+      if (year && retDate.getFullYear().toString() !== year) return false;
+      if (month && (retDate.getMonth() + 1).toString() !== month) return false;
+      return true;
+    });
+
     // 3. Process aggregates in memory
     const modelSales: Record<string, { quantity: number; category: string; currentStock: number; id: string }> = {};
     const monthlyTrendData: Record<string, Record<string, number>> = {};
-    const clientMap: Record<string, { name: string; docNumber: string; totalAmount: number; totalQty: number; count: number; lastPurchaseDate: Date }> = {};
+    const clientMap: Record<string, { name: string; docNumber: string; totalAmount: number; totalQty: number; count: number; lastPurchaseDate: Date; productsMap: Record<string, number>; returnsQty: number }> = {};
     
     // Initialize monthly counts
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -1752,7 +1767,9 @@ export class SalesService {
             totalAmount: 0,
             totalQty: 0,
             count: 0,
-            lastPurchaseDate: saleDate
+            lastPurchaseDate: saleDate,
+            productsMap: {},
+            returnsQty: 0
           };
         }
 
@@ -1761,6 +1778,13 @@ export class SalesService {
         clientMap[clientId].count += 1;
         if (saleDate > clientMap[clientId].lastPurchaseDate) {
           clientMap[clientId].lastPurchaseDate = saleDate;
+        }
+
+        // Track products bought
+        for (const item of sale.items) {
+          if (!item.variant || !item.variant.product) continue;
+          const pName = item.variant.product.name.trim().toUpperCase();
+          clientMap[clientId].productsMap[pName] = (clientMap[clientId].productsMap[pName] || 0) + (item.quantity || 0);
         }
       }
 
@@ -1789,6 +1813,27 @@ export class SalesService {
         // Monthly trend aggregation
         monthlyTrendData[monthName].Total = (monthlyTrendData[monthName].Total || 0) + qty;
         monthlyTrendData[monthName][modelName] = (monthlyTrendData[monthName][modelName] || 0) + qty;
+      }
+    }
+
+    // Process returns per client
+    for (const ret of filteredReturns) {
+      const clientId = ret.clientId;
+      const retQty = ret.items.reduce((acc, item) => acc + (item.quantity || 0), 0);
+      if (clientId && ret.client) {
+        if (!clientMap[clientId]) {
+          clientMap[clientId] = {
+            name: ret.client.name,
+            docNumber: ret.client.documentNumber || '',
+            totalAmount: 0,
+            totalQty: 0,
+            count: 0,
+            lastPurchaseDate: new Date(ret.createdAt),
+            productsMap: {},
+            returnsQty: 0
+          };
+        }
+        clientMap[clientId].returnsQty += retQty;
       }
     }
 
@@ -1847,6 +1892,7 @@ export class SalesService {
       }
 
       return {
+        name: item.modelName, // Make consistent with bestSellers structure
         modelName: item.modelName,
         category: item.category,
         unitsSold: item.quantity,
@@ -1869,6 +1915,30 @@ export class SalesService {
         status = 'REGULAR';
       }
 
+      // Find favorite product
+      let favoriteProduct = 'NINGUNO';
+      let maxQty = 0;
+      for (const [pName, qty] of Object.entries(client.productsMap)) {
+        if (qty > maxQty) {
+          maxQty = qty;
+          favoriteProduct = pName;
+        }
+      }
+
+      // Calculate return rate and qualification
+      const returnsQty = client.returnsQty;
+      const totalQty = client.totalQty;
+      const returnRate = totalQty > 0 ? parseFloat(((returnsQty / totalQty) * 100).toFixed(1)) : 0;
+
+      let qualification = 'BUEN CLIENTE';
+      if (returnRate > 25 && returnsQty >= 10) {
+        qualification = 'CUIDADO (ALTO RETORNO)';
+      } else if (returnRate > 15) {
+        qualification = 'REGULAR';
+      } else if (totalQty > 100 && returnRate <= 5) {
+        qualification = 'EXCELENTE';
+      }
+
       return {
         name: client.name,
         docNumber: client.docNumber,
@@ -1876,7 +1946,11 @@ export class SalesService {
         totalQuantity: client.totalQty,
         purchaseCount: client.count,
         status,
-        lastPurchase: client.lastPurchaseDate.toLocaleDateString()
+        lastPurchase: client.lastPurchaseDate.toLocaleDateString(),
+        favoriteProduct,
+        returnsQty,
+        returnRate,
+        qualification
       };
     }).sort((a, b) => b.totalQuantity - a.totalQuantity);
 
