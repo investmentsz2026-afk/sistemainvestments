@@ -37,6 +37,7 @@ export default function PredictionsPage() {
     const [data, setData] = useState<any>(null);
     const [year, setYear] = useState('2026');
     const [month, setMonth] = useState('ALL');
+    const [semester, setSemester] = useState('ALL');
     const [activeTab, setActiveTab] = useState<'production' | 'clients'>('production');
 
     useEffect(() => {
@@ -47,7 +48,7 @@ export default function PredictionsPage() {
         if (isMounted) {
             fetchPredictions();
         }
-    }, [isMounted, year, month]);
+    }, [isMounted, year, month, semester]);
 
     const fetchPredictions = async () => {
         setIsLoading(true);
@@ -55,6 +56,9 @@ export default function PredictionsPage() {
             const params: any = { year };
             if (month !== 'ALL') {
                 params.month = month;
+            }
+            if (semester !== 'ALL') {
+                params.semester = semester;
             }
             const resp = await api.get('/sales/predictions', { params });
             setData(resp.data);
@@ -93,7 +97,7 @@ export default function PredictionsPage() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `predicciones_produccion_${year}_${month}.csv`);
+        link.setAttribute('download', `predicciones_produccion_${year}_M${month}_S${semester}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -144,7 +148,12 @@ export default function PredictionsPage() {
                         <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3.5 py-2 shadow-sm">
                             <select
                                 value={month}
-                                onChange={(e) => setMonth(e.target.value)}
+                                onChange={(e) => {
+                                    setMonth(e.target.value);
+                                    if (e.target.value !== 'ALL') {
+                                        setSemester('ALL');
+                                    }
+                                }}
                                 className="bg-transparent text-xs font-black text-slate-700 outline-none cursor-pointer"
                             >
                                 <option value="ALL">Todo el Año</option>
@@ -160,6 +169,24 @@ export default function PredictionsPage() {
                                 <option value="10">Octubre</option>
                                 <option value="11">Noviembre</option>
                                 <option value="12">Diciembre</option>
+                            </select>
+                        </div>
+
+                        {/* Semester selector */}
+                        <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3.5 py-2 shadow-sm">
+                            <select
+                                value={semester}
+                                onChange={(e) => {
+                                    setSemester(e.target.value);
+                                    if (e.target.value !== 'ALL') {
+                                        setMonth('ALL');
+                                    }
+                                }}
+                                className="bg-transparent text-xs font-black text-slate-700 outline-none cursor-pointer"
+                            >
+                                <option value="ALL">Sin Filtro Semestral</option>
+                                <option value="1">1er Semestre (Ene-Jun)</option>
+                                <option value="2">2do Semestre (Jul-Dic)</option>
                             </select>
                         </div>
 

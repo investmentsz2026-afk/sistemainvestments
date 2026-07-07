@@ -38,8 +38,8 @@ export class SalesController {
   }
 
   @Get('predictions')
-  getPredictions(@Query('year') year?: string, @Query('month') month?: string) {
-    return this.salesService.getPredictions(year, month);
+  getPredictions(@Query('year') year?: string, @Query('month') month?: string, @Query('semester') semester?: string) {
+    return this.salesService.getPredictions(year, month, semester);
   }
 
   @Get('payments/pending')

@@ -1689,7 +1689,7 @@ export class SalesService {
     }
   }
 
-  async getPredictions(year?: string, month?: string) {
+  async getPredictions(year?: string, month?: string, semester?: string) {
     // 1. Fetch all completed sales (exclude ANULADO) with client information
     const sales = await this.prisma.sale.findMany({
       where: {
@@ -1721,18 +1721,28 @@ export class SalesService {
       }
     });
 
-    // 2. Filter sales and returns by year/month if provided
+    // 2. Filter sales and returns by year/month/semester if provided
     const filteredSales = sales.filter(sale => {
       const saleDate = new Date(sale.createdAt);
       if (year && saleDate.getFullYear().toString() !== year) return false;
-      if (month && (saleDate.getMonth() + 1).toString() !== month) return false;
+      const mVal = saleDate.getMonth() + 1;
+      if (month && mVal.toString() !== month) return false;
+      if (semester) {
+        if (semester === '1' && (mVal < 1 || mVal > 6)) return false;
+        if (semester === '2' && (mVal < 7 || mVal > 12)) return false;
+      }
       return true;
     });
 
     const filteredReturns = returnRequests.filter(ret => {
       const retDate = new Date(ret.createdAt);
       if (year && retDate.getFullYear().toString() !== year) return false;
-      if (month && (retDate.getMonth() + 1).toString() !== month) return false;
+      const mVal = retDate.getMonth() + 1;
+      if (month && mVal.toString() !== month) return false;
+      if (semester) {
+        if (semester === '1' && (mVal < 1 || mVal > 6)) return false;
+        if (semester === '2' && (mVal < 7 || mVal > 12)) return false;
+      }
       return true;
     });
 
@@ -1866,7 +1876,7 @@ export class SalesService {
 
     const monthNamesES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const targetDate = new Date();
-    targetDate.setMonth(targetDate.getMonth() + 5);
+    targetDate.setDate(targetDate.getDate() + 45); // 45 days projection
     const targetMonthName = monthNamesES[targetDate.getMonth()];
     const targetYear = targetDate.getFullYear();
 
@@ -1874,21 +1884,21 @@ export class SalesService {
       const monthlyAverage = item.quantity / elapsedMonths;
       const currentStock = item.currentStock;
       
-      // Calculate suggested production to cover the 5-month lead time + 1 month safety buffer (6 months total average)
-      const recommendedQty = Math.max(0, Math.ceil((monthlyAverage * 6) - currentStock));
+      // Calculate suggested production to cover the 45-day lead time + 15 days safety buffer (2 months total average)
+      const recommendedQty = Math.max(0, Math.ceil((monthlyAverage * 2) - currentStock));
       
       let status = 'SUFICIENTE';
       let reason = `El stock actual de ${currentStock} unidades es suficiente para cubrir la rotación mensual proyectada.`;
 
       if (currentStock <= monthlyAverage * 1.5) {
         status = 'CRÍTICO';
-        reason = `Este modelo representa el ${item.percentage}% de las ventas totales. Como el ciclo de producción de fábrica toma aproximadamente 5 meses, es crítico iniciar hoy mismo la producción de ${recommendedQty} unidades para asegurar stock en el mes de ${targetMonthName} ${targetYear} y evitar quiebre.`;
-      } else if (currentStock <= monthlyAverage * 3.5) {
+        reason = `Este modelo representa el ${item.percentage}% de las ventas totales. Como el ciclo de producción de fábrica toma aproximadamente de 40 a 50 días, es crítico iniciar hoy mismo la producción de ${recommendedQty} unidades para asegurar stock en el mes de ${targetMonthName} ${targetYear} y evitar quiebre.`;
+      } else if (currentStock <= monthlyAverage * 2.5) {
         status = 'ALTA DEMANDA';
-        reason = `Demanda activa constante. Con un ciclo de producción de 5 meses, se sugiere iniciar preventivamente una orden de ${recommendedQty} unidades para reposición en ${targetMonthName} ${targetYear}.`;
+        reason = `Demanda activa constante. Con un ciclo de producción de 40 a 50 días, se sugiere iniciar preventivamente una orden de ${recommendedQty} unidades para reposición en ${targetMonthName} ${targetYear}.`;
       } else if (recommendedQty > 0) {
         status = 'REPOSICIÓN SUGERIDA';
-        reason = `Orden de reposición preventiva sugerida de ${recommendedQty} unidades para compensar el tiempo de espera de producción de 5 meses.`;
+        reason = `Orden de reposición preventiva sugerida de ${recommendedQty} unidades para compensar el tiempo de espera de producción de 40 a 50 días.`;
       }
 
       return {
