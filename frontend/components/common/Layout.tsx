@@ -30,7 +30,9 @@ import {
   Beaker,
   ShoppingBag,
   DollarSign,
-  ClipboardCheck
+  ClipboardCheck,
+  TrendingUp,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -124,6 +126,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Calidad', href: '/quality', icon: ShieldCheck },
       { name: 'Auditoría', href: '/audit', icon: FileSearch }
     ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' ? [
+      { name: 'Predicciones', href: '/commercial/predictions', icon: TrendingUp }
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE' || user?.role === 'UDP' || user?.role === 'LOGISTICA' ? [
+      { name: 'Devoluciones', href: '/returns', icon: RefreshCw }
+    ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE' ? [
       { name: 'Ver Stock', href: '/commercial/stock', icon: Package },
       { name: 'Pedidos', href: '/orders', icon: ShoppingBag },
@@ -134,7 +142,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ] : []),
     ...(user?.role === 'ADMIN' ? [
       { name: 'Proveedores', href: '/suppliers', icon: Building2 },
-      { name: 'Usuarios', href: '/users', icon: User }
+      { name: 'Usuarios', href: '/users', icon: User },
+      { name: 'RRHH', href: '/admin/hr', icon: Users }
     ] : []),
   ];
 

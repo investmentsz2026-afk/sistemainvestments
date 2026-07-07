@@ -17,6 +17,8 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { AgenciesModule } from './modules/agencies/agencies.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ProductionOrdersModule } from './modules/production-orders/production-orders.module';
+import { ReturnsModule } from './modules/returns/returns.module';
+import { HrModule } from './modules/hr/hr.module';
 import { AppController } from './app.controller';
 import { PrismaService } from './database/prisma.service';
 
@@ -42,6 +44,8 @@ import { PrismaService } from './database/prisma.service';
     AgenciesModule,
     UploadsModule,
     ProductionOrdersModule,
+    ReturnsModule,
+    HrModule,
   ],
   controllers: [AppController],
   providers: [],

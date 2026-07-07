@@ -1688,4 +1688,204 @@ export class SalesService {
       throw new BadRequestException('Error al consultar la Guía de Remisión: ' + error.message);
     }
   }
+
+  async getPredictions(year?: string, month?: string) {
+    // 1. Fetch all completed sales (exclude ANULADO) with client information
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        status: { not: 'ANULADO' }
+      },
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  include: {
+                    variants: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // 2. Filter sales by year/month if provided
+    const filteredSales = sales.filter(sale => {
+      const saleDate = new Date(sale.createdAt);
+      if (year && saleDate.getFullYear().toString() !== year) return false;
+      if (month && (saleDate.getMonth() + 1).toString() !== month) return false;
+      return true;
+    });
+
+    // 3. Process aggregates in memory
+    const modelSales: Record<string, { quantity: number; category: string; currentStock: number; id: string }> = {};
+    const monthlyTrendData: Record<string, Record<string, number>> = {};
+    const clientMap: Record<string, { name: string; docNumber: string; totalAmount: number; totalQty: number; count: number; lastPurchaseDate: Date }> = {};
+    
+    // Initialize monthly counts
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    for (let i = 0; i < 12; i++) {
+      monthlyTrendData[monthNames[i]] = { Total: 0 };
+    }
+
+    let totalGlobalSold = 0;
+
+    for (const sale of filteredSales) {
+      const saleDate = new Date(sale.createdAt);
+      const monthIdx = saleDate.getMonth();
+      const monthName = monthNames[monthIdx];
+
+      // Client Analytics Aggregation
+      if (sale.client && sale.clientId) {
+        const clientId = sale.clientId;
+        const amount = sale.totalAmount || 0;
+        const saleQty = (sale.items || []).reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
+
+        if (!clientMap[clientId]) {
+          clientMap[clientId] = {
+            name: sale.client.name,
+            docNumber: sale.client.documentNumber || '',
+            totalAmount: 0,
+            totalQty: 0,
+            count: 0,
+            lastPurchaseDate: saleDate
+          };
+        }
+
+        clientMap[clientId].totalAmount += amount;
+        clientMap[clientId].totalQty += saleQty;
+        clientMap[clientId].count += 1;
+        if (saleDate > clientMap[clientId].lastPurchaseDate) {
+          clientMap[clientId].lastPurchaseDate = saleDate;
+        }
+      }
+
+      // Items Aggregation
+      for (const item of sale.items) {
+        if (!item.variant || !item.variant.product) continue;
+        const product = item.variant.product;
+        const modelName = product.name.trim().toUpperCase();
+        const category = product.category || 'Otros';
+        const qty = item.quantity || 0;
+
+        totalGlobalSold += qty;
+
+        // Model sales aggregation
+        if (!modelSales[modelName]) {
+          const totalStock = (product.variants || []).reduce((acc, v) => acc + (v.stock || 0), 0);
+          modelSales[modelName] = {
+            quantity: 0,
+            category,
+            currentStock: totalStock,
+            id: product.id
+          };
+        }
+        modelSales[modelName].quantity += qty;
+
+        // Monthly trend aggregation
+        monthlyTrendData[monthName].Total = (monthlyTrendData[monthName].Total || 0) + qty;
+        monthlyTrendData[monthName][modelName] = (monthlyTrendData[monthName][modelName] || 0) + qty;
+      }
+    }
+
+    // 4. Format best sellers list
+    const bestSellers = Object.entries(modelSales).map(([name, data]) => {
+      return {
+        modelName: name,
+        quantity: data.quantity,
+        category: data.category,
+        percentage: totalGlobalSold > 0 ? parseFloat(((data.quantity / totalGlobalSold) * 100).toFixed(1)) : 0,
+        currentStock: data.currentStock,
+        id: data.id
+      };
+    }).sort((a, b) => b.quantity - a.quantity);
+
+    // 5. Format monthly trend list for Recharts
+    const monthlyTrend = monthNames.map(name => {
+      return {
+        month: name,
+        ...monthlyTrendData[name]
+      };
+    });
+
+    // 6. Generate smart production recommendations (incorporating 5-month production cycle)
+    const uniqueMonths = new Set(filteredSales.map(s => {
+      const d = new Date(s.createdAt);
+      return `${d.getFullYear()}-${d.getMonth() + 1}`;
+    }));
+    const elapsedMonths = uniqueMonths.size || 1;
+
+    const monthNamesES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + 5);
+    const targetMonthName = monthNamesES[targetDate.getMonth()];
+    const targetYear = targetDate.getFullYear();
+
+    const recommendations = bestSellers.map(item => {
+      const monthlyAverage = item.quantity / elapsedMonths;
+      const currentStock = item.currentStock;
+      
+      // Calculate suggested production to cover the 5-month lead time + 1 month safety buffer (6 months total average)
+      const recommendedQty = Math.max(0, Math.ceil((monthlyAverage * 6) - currentStock));
+      
+      let status = 'SUFICIENTE';
+      let reason = `El stock actual de ${currentStock} unidades es suficiente para cubrir la rotación mensual proyectada.`;
+
+      if (currentStock <= monthlyAverage * 1.5) {
+        status = 'CRÍTICO';
+        reason = `Este modelo representa el ${item.percentage}% de las ventas totales. Como el ciclo de producción de fábrica toma aproximadamente 5 meses, es crítico iniciar hoy mismo la producción de ${recommendedQty} unidades para asegurar stock en el mes de ${targetMonthName} ${targetYear} y evitar quiebre.`;
+      } else if (currentStock <= monthlyAverage * 3.5) {
+        status = 'ALTA DEMANDA';
+        reason = `Demanda activa constante. Con un ciclo de producción de 5 meses, se sugiere iniciar preventivamente una orden de ${recommendedQty} unidades para reposición en ${targetMonthName} ${targetYear}.`;
+      } else if (recommendedQty > 0) {
+        status = 'REPOSICIÓN SUGERIDA';
+        reason = `Orden de reposición preventiva sugerida de ${recommendedQty} unidades para compensar el tiempo de espera de producción de 5 meses.`;
+      }
+
+      return {
+        modelName: item.modelName,
+        category: item.category,
+        unitsSold: item.quantity,
+        monthlyAverage: parseFloat(monthlyAverage.toFixed(1)),
+        currentStock,
+        recommendedProduction: recommendedQty,
+        status,
+        reason
+      };
+    });
+
+    // 7. Format Client Analytics
+    const today = new Date();
+    const clientAnalytics = Object.values(clientMap).map(client => {
+      const daysSinceLastPurchase = Math.floor((today.getTime() - client.lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+      let status = 'ACTIVO';
+      if (daysSinceLastPurchase > 90) {
+        status = 'INACTIVO';
+      } else if (daysSinceLastPurchase > 30) {
+        status = 'REGULAR';
+      }
+
+      return {
+        name: client.name,
+        docNumber: client.docNumber,
+        totalAmount: parseFloat(client.totalAmount.toFixed(2)),
+        totalQuantity: client.totalQty,
+        purchaseCount: client.count,
+        status,
+        lastPurchase: client.lastPurchaseDate.toLocaleDateString()
+      };
+    }).sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    return {
+      bestSellers,
+      monthlyTrend,
+      recommendations,
+      clientAnalytics,
+      totalGlobalSold
+    };
+  }
 }

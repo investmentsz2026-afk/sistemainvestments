@@ -29,6 +29,7 @@ model User {
   samplesReviewed ProductSample[] @relation("SampleReviewer")
   createdClients Client[] @relation("ClientCreator")
   createdAgencies Agency[] @relation("AgencyCreator")
+  returnRequests ReturnRequest[] @relation("UserReturnRequests")
 
   @@map("users")
 }
@@ -314,6 +315,7 @@ model Client {
   createdBy       User?    @relation("ClientCreator", fields: [createdById], references: [id])
   sales           Sale[]
   orders          Order[]
+  returnRequests  ReturnRequest[]
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -577,4 +579,75 @@ model InvoiceConfig {
   nextNumber      Int      @default(1)
   
   @@map("invoice_configs")
+}
+
+model ReturnRequest {
+  id                 String              @id @default(cuid())
+  returnNumber       String              @unique @map("return_number")
+  clientId           String              @map("client_id")
+  client             Client              @relation(fields: [clientId], references: [id])
+  sellerId           String              @map("seller_id")
+  seller             User                @relation("UserReturnRequests", fields: [sellerId], references: [id])
+  status             String              @default("PENDIENTE_COMERCIAL") // PENDIENTE_COMERCIAL, RECHAZADO_COMERCIAL, PENDIENTE_ADMIN, RECHAZADO_ADMIN, PENDIENTE_UDP, RECHAZADO_UDP, PENDIENTE_LOGISTICA, COMPLETADO
+  reason             String              @db.Text
+  evidenceUrl        String?             @map("evidence_url")
+  rejectionReason    String?             @map("rejection_reason") @db.Text
+  qualityObservations String?            @map("quality_observations") @db.Text
+  items              ReturnRequestItem[]
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@map("return_requests")
+}
+
+model ReturnRequestItem {
+  id              String        @id @default(cuid())
+  returnRequestId String        @map("return_request_id")
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  modelName       String        @map("model_name")
+  color           String
+  s28             Int           @default(0)
+  m30             Int           @default(0)
+  l32             Int           @default(0)
+  xl34            Int           @default(0)
+  xxl36           Int           @default(0)
+  size38          Int           @default(0)
+  size40          Int           @default(0)
+  size42          Int           @default(0)
+  size44          Int           @default(0)
+  size46          Int           @default(0)
+  quantity        Int           @default(0)
+
+  @@map("return_request_items")
+}
+
+model Employee {
+  id             String      @id @default(cuid())
+  name           String
+  documentNumber String      @unique @map("document_number")
+  phone          String?
+  email          String?
+  hourlyRate     Float       @map("hourly_rate")
+  isActive       Boolean     @default(true) @map("is_active")
+  shifts         WorkShift[]
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@map("employees")
+}
+
+model WorkShift {
+  id           String   @id @default(cuid())
+  employeeId   String   @map("employee_id")
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date         DateTime
+  startTime    DateTime @map("start_time")
+  endTime      DateTime @map("end_time")
+  hoursWorked  Float    @map("hours_worked")
+  totalPayment Float    @map("total_payment")
+  status       String   @default("ASISTIO")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("work_shifts")
 }

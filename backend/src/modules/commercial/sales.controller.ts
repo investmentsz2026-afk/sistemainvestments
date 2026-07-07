@@ -37,6 +37,11 @@ export class SalesController {
     return this.salesService.updateClient(req.user, id, data);
   }
 
+  @Get('predictions')
+  getPredictions(@Query('year') year?: string, @Query('month') month?: string) {
+    return this.salesService.getPredictions(year, month);
+  }
+
   @Get('payments/pending')
   getPendingPayments() {
     return this.salesService.getPendingPayments();
