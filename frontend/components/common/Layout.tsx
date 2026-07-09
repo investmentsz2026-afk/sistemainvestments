@@ -32,7 +32,10 @@ import {
   DollarSign,
   ClipboardCheck,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  FileSignature,
+  Scale,
+  Landmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -137,6 +140,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Pedidos', href: '/orders', icon: ShoppingBag },
       { name: 'Ventas', href: '/sales', icon: ShoppingCart },
       { name: 'Cobranza', href: '/sales/collections', icon: CreditCard },
+      { name: 'Letras', href: '/sales/letra-groups', icon: FileSignature },
       { name: 'Clientes', href: '/sales/clients', icon: Users },
       { name: 'Agencias', href: '/commercial/agencies', icon: Building2 }
     ] : []),
@@ -144,6 +148,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Proveedores', href: '/suppliers', icon: Building2 },
       { name: 'Usuarios', href: '/users', icon: User },
       { name: 'RRHH', href: '/admin/hr', icon: Users }
+    ] : []),
+    ...(user?.role === 'ADMIN' || user?.role === 'CONTABILIDAD' ? [
+      { name: 'Cobro de Letras', href: '/admin/letras-collection', icon: Landmark },
+      { name: 'Contabilidad', href: '/admin/accounting', icon: Scale }
     ] : []),
   ];
 

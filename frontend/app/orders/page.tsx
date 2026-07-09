@@ -156,6 +156,9 @@ export default function OrdersPage() {
                         'T/42': item.size42 || 0,
                         'T/44': item.size44 || 0,
                         'T/46': item.size46 || 0,
+                        'T/48': item.size48 || 0,
+                        'T/50': item.size50 || 0,
+                        'T/52': item.size52 || 0,
                         'Cant. Total': item.quantity || 0,
                         'Precio U.': item.unitPrice || 0,
                         'Subtotal': item.totalPrice || 0,
@@ -174,7 +177,7 @@ export default function OrdersPage() {
                     'Agencia': order.agency || 'N/A',
                     'Modelo': 'N/A',
                     'Color': 'N/A',
-                    'S/28': 0, 'M/30': 0, 'L/32': 0, 'XL/34': 0, 'XXL/36': 0, 'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0,
+                    'S/28': 0, 'M/30': 0, 'L/32': 0, 'XL/34': 0, 'XXL/36': 0, 'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0, 'T/48': 0, 'T/50': 0, 'T/52': 0,
                     'Cant. Total': 0,
                     'Precio U.': 0,
                     'Subtotal': 0,
@@ -221,7 +224,7 @@ export default function OrdersPage() {
                                         'Modelo': p.name,
                                         'Color': v.color,
                                         'S/28': 0, 'M/30': 0, 'L/32': 0, 'XL/34': 0, 'XXL/36': 0, 
-                                        'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0,
+                                        'T/38': 0, 'T/40': 0, 'T/42': 0, 'T/44': 0, 'T/46': 0, 'T/48': 0, 'T/50': 0, 'T/52': 0,
                                         'Stock Total': 0
                                     };
                                 }
@@ -229,6 +232,7 @@ export default function OrdersPage() {
                                 const sizeMapping: Record<string, string> = {
                                     '28': 'S/28', '30': 'M/30', '32': 'L/32', '34': 'XL/34', '36': 'XXL/36',
                                     '38': 'T/38', '40': 'T/40', '42': 'T/42', '44': 'T/44', '46': 'T/46',
+                                    '48': 'T/48', '50': 'T/50', '52': 'T/52',
                                     'S': 'S/28', 'M': 'M/30', 'L': 'L/32', 'XL': 'XL/34', 'XXL': 'XXL/36'
                                 };
                                 

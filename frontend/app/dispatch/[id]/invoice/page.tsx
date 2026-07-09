@@ -167,6 +167,9 @@ export default function InvoicePage() {
         { field: 'size42', dispField: 'dispSize42', label: '42' },
         { field: 'size44', dispField: 'dispSize44', label: '44' },
         { field: 'size46', dispField: 'dispSize46', label: '46' },
+        { field: 'size48', dispField: 'dispSize48', label: '48' },
+        { field: 'size50', dispField: 'dispSize50', label: '50' },
+        { field: 'size52', dispField: 'dispSize52', label: '52' },
     ];
 
     // Filter size fields that have dispatched data

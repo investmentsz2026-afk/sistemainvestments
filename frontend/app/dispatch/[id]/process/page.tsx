@@ -74,6 +74,9 @@ export default function DispatchProcessPage() {
         { field: 'size42', label: '42' },
         { field: 'size44', label: '44' },
         { field: 'size46', label: '46' },
+        { field: 'size48', label: '48' },
+        { field: 'size50', label: '50' },
+        { field: 'size52', label: '52' },
     ];
 
     useEffect(() => {
@@ -146,6 +149,9 @@ export default function DispatchProcessPage() {
             '42': 'size42',
             '44': 'size44',
             '46': 'size46',
+            '48': 'size48',
+            '50': 'size50',
+            '52': 'size52',
         };
 
         const sizeField = sizeFieldMap[variantSize];
@@ -238,14 +244,15 @@ export default function DispatchProcessPage() {
         const sizeNumMap: Record<string, string> = {
             's28': '28', 'm30': '30', 'l32': '32', 'xl34': '34', 'xxl36': '36',
             'size38': '38', 'size40': '40', 'size42': '42', 'size44': '44', 'size46': '46',
+            'size48': '48', 'size50': '50', 'size52': '52',
         };
         const sizeNum = sizeNumMap[sizeField];
         if (!sizeNum) return [];
 
         const matches: any[] = [];
         for (const p of products) {
-            // First quality only
-            if (p.inventoryType !== 'TERMINADOS') continue;
+            // First quality and Tallas Especiales
+            if (p.inventoryType !== 'TERMINADOS' && p.inventoryType !== 'TALLAS ESPECIALES') continue;
 
             const nameMatch = p.name.toUpperCase().includes(di.modelName.toUpperCase()) ||
                               di.modelName.toUpperCase().includes(p.name.toUpperCase());
@@ -506,7 +513,7 @@ export default function DispatchProcessPage() {
                             <div className="flex items-center gap-6 text-sm text-gray-400 font-bold">
                                 <span className="flex items-center gap-2"><User className="w-4 h-4" /> {order.client?.name}</span>
                                 <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-rose-500" /> {order.zone || 'OFICINA'}</span>
-                                <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {new Date(order.createdAt).toLocaleDateString()}</span>
+                                <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {String(order.createdAt).endsWith('T00:00:00.000Z') ? new Date(order.createdAt).toLocaleDateString('es-PE', { timeZone: 'UTC' }) : new Date(order.createdAt).toLocaleDateString('es-PE')}</span>
                             </div>
                         </div>
                     </div>

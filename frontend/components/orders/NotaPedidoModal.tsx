@@ -38,7 +38,7 @@ interface NotaPedidoModalProps {
 
 export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder, readOnly }: NotaPedidoModalProps) {
     const [clients, setClients] = useState<any[]>([]);
-    const [isSecondInventory, setIsSecondInventory] = useState(false);
+    const [inventoryMode, setInventoryMode] = useState<'TERMINADOS' | 'SEGUNDA' | 'TALLAS ESPECIALES'>('TERMINADOS');
     const [formData, setFormData] = useState({
         clientId: '',
         condition: 'FACTURA/CREDITO 45 DIAS',
@@ -55,6 +55,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         Array(5).fill(null).map(() => ({
             modelName: '', color: '', s28: 0, m30: 0, l32: 0, xl34: 0, xxl36: 0,
             size38: 0, size40: 0, size42: 0, size44: 0, size46: 0,
+            size48: 0, size50: 0, size52: 0,
             unitPrice: 0, quantity: 0, totalPrice: 0
         }))
     );
@@ -76,7 +77,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         
         const groups: { [key: string]: Product[] } = {};
         products.forEach(p => {
-            const targetType = isSecondInventory ? 'SEGUNDA' : 'TERMINADOS';
+            const targetType = inventoryMode;
             if (p.inventoryType !== targetType) return;
             const normName = p.name.trim().toUpperCase();
             if (!groups[normName]) {
@@ -120,7 +121,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                 productIds: groupProds.map(p => p.id)
             };
         });
-    }, [products, isSecondInventory]);
+    }, [products, inventoryMode]);
 
     const [productSearch, setProductSearch] = useState<{ index: number; query: string } | null>(null);
     const [colorSearch, setColorSearch] = useState<{ index: number; query: string } | null>(null);
@@ -142,6 +143,9 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         if (cleanSize === '42') return 'size42';
         if (cleanSize === '44') return 'size44';
         if (cleanSize === '46') return 'size46';
+        if (cleanSize === '48') return 'size48';
+        if (cleanSize === '50') return 'size50';
+        if (cleanSize === '52') return 'size52';
         return null;
     };
 
@@ -153,7 +157,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
     const getRowActiveFields = (rowIndex: number) => {
         const item = items[rowIndex];
-        const defaultFields = ['modelName', 'color', 's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'unitPrice'];
+        const defaultFields = ['modelName', 'color', 's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52', 'unitPrice'];
         if (!item || !item.productId) return defaultFields;
         
         const prodSizes = getProductSizes(item.productId);
@@ -167,7 +171,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             }
         });
         
-        const defaultSizesOrder = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'];
+        const defaultSizesOrder = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'];
         activeSizeFields.sort((a, b) => defaultSizesOrder.indexOf(a) - defaultSizesOrder.indexOf(b));
         
         return ['modelName', 'color', ...activeSizeFields, 'unitPrice'];
@@ -192,7 +196,10 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             size40: ['40'],
             size42: ['42'],
             size44: ['44'],
-            size46: ['46']
+            size46: ['46'],
+            size48: ['48'],
+            size50: ['50'],
+            size52: ['52']
         };
         
         const allowedSizes = fieldSizeMap[field];
@@ -260,7 +267,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         if (isOpen) {
             fetchClients();
             fetchAgencies();
-            setIsSecondInventory(false);
+            setInventoryMode('TERMINADOS');
             if (initialOrder) {
                 setFormData({
                     clientId: initialOrder.clientId || '',
@@ -269,7 +276,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     observations: initialOrder.observations || '',
                     deliveryAddress: initialOrder.deliveryAddress || initialOrder.client?.address || '',
                     orderNumber: initialOrder.orderNumber || '',
-                    createdAt: new Date(initialOrder.createdAt).toLocaleDateString('sv-SE')
+                    createdAt: String(initialOrder.createdAt).includes('T') ? String(initialOrder.createdAt).split('T')[0] : new Date(initialOrder.createdAt).toLocaleDateString('sv-SE')
                 });
                 setItems(initialOrder.items || []);
                 setSelectedClient(initialOrder.client);
@@ -433,8 +440,8 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         }
 
         // Recalculate quantity for matrix rows
-        if (['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'].includes(field)) {
-            const qtyFields = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'];
+        if (['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'].includes(field)) {
+            const qtyFields = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'];
             newItems[index].quantity = qtyFields.reduce((acc, f) => acc + (parseInt(newItems[index][f]) || 0), 0);
         }
 
@@ -656,11 +663,15 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         let totalQuantity = 0;
         let totalAmount = 0;
 
+        const isSpecialSizes = inventoryMode === 'TALLAS ESPECIALES';
+
         itemsList.forEach((item: any) => {
-            const rowQty = [
-                item.s28, item.m30, item.l32, item.xl34, item.xxl36,
-                item.size38, item.size40, item.size42, item.size44, item.size46
-            ].reduce((acc, val) => acc + (parseInt(val) || 0), 0);
+            const rowQty = isSpecialSizes
+                ? [item.size48, item.size50, item.size52].reduce((acc, val) => acc + (parseInt(val) || 0), 0)
+                : [
+                    item.s28, item.m30, item.l32, item.xl34, item.xxl36,
+                    item.size38, item.size40, item.size42, item.size44, item.size46
+                ].reduce((acc, val) => acc + (parseInt(val) || 0), 0);
 
             const rowPrice = parseFloat(item.unitPrice) || 0;
             const rowImporte = rowQty * rowPrice;
@@ -668,48 +679,78 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             totalQuantity += rowQty;
             totalAmount += rowImporte;
 
-            itemsHTML += `
-                <tr>
-                    <td class="model-cell">${item.modelName || ''}</td>
-                    <td class="color-cell">${item.color || ''}</td>
-                    <td>${displayQty(item.s28)}</td>
-                    <td>${displayQty(item.m30)}</td>
-                    <td>${displayQty(item.l32)}</td>
-                    <td>${displayQty(item.xl34)}</td>
-                    <td>${displayQty(item.xxl36)}</td>
-                    <td class="bg-gray-column">${displayQty(item.size38)}</td>
-                    <td class="bg-gray-column">${displayQty(item.size40)}</td>
-                    <td class="bg-gray-column">${displayQty(item.size42)}</td>
-                    <td class="bg-gray-column">${displayQty(item.size44)}</td>
-                    <td class="bg-gray-column">${displayQty(item.size46)}</td>
-                    <td class="font-bold">${rowQty || ''}</td>
-                    <td class="text-right">${rowPrice > 0 ? rowPrice.toFixed(2) : ''}</td>
-                    <td class="text-right font-bold">${rowImporte > 0 ? rowImporte.toFixed(2) : ''}</td>
-                </tr>
-            `;
+            if (isSpecialSizes) {
+                itemsHTML += `
+                    <tr>
+                        <td class="model-cell">${item.modelName || ''}</td>
+                        <td class="color-cell">${item.color || ''}</td>
+                        <td class="bg-gray-column">${displayQty(item.size48)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size50)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size52)}</td>
+                        <td class="font-bold">${rowQty || ''}</td>
+                        <td class="text-right">${rowPrice > 0 ? rowPrice.toFixed(2) : ''}</td>
+                        <td class="text-right font-bold">${rowImporte > 0 ? rowImporte.toFixed(2) : ''}</td>
+                    </tr>
+                `;
+            } else {
+                itemsHTML += `
+                    <tr>
+                        <td class="model-cell">${item.modelName || ''}</td>
+                        <td class="color-cell">${item.color || ''}</td>
+                        <td>${displayQty(item.s28)}</td>
+                        <td>${displayQty(item.m30)}</td>
+                        <td>${displayQty(item.l32)}</td>
+                        <td>${displayQty(item.xl34)}</td>
+                        <td>${displayQty(item.xxl36)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size38)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size40)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size42)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size44)}</td>
+                        <td class="bg-gray-column">${displayQty(item.size46)}</td>
+                        <td class="font-bold">${rowQty || ''}</td>
+                        <td class="text-right">${rowPrice > 0 ? rowPrice.toFixed(2) : ''}</td>
+                        <td class="text-right font-bold">${rowImporte > 0 ? rowImporte.toFixed(2) : ''}</td>
+                    </tr>
+                `;
+            }
         });
 
         // Fill remaining empty rows to look like a template grid
         for (let i = itemsList.length; i < minRows; i++) {
-            itemsHTML += `
-                <tr>
-                    <td class="model-cell">&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td class="bg-gray-column">&nbsp;</td>
-                    <td class="bg-gray-column">&nbsp;</td>
-                    <td class="bg-gray-column">&nbsp;</td>
-                    <td class="bg-gray-column">&nbsp;</td>
-                    <td class="bg-gray-column">&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                </tr>
-            `;
+            if (isSpecialSizes) {
+                itemsHTML += `
+                    <tr>
+                        <td class="model-cell">&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                    </tr>
+                `;
+            } else {
+                itemsHTML += `
+                    <tr>
+                        <td class="model-cell">&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td class="bg-gray-column">&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                    </tr>
+                `;
+            }
         }
 
         const printContent = `
@@ -851,6 +892,18 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     
     <table class="items-table">
         <thead>
+            ${isSpecialSizes ? `
+            <tr>
+                <th style="width: 25%;">MODELO</th>
+                <th style="width: 20%;">COLOR</th>
+                <th class="bg-gray-column">48</th>
+                <th class="bg-gray-column">50</th>
+                <th class="bg-gray-column">52</th>
+                <th style="width: 10%;">CANTIDAD</th>
+                <th style="width: 12%;">PRECIO UNITARIO</th>
+                <th style="width: 15%;">IMPORTE</th>
+            </tr>
+            ` : `
             <tr>
                 <th rowspan="2" style="width: 15%;">MODELO</th>
                 <th rowspan="2" style="width: 13%;">COLOR</th>
@@ -876,11 +929,12 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                 <th class="bg-gray-column">44</th>
                 <th class="bg-gray-column">46</th>
             </tr>
+            `}
         </thead>
         <tbody>
             ${itemsHTML}
             <tr>
-                <td colspan="12" class="font-bold text-right" style="border-right: 1px solid #000; height: 18px;">TOTAL</td>
+                <td colspan="${isSpecialSizes ? '5' : '12'}" class="font-bold text-right" style="border-right: 1px solid #000; height: 18px;">TOTAL</td>
                 <td class="font-bold" style="height: 18px;">${totalQuantity}</td>
                 <td style="height: 18px;"></td>
                 <td class="bg-yellow font-bold text-right" style="height: 18px;">S/ ${totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</td>
@@ -1051,18 +1105,24 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
         }
     };
 
-    const sizeHeaders = [
-        { label: '28', sub: 'S' },
-        { label: '30', sub: 'M' },
-        { label: '32', sub: 'L' },
-        { label: '34', sub: 'XL' },
-        { label: '36', sub: 'XXL' },
-        { label: '38', sub: '' },
-        { label: '40', sub: '' },
-        { label: '42', sub: '' },
-        { label: '44', sub: '' },
-        { label: '46', sub: '' }
-    ];
+    const sizeHeaders = inventoryMode === 'TALLAS ESPECIALES' 
+        ? [
+            { label: '48', sub: '' },
+            { label: '50', sub: '' },
+            { label: '52', sub: '' }
+        ]
+        : [
+            { label: '28', sub: 'S' },
+            { label: '30', sub: 'M' },
+            { label: '32', sub: 'L' },
+            { label: '34', sub: 'XL' },
+            { label: '36', sub: 'XXL' },
+            { label: '38', sub: '' },
+            { label: '40', sub: '' },
+            { label: '42', sub: '' },
+            { label: '44', sub: '' },
+            { label: '46', sub: '' }
+        ];
 
     if (!isOpen) return null;
 
@@ -1411,13 +1471,9 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                             <div className="flex justify-end gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setIsSecondInventory(false);
-                                        // Reset items so they don't accidentally mix models of primera and segunda without knowing
-                                        // or leave them to allow custom combinations
-                                    }}
+                                    onClick={() => setInventoryMode('TERMINADOS')}
                                     className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                                        !isSecondInventory
+                                        inventoryMode === 'TERMINADOS'
                                             ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                                     }`}
@@ -1426,15 +1482,27 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setIsSecondInventory(true)}
+                                    onClick={() => setInventoryMode('SEGUNDA')}
                                     className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                                        isSecondInventory
+                                        inventoryMode === 'SEGUNDA'
                                             ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-500/20'
                                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
                                     }`}
                                 >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${isSecondInventory ? 'animate-spin' : ''}`} />
+                                    <RefreshCw className={`w-3.5 h-3.5 ${inventoryMode === 'SEGUNDA' ? 'animate-spin' : ''}`} />
                                     Inventario de Segunda
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setInventoryMode('TALLAS ESPECIALES')}
+                                    className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                        inventoryMode === 'TALLAS ESPECIALES'
+                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Package className="w-3.5 h-3.5" />
+                                    Tallas Especiales
                                 </button>
                             </div>
                         )}
@@ -1580,7 +1648,10 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                                         </AnimatePresence>
                                                     </div>
                                                 </td>
-                                                {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'].map(field => {
+                                                {(inventoryMode === 'TALLAS ESPECIALES' 
+                                                    ? ['size48', 'size50', 'size52'] 
+                                                    : ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46']
+                                                ).map(field => {
                                                     const isDisabled = isFieldDisabled(index, field);
                                                     return (
                                                         <td key={field} className={`p-0 border-r border-slate-900 ${isDisabled ? 'bg-slate-100/70' : 'bg-white'}`}>

@@ -316,6 +316,7 @@ model Client {
   sales           Sale[]
   orders          Order[]
   returnRequests  ReturnRequest[]
+  letraGroups     LetraGroup[]
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -379,6 +380,9 @@ model OrderItem {
   size42          Int      @default(0)
   size44          Int      @default(0)
   size46          Int      @default(0)
+  size48          Int      @default(0)
+  size50          Int      @default(0)
+  size52          Int      @default(0)
   
   quantity        Int      @default(0)
   unitPrice       Float    @map("unit_price")
@@ -395,6 +399,9 @@ model OrderItem {
   dispSize42      Int      @default(0) @map("disp_size42")
   dispSize44      Int      @default(0) @map("disp_size44")
   dispSize46      Int      @default(0) @map("disp_size46")
+  dispSize48      Int      @default(0) @map("disp_size48")
+  dispSize50      Int      @default(0) @map("disp_size50")
+  dispSize52      Int      @default(0) @map("disp_size52")
   dispQuantity    Int      @default(0) @map("disp_quantity")
 
   createdAt       DateTime @default(now()) @map("created_at")
@@ -426,6 +433,8 @@ model Sale {
   sunatGuidePdfUrl String?    @map("sunat_guide_pdf_url")
   cargoUrl        String?    @map("cargo_url")
   deliveryAddress String?    @map("delivery_address") @db.Text
+  letraGroupId    String?    @map("letra_group_id")
+  letraGroup      LetraGroup? @relation("LetraGroupSales", fields: [letraGroupId], references: [id])
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
@@ -616,6 +625,9 @@ model ReturnRequestItem {
   size42          Int           @default(0)
   size44          Int           @default(0)
   size46          Int           @default(0)
+  size48          Int           @default(0)
+  size50          Int           @default(0)
+  size52          Int           @default(0)
   quantity        Int           @default(0)
 
   @@map("return_request_items")
@@ -650,4 +662,44 @@ model WorkShift {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("work_shifts")
+}
+
+model LetraGroup {
+  id                String           @id @default(cuid())
+  clientId          String           @map("client_id")
+  client            Client           @relation(fields: [clientId], references: [id])
+  totalSalesAmount  Float            @map("total_sales_amount")
+  totalLetrasAmount Float            @map("total_letras_amount")
+  pendingBalance    Float            @map("pending_balance")
+  status            String           @default("PENDIENTE") // PENDIENTE, APROBADO, RECHAZADO
+  notes             String?          @db.Text
+  sales             Sale[]           @relation("LetraGroupSales")
+  letras            LetraGroupItem[]
+  registeredById    String?          @map("registered_by_id")
+  registeredByName  String?          @map("registered_by_name")
+  creditNoteNumber  String?          @map("credit_note_number")
+  creditNoteMotive  String?          @map("credit_note_motive")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@map("letra_groups")
+}
+
+model LetraGroupItem {
+  id              String      @id @default(cuid())
+  groupId         String      @map("group_id")
+  group           LetraGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  number          Int
+  dueDate         DateTime    @map("due_date")
+  amount          Float
+  uniqueNumber    String?     @map("unique_number")
+  observation     String?     @db.Text
+  status          String      @default("PENDIENTE") // PENDIENTE, PAGADO
+  paymentDate     DateTime?   @map("payment_date")
+  voucherUrl      String?     @map("voucher_url")
+  paymentNotes    String?     @map("payment_notes")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@map("letra_group_items")
 }

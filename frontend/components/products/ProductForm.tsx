@@ -168,7 +168,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     ? ((watchRealPrice - watchPurchasePrice) / watchPurchasePrice * 100)
     : 0;
 
-  const AVAILABLE_SIZES = ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'];
+  const AVAILABLE_SIZES = watchInventoryType === 'TALLAS ESPECIALES' 
+    ? ['48', '50', '52'] 
+    : ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'];
 
   const watchSizes = watch('sizes') || [];
   const watchColors = watch('colors') || [];
@@ -460,6 +462,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <option value="TERMINADOS">📦 Productos Terminados</option>
                 <option value="PROCESO">⏳ Productos en Proceso</option>
                 <option value="SEGUNDA">♻️ Productos de Segunda</option>
+                <option value="TALLAS ESPECIALES">🌟 Tallas Especiales</option>
                 <option value="MATERIALES">🧱 Materiales</option>
                 <option value="MAQUINARIA">⚙️ Maquinaria</option>
                 <option value="AVIOS">🧷 Avíos</option>
@@ -491,7 +494,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
 
             {/* Campo Entalle */}
-            {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(watchInventoryType) && (
+            {['TERMINADOS', 'PROCESO', 'SEGUNDA', 'TALLAS ESPECIALES'].includes(watchInventoryType) && (
               <div>
                 <label className={labelClass}>
                   <Hash className="w-3.5 h-3.5 text-indigo-500" />
@@ -583,7 +586,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               <div>
                 <label className={labelClass}>
                   <DollarSign className="w-3.5 h-3.5" />
-                  {['TERMINADOS', 'PROCESO', 'SEGUNDA'].includes(watchInventoryType) ? 'Costo de Producción' : 'Precio de Compra'} <span className="text-red-400">*</span>
+                  {['TERMINADOS', 'PROCESO', 'SEGUNDA', 'TALLAS ESPECIALES'].includes(watchInventoryType) ? 'Costo de Producción' : 'Precio de Compra'} <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>

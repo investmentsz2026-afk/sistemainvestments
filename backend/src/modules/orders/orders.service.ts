@@ -39,7 +39,7 @@ export class OrdersService {
     // Sanitize and calculate
     const sanitizedItems = items.map((item: any) => {
       const quantity = [
-        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'
+        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'
       ].reduce((acc, field) => acc + (parseInt(item[field]) || 0), 0);
 
       const unitPrice = parseFloat(item.unitPrice) || 0;
@@ -58,6 +58,9 @@ export class OrdersService {
         size42: parseInt(item.size42) || 0,
         size44: parseInt(item.size44) || 0,
         size46: parseInt(item.size46) || 0,
+        size48: parseInt(item.size48) || 0,
+        size50: parseInt(item.size50) || 0,
+        size52: parseInt(item.size52) || 0,
         quantity,
         unitPrice,
         totalPrice,
@@ -187,7 +190,7 @@ export class OrdersService {
     // Sanitize items
     const sanitizedItems = items.map((item: any) => {
       const quantity = [
-        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'
+        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'
       ].reduce((acc, field) => acc + (parseInt(item[field]) || 0), 0);
 
       const unitPrice = parseFloat(item.unitPrice) || 0;
@@ -206,6 +209,9 @@ export class OrdersService {
         size42: parseInt(item.size42) || 0,
         size44: parseInt(item.size44) || 0,
         size46: parseInt(item.size46) || 0,
+        size48: parseInt(item.size48) || 0,
+        size50: parseInt(item.size50) || 0,
+        size52: parseInt(item.size52) || 0,
         quantity,
         unitPrice,
         totalPrice,
@@ -300,7 +306,7 @@ export class OrdersService {
       for (const di of dispatchedItems) {
         const totalQty = (di.s28 || 0) + (di.m30 || 0) + (di.l32 || 0) + (di.xl34 || 0) + 
                           (di.xxl36 || 0) + (di.size38 || 0) + (di.size40 || 0) + 
-                          (di.size42 || 0) + (di.size44 || 0) + (di.size46 || 0);
+                          (di.size42 || 0) + (di.size44 || 0) + (di.size46 || 0) + (di.size48 || 0) + (di.size50 || 0) + (di.size52 || 0);
 
         await (this.prisma as any).orderItem.update({
           where: { id: di.orderItemId },
@@ -315,6 +321,9 @@ export class OrdersService {
             dispSize42: di.size42 || 0,
             dispSize44: di.size44 || 0,
             dispSize46: di.size46 || 0,
+            dispSize48: di.size48 || 0,
+            dispSize50: di.size50 || 0,
+            dispSize52: di.size52 || 0,
             dispQuantity: totalQty,
           }
         });
@@ -409,7 +418,7 @@ export class OrdersService {
         where: { id: oi.id },
         data: {
           dispS28: 0, dispM30: 0, dispL32: 0, dispXL34: 0, dispXXL36: 0,
-          dispSize38: 0, dispSize40: 0, dispSize42: 0, dispSize44: 0, dispSize46: 0,
+          dispSize38: 0, dispSize40: 0, dispSize42: 0, dispSize44: 0, dispSize46: 0, dispSize48: 0, dispSize50: 0, dispSize52: 0,
           dispQuantity: 0
         }
       });
@@ -527,7 +536,7 @@ export class OrdersService {
       // Fallback for legacy orders
       const sizeMap: Record<string, string> = {
         'dispS28': '28', 'dispM30': '30', 'dispL32': '32', 'dispXL34': '34', 'dispXXL36': '36',
-        'dispSize38': '38', 'dispSize40': '40', 'dispSize42': '42', 'dispSize44': '44', 'dispSize46': '46',
+        'dispSize38': '38', 'dispSize40': '40', 'dispSize42': '42', 'dispSize44': '44', 'dispSize46': '46', 'dispSize48': '48', 'dispSize50': '50', 'dispSize52': '52',
       };
 
       for (const item of order.items) {

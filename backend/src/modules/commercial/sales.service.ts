@@ -20,6 +20,7 @@ export class SalesService {
   }
 
   async ensureInvoiceConfigs() {
+
     const configs = [
       { type: 'FACTURA', series: 'F001' },
       { type: 'BOLETA', series: 'B001' },
@@ -430,14 +431,22 @@ export class SalesService {
     });
   }
 
-  async getPendingPayments() {
+  async getPendingPayments(status: string = 'PENDIENTE') {
+    const whereClause: any = { status };
+    
+    // Administration only wants to validate payments when the entire sale is marked as CANCELADO
+    if (status === 'APROBADO') {
+      whereClause.sale = { paymentStatus: 'CANCELADO' };
+    }
+
     return this.prisma.salePayment.findMany({
-      where: { status: 'PENDIENTE' },
+      where: whereClause,
       include: {
         letraDetails: true,
         sale: {
           include: {
             client: true,
+            seller: true,
           },
         },
       },
@@ -473,10 +482,8 @@ export class SalesService {
       let updateData: any = { status: 'APROBADO' };
 
       if (payment.method === 'NOTA_CREDITO') {
-        // If it was requested as electronic (has motive and doesn't have credit note number yet)
         const isElectronic = payment.creditNoteMotive && payment.creditNoteMotive !== 'Manual' && !payment.creditNoteNumber;
         if (isElectronic) {
-          // Generate in Nubefact on approval
           const sunatResult = await this.sendCreditNoteToSunat(tx, payment.saleId, payment.amount, payment.creditNoteMotive || '4', payment.notes || 'Nota de crédito');
           updateData.creditNoteNumber = sunatResult.creditNoteNumber;
           updateData.sunatStatus = sunatResult.sunatStatus;
@@ -487,7 +494,6 @@ export class SalesService {
         }
       }
 
-      // Approve the payment
       const approvedPayment = await tx.salePayment.update({
         where: { id: paymentId },
         data: updateData,
@@ -510,6 +516,50 @@ export class SalesService {
       });
 
       return approvedPayment;
+    });
+  }
+
+  // Admin bank verification: APROBADO → CONCILIADO
+  async conciliatePayment(paymentId: string) {
+    const payment = await this.prisma.salePayment.findUnique({
+      where: { id: paymentId },
+    });
+
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (payment.status !== 'APROBADO') {
+      throw new BadRequestException('Solo se pueden conciliar pagos aprobados por Comercial.');
+    }
+
+    return this.prisma.salePayment.update({
+      where: { id: paymentId },
+      data: { status: 'CONCILIADO' },
+    });
+  }
+
+  // Bulk Admin bank verification for a specific sale
+  async conciliateSalePayments(saleId: string, paymentIds: string[]) {
+    if (!paymentIds || paymentIds.length === 0) {
+      throw new BadRequestException('No se han seleccionado pagos para conciliar.');
+    }
+
+    // Verify all provided payments belong to the sale and are APROBADO
+    const payments = await this.prisma.salePayment.findMany({
+      where: { 
+        id: { in: paymentIds },
+        saleId,
+        status: 'APROBADO'
+      }
+    });
+
+    if (payments.length !== paymentIds.length) {
+      throw new BadRequestException('Algunos de los pagos seleccionados no son válidos o no pertenecen a esta venta.');
+    }
+
+    return this.prisma.salePayment.updateMany({
+      where: { 
+        id: { in: paymentIds }
+      },
+      data: { status: 'CONCILIADO' }
     });
   }
 
@@ -1971,5 +2021,238 @@ export class SalesService {
       clientAnalytics,
       totalGlobalSold
     };
+  }
+
+  async createLetraGroup(data: any, currentUser?: any) {
+    const { clientId, saleIds, letras, notes } = data;
+
+    if (!clientId) throw new BadRequestException('El cliente es obligatorio.');
+    if (!saleIds || !Array.isArray(saleIds) || saleIds.length === 0) {
+      throw new BadRequestException('Debe seleccionar al menos una venta.');
+    }
+    if (!letras || !Array.isArray(letras) || letras.length === 0) {
+      throw new BadRequestException('Debe registrar al menos una letra.');
+    }
+
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId }
+    });
+    if (!client) throw new NotFoundException('Cliente no encontrado');
+
+    // Fetch and check all sales
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        id: { in: saleIds },
+        clientId
+      }
+    });
+
+    if (sales.length !== saleIds.length) {
+      throw new BadRequestException('Una o más ventas seleccionadas no son válidas o no pertenecen al cliente.');
+    }
+
+    const totalSalesAmount = sales.reduce((sum, s) => sum + s.totalAmount, 0);
+    const totalLetrasAmount = letras.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
+    const pendingBalance = parseFloat((totalSalesAmount - totalLetrasAmount).toFixed(2));
+
+    const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
+    const status = isVendor ? 'PENDIENTE' : 'APROBADO';
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Create LetraGroup
+      const group = await tx.letraGroup.create({
+        data: {
+          clientId,
+          totalSalesAmount,
+          totalLetrasAmount,
+          pendingBalance,
+          status,
+          notes,
+          registeredById: currentUser?.id || null,
+          registeredByName: currentUser?.name || null,
+          letras: {
+            create: letras.map((letra: any) => ({
+              number: parseInt(letra.number),
+              dueDate: new Date(letra.dueDate),
+              amount: parseFloat(letra.amount),
+              uniqueNumber: letra.uniqueNumber || null,
+              observation: letra.observation || null,
+              status: 'PENDIENTE'
+            }))
+          }
+        },
+        include: {
+          letras: true
+        }
+      });
+
+      // Link sales and if approved, mark them as CANCELADO
+      for (const saleId of saleIds) {
+        await tx.sale.update({
+          where: { id: saleId },
+          data: {
+            letraGroupId: group.id,
+            paymentStatus: status === 'APROBADO' ? 'CANCELADO' : undefined
+          }
+        });
+      }
+
+      return group;
+    });
+  }
+
+  async findAllLetraGroups(clientId?: string) {
+    const where: any = {};
+    if (clientId) {
+      where.clientId = clientId;
+    }
+    return this.prisma.letraGroup.findMany({
+      where,
+      include: {
+        client: true,
+        sales: true,
+        letras: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async approveLetraGroup(groupId: string) {
+    const group = await this.prisma.letraGroup.findUnique({
+      where: { id: groupId },
+      include: { sales: true }
+    });
+
+    if (!group) throw new NotFoundException('Lote de letras no encontrado');
+    if (group.status !== 'PENDIENTE') {
+      throw new BadRequestException('El lote ya ha sido procesado');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const approvedGroup = await tx.letraGroup.update({
+        where: { id: groupId },
+        data: { status: 'APROBADO' }
+      });
+
+      // Cancel all sales linked to this group
+      for (const sale of group.sales) {
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: { paymentStatus: 'CANCELADO' }
+        });
+      }
+
+      return approvedGroup;
+    });
+  }
+
+  async rejectLetraGroup(groupId: string) {
+    const group = await this.prisma.letraGroup.findUnique({
+      where: { id: groupId }
+    });
+
+    if (!group) throw new NotFoundException('Lote de letras no encontrado');
+    if (group.status !== 'PENDIENTE') {
+      throw new BadRequestException('El lote ya ha sido procesado');
+    }
+
+    return this.prisma.letraGroup.update({
+      where: { id: groupId },
+      data: { status: 'RECHAZADO' }
+    });
+  }
+
+  async adjustLetraGroupBalance(groupId: string, data: any) {
+    const { creditNoteNumber, creditNoteMotive, amount } = data;
+
+    const group = await this.prisma.letraGroup.findUnique({
+      where: { id: groupId }
+    });
+
+    if (!group) throw new NotFoundException('Lote de letras no encontrado');
+
+    const inputAmount = parseFloat(amount);
+    if (isNaN(inputAmount) || inputAmount <= 0) {
+      throw new BadRequestException('El monto de ajuste debe ser mayor a cero.');
+    }
+
+    const newBalance = parseFloat(Math.max(0, group.pendingBalance - inputAmount).toFixed(2));
+
+    return this.prisma.letraGroup.update({
+      where: { id: groupId },
+      data: {
+        pendingBalance: newBalance,
+        creditNoteNumber: creditNoteNumber || group.creditNoteNumber,
+        creditNoteMotive: creditNoteMotive || group.creditNoteMotive
+      }
+    });
+  }
+
+  async findAllLetras() {
+    return this.prisma.letraGroupItem.findMany({
+      include: {
+        group: {
+          include: {
+            client: true,
+            sales: true
+          }
+        }
+      },
+      orderBy: [
+        { dueDate: 'asc' },
+        { number: 'asc' }
+      ]
+    });
+  }
+
+  async payLetra(letraId: string, data: any) {
+    const letra = await this.prisma.letraGroupItem.findUnique({
+      where: { id: letraId },
+      include: { group: true }
+    });
+
+    if (!letra) throw new NotFoundException('Letra no encontrada.');
+    if (letra.status === 'PAGADO') {
+      throw new BadRequestException('La letra ya se encuentra cancelada/pagada.');
+    }
+
+    const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
+    const voucherUrl = data.voucherUrl || null;
+    const paymentNotes = data.paymentNotes || null;
+
+    return this.prisma.letraGroupItem.update({
+      where: { id: letraId },
+      data: {
+        status: 'PAGADO',
+        paymentDate,
+        voucherUrl,
+        paymentNotes
+      }
+    });
+  }
+
+  async completeLetraGroup(groupId: string, user: any) {
+    const group = await this.prisma.letraGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        letras: true
+      }
+    });
+
+    if (!group) throw new NotFoundException('Grupo de letras no encontrado.');
+
+    // Verify all letras are paid
+    const allPaid = group.letras.every(l => l.status === 'PAGADO');
+    if (!allPaid) {
+      throw new BadRequestException('No se puede completar el cronograma porque hay letras pendientes de pago.');
+    }
+
+    return this.prisma.letraGroup.update({
+      where: { id: groupId },
+      data: {
+        status: 'COMPLETADO',
+        notes: group.notes ? `${group.notes}\n[Completado por ${user?.name || 'Administrador'} el ${new Date().toLocaleDateString()}]` : `[Completado por ${user?.name || 'Administrador'} el ${new Date().toLocaleDateString()}]`
+      }
+    });
   }
 }

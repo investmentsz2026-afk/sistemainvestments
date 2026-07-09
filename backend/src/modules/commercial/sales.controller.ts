@@ -43,8 +43,8 @@ export class SalesController {
   }
 
   @Get('payments/pending')
-  getPendingPayments() {
-    return this.salesService.getPendingPayments();
+  getPendingPayments(@Query('status') status?: string) {
+    return this.salesService.getPendingPayments(status);
   }
 
   @Post('payments/:paymentId/approve')
@@ -55,6 +55,59 @@ export class SalesController {
   @Post('payments/:paymentId/reject')
   rejectPayment(@Param('paymentId') paymentId: string) {
     return this.salesService.rejectPayment(paymentId);
+  }
+
+  @Post('payments/:paymentId/conciliate')
+  conciliatePayment(@Param('paymentId') paymentId: string) {
+    return this.salesService.conciliatePayment(paymentId);
+  }
+
+  @Post(':saleId/conciliate-payments')
+  conciliateSalePayments(
+    @Param('saleId') saleId: string, 
+    @Body('paymentIds') paymentIds: string[]
+  ) {
+    return this.salesService.conciliateSalePayments(saleId, paymentIds);
+  }
+
+  @Post('letra-groups')
+  createLetraGroup(@Req() req: any, @Body() data: any) {
+    return this.salesService.createLetraGroup(data, req.user);
+  }
+
+  @Get('letra-groups')
+  findAllLetraGroups(@Query('clientId') clientId?: string) {
+    return this.salesService.findAllLetraGroups(clientId);
+  }
+
+  @Post('letra-groups/:id/approve')
+  approveLetraGroup(@Param('id') id: string) {
+    return this.salesService.approveLetraGroup(id);
+  }
+
+  @Post('letra-groups/:id/reject')
+  rejectLetraGroup(@Param('id') id: string) {
+    return this.salesService.rejectLetraGroup(id);
+  }
+
+  @Post('letra-groups/:id/adjust')
+  adjustLetraGroupBalance(@Param('id') id: string, @Body() data: any) {
+    return this.salesService.adjustLetraGroupBalance(id, data);
+  }
+
+  @Get('letras')
+  findAllLetras() {
+    return this.salesService.findAllLetras();
+  }
+
+  @Post('letras/:id/pay')
+  payLetra(@Param('id') id: string, @Body() data: any) {
+    return this.salesService.payLetra(id, data);
+  }
+
+  @Post('letra-groups/:id/complete')
+  completeLetraGroup(@Param('id') id: string, @Req() req: any) {
+    return this.salesService.completeLetraGroup(id, req.user);
   }
 
   @Get(':id')

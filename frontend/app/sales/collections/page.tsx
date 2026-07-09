@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Layout } from '../../../components/common/Layout';
+import Link from 'next/link';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../lib/axios';
 import {

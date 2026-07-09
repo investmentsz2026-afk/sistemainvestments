@@ -189,7 +189,7 @@ export default function ReturnsPage() {
     setFormReason('');
     setFormEvidenceUrl('');
     setFormItems([
-      { modelName: '', color: '', s28: 0, m30: 0, l32: 0, xl34: 0, xxl36: 0, size38: 0, size40: 0, size42: 0, size44: 0, size46: 0 }
+      { modelName: '', color: '', s28: 0, m30: 0, l32: 0, xl34: 0, xxl36: 0, size38: 0, size40: 0, size42: 0, size44: 0, size46: 0, size48: 0, size50: 0, size52: 0 }
     ]);
   };
 
@@ -211,7 +211,10 @@ export default function ReturnsPage() {
       size40: item.size40,
       size42: item.size42,
       size44: item.size44,
-      size46: item.size46
+      size46: item.size46,
+      size48: item.size48,
+      size50: item.size50,
+      size52: item.size52
     })));
     setShowCreateModal(true);
   };
@@ -549,10 +552,11 @@ export default function ReturnsPage() {
                         <div>
                           <label className="block text-[9px] font-black uppercase text-slate-400 mb-2">Cantidad por Tallas</label>
                           <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-                            {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'].map((size) => {
+                            {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'].map((size) => {
                               const labelMap: Record<string, string> = {
                                 s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
-                                size38: '38', size40: '40', size42: '42', size44: '44', size46: '46'
+                                size38: '38', size40: '40', size42: '42', size44: '44', size46: '46',
+                                size48: '48', size50: '50', size52: '52'
                               };
                               return (
                                 <div key={size} className="text-center">

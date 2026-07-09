@@ -24,7 +24,7 @@ export class ReturnsService {
     // Map items and calculate quantities
     const sanitizedItems = items.map((item: any) => {
       const quantity = [
-        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'
+        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'
       ].reduce((acc, field) => acc + (parseInt(item[field]) || 0), 0);
 
       if (quantity <= 0) {
@@ -44,6 +44,9 @@ export class ReturnsService {
         size42: parseInt(item.size42) || 0,
         size44: parseInt(item.size44) || 0,
         size46: parseInt(item.size46) || 0,
+        size48: parseInt(item.size48) || 0,
+        size50: parseInt(item.size50) || 0,
+        size52: parseInt(item.size52) || 0,
         quantity,
       };
     });
@@ -135,7 +138,7 @@ export class ReturnsService {
     // Map items and calculate quantities
     const sanitizedItems = items.map((item: any) => {
       const quantity = [
-        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46'
+        's28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'
       ].reduce((acc, field) => acc + (parseInt(item[field]) || 0), 0);
 
       if (quantity <= 0) {
@@ -155,6 +158,9 @@ export class ReturnsService {
         size42: parseInt(item.size42) || 0,
         size44: parseInt(item.size44) || 0,
         size46: parseInt(item.size46) || 0,
+        size48: parseInt(item.size48) || 0,
+        size50: parseInt(item.size50) || 0,
+        size52: parseInt(item.size52) || 0,
         quantity,
       };
     });
@@ -281,7 +287,7 @@ export class ReturnsService {
 
     const sizeMap: Record<string, string> = {
       s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
-      size38: '38', size40: '40', size42: '42', size44: '44', size46: '46',
+      size38: '38', size40: '40', size42: '42', size44: '44', size46: '46', size48: '48', size50: '50', size52: '52',
     };
 
     // Process inventory ingress inside a Prisma transaction to ensure consistency
