@@ -37,10 +37,11 @@ export default function AccountingPage() {
     const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
+const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
+
     const getImageUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http://') || url.startsWith('https://')) return url;
-        const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
         return `${SERVER_URL}${url}`;
     };
 

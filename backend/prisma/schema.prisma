@@ -1,4 +1,3 @@
-// backend/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,36 +8,35 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  password      String
-  roles         Role[]    @relation("UserRoles")
-  isActive      Boolean   @default(true) @map("is_active")
-  zone          String?   // LIMA, ORIENTE, etc.
-  movements     Movement[]
-  purchases     Purchase[]
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String
+  password        String
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  isActive        Boolean          @default(true) @map("is_active")
+  zone            String?
+  createdAgencies Agency[]         @relation("AgencyCreator")
+  createdClients  Client[]         @relation("ClientCreator")
+  movements       Movement[]
+  orders          Order[]          @relation("UserOrders")
+  processAudits   ProcessAudit[]
+  samplesReviewed ProductSample[]  @relation("SampleReviewer")
+  samplesCreated  ProductSample[]  @relation("SampleCreator")
+  purchases       Purchase[]
   qualityControls QualityControl[] @relation("QualityConfirmedBy")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  processAudits ProcessAudit[]
-  sales         Sale[]    @relation("UserSales")
-  orders        Order[]   @relation("UserOrders")
-  samplesCreated ProductSample[] @relation("SampleCreator")
-  samplesReviewed ProductSample[] @relation("SampleReviewer")
-  createdClients Client[] @relation("ClientCreator")
-  createdAgencies Agency[] @relation("AgencyCreator")
-  returnRequests ReturnRequest[] @relation("UserReturnRequests")
+  returnRequests  ReturnRequest[]  @relation("UserReturnRequests")
+  sales           Sale[]           @relation("UserSales")
+  roles           Role[]           @relation("UserRoles")
 
   @@map("users")
 }
 
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
   description String?
-  users       User[]   @relation("UserRoles")
+  users       User[]  @relation("UserRoles")
 
   @@map("roles")
 }
@@ -48,42 +46,42 @@ model Product {
   sku              String            @unique
   name             String
   category         String
-  inventoryType    String            @default("TERMINADOS") @map("inventory_type")
-  description      String?           @db.Text
+  description      String?
   purchasePrice    Float             @map("purchase_price")
   sellingPrice     Float             @map("selling_price")
-  realPrice        Float             @default(0.0) @map("real_price")
   minStock         Float             @default(5) @map("min_stock")
-  op               String?
-  entalle          String?
   isActive         Boolean           @default(true) @map("is_active")
-  sizes            String[]          @default([])
-  colors           String[]          @default([])
-  variants         ProductVariant[]
-  purchaseItems    PurchaseItem[]
-  processAudits    ProcessAudit[]
-  sampleUsage      SampleMaterial[]
-  productionOrders ProductionOrder[]
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
+  inventoryType    String            @default("TERMINADOS") @map("inventory_type")
+  op               String?
+  colors           String[]          @default([])
+  sizes            String[]          @default([])
+  entalle          String?
+  realPrice        Float             @default(0.0) @map("real_price")
+  processAudits    ProcessAudit[]
+  variants         ProductVariant[]
+  productionOrders ProductionOrder[]
+  purchaseItems    PurchaseItem[]
+  sampleUsage      SampleMaterial[]
 
   @@map("products")
 }
 
 model ProductVariant {
-  id               String        @id @default(cuid())
-  productId        String        @map("product_id")
-  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  size             String
-  color            String
-  stock            Float         @default(0)
-  variantSku       String        @unique @map("variant_sku")
-  op               String?       @map("op")
-  movements        Movement[]
-  purchaseItems    PurchaseItem[]
-  saleItems        SaleItem[]
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id            String         @id @default(cuid())
+  productId     String         @map("product_id")
+  size          String
+  color         String
+  stock         Float          @default(0)
+  variantSku    String         @unique @map("variant_sku")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  op            String?        @map("op")
+  movements     Movement[]
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
 
   @@unique([productId, size, color])
   @@index([variantSku])
@@ -91,29 +89,29 @@ model ProductVariant {
 }
 
 model ProductionOrder {
-  id               String        @id @default(cuid())
-  opNumber         String        @unique @map("op_number")
-  productId        String        @map("product_id")
-  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  opNumber  String   @unique @map("op_number")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("production_orders")
 }
 
 model Movement {
-  id               String        @id @default(cuid())
-  type             String        // "ENTRY" o "EXIT"
-  quantity         Float
-  reason           String
-  reference        String?
-  previousStock    Float         @map("previous_stock")
-  newStock         Float         @map("new_stock")
-  variantId        String        @map("variant_id")
-  variant          ProductVariant @relation(fields: [variantId], references: [id])
-  userId           String        @map("user_id")
-  user             User          @relation(fields: [userId], references: [id])
-  createdAt        DateTime      @default(now()) @map("created_at")
+  id            String         @id @default(cuid())
+  type          String
+  quantity      Float
+  reason        String
+  reference     String?
+  previousStock Float          @map("previous_stock")
+  newStock      Float          @map("new_stock")
+  variantId     String         @map("variant_id")
+  userId        String         @map("user_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  user          User           @relation(fields: [userId], references: [id])
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
 
   @@index([variantId])
   @@index([createdAt])
@@ -122,47 +120,40 @@ model Movement {
 
 model Purchase {
   id            String         @id @default(cuid())
-  type          String         @default("PURCHASE") // PURCHASE or SERVICE
   invoiceNumber String?        @map("invoice_number")
-  op            String?        // Orden de Producción
   totalAmount   Float          @default(0) @map("total_amount")
-  status        String         @default("EN_CALIDAD") // EN_CALIDAD, RECIBIDO, RECHAZADO
-  items         PurchaseItem[]
   userId        String         @map("user_id")
-  user          User           @relation(fields: [userId], references: [id])
-  supplierId    String?        @map("supplier_id")
-  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
   notes         String?
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+  type          String         @default("PURCHASE")
+  op            String?
+  status        String         @default("EN_CALIDAD")
+  supplierId    String?        @map("supplier_id")
+  items         PurchaseItem[]
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
 
   @@map("purchases")
 }
 
 model PurchaseItem {
-  id            String   @id @default(cuid())
-  purchaseId    String   @map("purchase_id")
-  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  
-  // Opcionales por si ya existe en inventario
-  productId     String?  @map("product_id")
-  product       Product? @relation(fields: [productId], references: [id])
-  variantId     String?  @map("variant_id")
-  variant       ProductVariant? @relation(fields: [variantId], references: [id])
-  
-  // Datos descriptivos (obligatorios para nuevas compras)
-  name          String
-  description   String?
-  category      String   // Materiales, Maquinaria, Avios, Productos Químicos
-  unit          String?  // Metros, Unidades, Litros, etc.
-  
-  quantity      Float
-  price         Float    // Precio de compra unitario
-  status        String   @default("EN_CALIDAD") // EN_CALIDAD, RECEIVED, REJECTED
-  
+  id             String          @id @default(cuid())
+  purchaseId     String          @map("purchase_id")
+  productId      String?         @map("product_id")
+  variantId      String?         @map("variant_id")
+  quantity       Float
+  price          Float
+  createdAt      DateTime        @default(now()) @map("created_at")
+  category       String
+  description    String?
+  name           String
+  unit           String?
+  status         String          @default("EN_CALIDAD")
+  product        Product?        @relation(fields: [productId], references: [id])
+  purchase       Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
   qualityControl QualityControl?
-  
-  createdAt     DateTime @default(now()) @map("created_at")
 
   @@map("purchase_items")
 }
@@ -170,36 +161,33 @@ model PurchaseItem {
 model QualityControl {
   id              String       @id @default(cuid())
   purchaseItemId  String       @unique @map("purchase_item_id")
-  purchaseItem    PurchaseItem @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
-  
-  status          String       // RECEIVED, REJECTED, PARTIAL?
-  observations    String?      @db.Text
-  rejectionReason String?      @map("rejection_reason") @db.Text
-  
+  status          String
+  observations    String?
+  rejectionReason String?      @map("rejection_reason")
   confirmedById   String?      @map("confirmed_by_id")
-  confirmedBy     User?        @relation("QualityConfirmedBy", fields: [confirmedById], references: [id])
-  
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
+  confirmedBy     User?        @relation("QualityConfirmedBy", fields: [confirmedById], references: [id])
+  purchaseItem    PurchaseItem @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
 
   @@map("quality_controls")
 }
 
 model Supplier {
-  id            String    @id @default(cuid())
-  documentType  String    @default("RUC") @map("document_type") // RUC, DNI
-  documentNumber String   @unique @map("document_number")
-  name          String    // Razón Social o Nombres
-  contactName   String?   @map("contact_name")
-  email         String?
-  phone         String?
-  address       String?   @db.Text
-  category      String?   // Materiales, Servicios, Maquinarias, etc
-  isActive      Boolean   @default(true) @map("is_active")
-  notes         String?   @db.Text
-  purchases     Purchase[]
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id             String     @id @default(cuid())
+  documentType   String     @default("RUC") @map("document_type")
+  documentNumber String     @unique @map("document_number")
+  name           String
+  contactName    String?    @map("contact_name")
+  email          String?
+  phone          String?
+  address        String?
+  category       String?
+  isActive       Boolean    @default(true) @map("is_active")
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  purchases      Purchase[]
 
   @@map("suppliers")
 }
@@ -207,46 +195,37 @@ model Supplier {
 model ProcessAudit {
   id              String         @id @default(cuid())
   productId       String?        @map("product_id")
-  product         Product?       @relation(fields: [productId], references: [id])
   sampleId        String?        @map("sample_id")
-  sample          ProductSample? @relation(fields: [sampleId], references: [id])
-  op              String         // Lote de producción u OP
-  process         String         // Corte, Confección, Lavado, Acabados
-  externalCompany String?        @map("external_company") // Empresa externa que realiza el proceso
-  servicePrice    Float?         @map("service_price") @default(0)
+  op              String
+  process         String
+  externalCompany String?        @map("external_company")
   inspectorId     String         @map("inspector_id")
-  inspector       User           @relation(fields: [inspectorId], references: [id])
   auditDate       DateTime       @default(now()) @map("audit_date")
-  result          String         @default("PENDIENTE") // PENDIENTE, CONFORME, OBSERVACION, NO_CONFORME
-  
+  result          String         @default("PENDIENTE")
   quantityGood    Float          @default(0) @map("quantity_good")
   quantityProcess Float          @default(0) @map("quantity_process")
   quantitySecond  Float          @default(0) @map("quantity_second")
   totalQuantity   Float          @default(0) @map("total_quantity")
-
-  observations    String?        @db.Text
-  evidences       String[]       // Array of file paths/URLs
-  checklist       Json?          // Checklist values depending on the process
-  
-  status          String         @default("EN_PROCESO") // EN_PROCESO, FINALIZADO
-  approvalStatus  String         @default("PENDIENTE") @map("approval_status") // PENDIENTE, APROBADO, RECHAZADO
+  observations    String?
+  evidences       String[]
+  checklist       Json?
+  status          String         @default("EN_PROCESO")
+  approvalStatus  String         @default("PENDIENTE") @map("approval_status")
   approvedAt      DateTime?      @map("approved_at")
-  
-  findings        AuditFinding[]
-
-  // Admin and Logistics tracking
-  adminStatus     String         @default("PENDIENTE") @map("admin_status") // PENDIENTE, APROBADO, RECHAZADO
-  adminNotes      String?        @map("admin_notes") @db.Text
+  adminStatus     String         @default("PENDIENTE") @map("admin_status")
+  adminNotes      String?        @map("admin_notes")
   adminUserId     String?        @map("admin_user_id")
-  
-  logisticsStatus String         @default("PENDIENTE") @map("logistics_status") // PENDIENTE, RECIBIDO
+  logisticsStatus String         @default("PENDIENTE") @map("logistics_status")
   receivedAt      DateTime?      @map("received_at")
-
   processHistory  Json?          @map("process_history")
-  qualitySizeData Json?          @map("quality_size_data") // Breakdown of good/process/second per size
-
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
+  servicePrice    Float?         @default(0) @map("service_price")
+  qualitySizeData Json?          @map("quality_size_data")
+  findings        AuditFinding[]
+  inspector       User           @relation(fields: [inspectorId], references: [id])
+  product         Product?       @relation(fields: [productId], references: [id])
+  sample          ProductSample? @relation(fields: [sampleId], references: [id])
 
   @@map("process_audits")
 }
@@ -255,70 +234,64 @@ model Notification {
   id          String   @id @default(cuid())
   title       String
   message     String
-  type        String   // e.g., "AUDIT_FINALIZED", "AUDIT_APPROVED"
-  referenceId String?  @map("reference_id") // ID de la auditoría o muestra
-  
-  targetRole  String?  @map("target_role") // Para filtrar por rol (ADMIN, LOGISTICA, etc)
-  userId      String?  @map("user_id")    // Para filtrar por un usuario específico
-  
+  type        String
+  referenceId String?  @map("reference_id")
   isRead      Boolean  @default(false) @map("is_read")
   createdAt   DateTime @default(now()) @map("created_at")
+  targetRole  String?  @map("target_role")
+  userId      String?  @map("user_id")
 
   @@map("notifications")
 }
 
 model AuditFinding {
-  id              String         @id @default(cuid())
-  auditId         String         @map("audit_id")
-  audit           ProcessAudit   @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  description     String         @db.Text
-  severity        String         // BAJO, MEDIO, ALTO, CRITICO
-  responsibleArea String         @map("responsible_area") // Corte, Confección, etc.
-  date            DateTime       @default(now())
-  
+  id                String             @id @default(cuid())
+  auditId           String             @map("audit_id")
+  description       String
+  severity          String
+  responsibleArea   String             @map("responsible_area")
+  date              DateTime           @default(now())
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  audit             ProcessAudit       @relation(fields: [auditId], references: [id], onDelete: Cascade)
   correctiveActions CorrectiveAction[]
-
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@map("audit_findings")
 }
 
 model CorrectiveAction {
-  id              String         @id @default(cuid())
-  findingId       String         @map("finding_id")
-  finding         AuditFinding   @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  action          String         @db.Text
-  responsibleId   String?        @map("responsible_id") // Can be linked to User or just string
-  responsibleName String?        @map("responsible_name")
+  id              String       @id @default(cuid())
+  findingId       String       @map("finding_id")
+  action          String
+  responsibleId   String?      @map("responsible_id")
+  responsibleName String?      @map("responsible_name")
   deadline        DateTime?
-  status          String         @default("PENDIENTE") // PENDIENTE, EN_PROCESO, SOLUCIONADO
-  
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  status          String       @default("PENDIENTE")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  finding         AuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
 
   @@map("corrective_actions")
 }
 
-
 model Client {
-  id              String   @id @default(cuid())
-  documentType    String   @default("DNI") @map("document_type") // DNI, RUC
-  documentNumber  String   @unique @map("document_number")
-  name            String
-  email           String?
-  phone           String?
-  address         String?  @db.Text
-  address2        String?  @db.Text
-  zone            String?  // LIMA, ORIENTE, etc.
-  createdById     String?  @map("created_by_id")
-  createdBy       User?    @relation("ClientCreator", fields: [createdById], references: [id])
-  sales           Sale[]
-  orders          Order[]
-  returnRequests  ReturnRequest[]
-  letraGroups     LetraGroup[]
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String          @id @default(cuid())
+  documentType   String          @default("DNI") @map("document_type")
+  documentNumber String          @unique @map("document_number")
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  createdById    String?         @map("created_by_id")
+  zone           String?
+  address2       String?
+  createdBy      User?           @relation("ClientCreator", fields: [createdById], references: [id])
+  letraGroups    LetraGroup[]
+  orders         Order[]
+  returnRequests ReturnRequest[]
+  sales          Sale[]
 
   @@map("clients")
 }
@@ -327,220 +300,190 @@ model Order {
   id              String      @id @default(cuid())
   orderNumber     String?     @unique @map("order_number")
   clientId        String?     @map("client_id")
-  client          Client?     @relation(fields: [clientId], references: [id])
-  
-  // Header info from user image
-  condition       String?     // FACTURA/CREDITO 45 DIAS
-  agency          String?     // Agencia de transporte / Destino
-  observations    String?     @db.Text
-  
+  condition       String?
+  agency          String?
+  observations    String?
   totalAmount     Float       @default(0) @map("total_amount")
   totalQuantity   Int         @default(0) @map("total_quantity")
-  
-  // Status workflow
-  status          String      @default("PENDIENTE") // PENDIENTE, EN_LOGISTICA, DESPACHADO, ENTREGADO
-  
-  items           OrderItem[]
-  
+  status          String      @default("PENDIENTE")
   sellerId        String      @map("seller_id")
-  seller          User        @relation("UserOrders", fields: [sellerId], references: [id])
-  
-  zone            String?     // LIMA, ORIENTE
-  deliveryAddress String?     @map("delivery_address") @db.Text
+  zone            String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
   needsResend     Boolean     @default(false) @map("needs_resend")
   dispatchDetails Json?       @map("dispatch_details")
-  
   annulledAt      DateTime?   @map("annulled_at")
   annulledById    String?     @map("annulled_by_id")
   annulledByName  String?     @map("annulled_by_name")
   annulledByRole  String?     @map("annulled_by_role")
-  
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  deliveryAddress String?     @map("delivery_address")
+  items           OrderItem[]
+  client          Client?     @relation(fields: [clientId], references: [id])
+  seller          User        @relation("UserOrders", fields: [sellerId], references: [id])
 
   @@map("orders")
 }
 
 model OrderItem {
-  id              String   @id @default(cuid())
-  orderId         String   @map("order_id")
-  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
-  modelName       String   @map("model_name")
-  color           String
-  
-  // Matrix quantities (Excel style)
-  s28             Int      @default(0)
-  m30             Int      @default(0)
-  l32             Int      @default(0)
-  xl34            Int      @default(0)
-  xxl36           Int      @default(0)
-  size38          Int      @default(0)
-  size40          Int      @default(0)
-  size42          Int      @default(0)
-  size44          Int      @default(0)
-  size46          Int      @default(0)
-  size48          Int      @default(0)
-  size50          Int      @default(0)
-  size52          Int      @default(0)
-  
-  quantity        Int      @default(0)
-  unitPrice       Float    @map("unit_price")
-  totalPrice      Float    @map("total_price")
-  
-  // Actually dispatched quantities (tracked during logistics phase)
-  dispS28         Int      @default(0) @map("disp_s28")
-  dispM30         Int      @default(0) @map("disp_m30")
-  dispL32         Int      @default(0) @map("disp_l32")
-  dispXL34        Int      @default(0) @map("disp_xl34")
-  dispXXL36       Int      @default(0) @map("disp_xxl36")
-  dispSize38      Int      @default(0) @map("disp_size38")
-  dispSize40      Int      @default(0) @map("disp_size40")
-  dispSize42      Int      @default(0) @map("disp_size42")
-  dispSize44      Int      @default(0) @map("disp_size44")
-  dispSize46      Int      @default(0) @map("disp_size46")
-  dispSize48      Int      @default(0) @map("disp_size48")
-  dispSize50      Int      @default(0) @map("disp_size50")
-  dispSize52      Int      @default(0) @map("disp_size52")
-  dispQuantity    Int      @default(0) @map("disp_quantity")
-
-  createdAt       DateTime @default(now()) @map("created_at")
+  id           String   @id @default(cuid())
+  orderId      String   @map("order_id")
+  modelName    String   @map("model_name")
+  color        String
+  s28          Int      @default(0)
+  m30          Int      @default(0)
+  l32          Int      @default(0)
+  xl34         Int      @default(0)
+  xxl36        Int      @default(0)
+  size38       Int      @default(0)
+  size40       Int      @default(0)
+  size42       Int      @default(0)
+  size44       Int      @default(0)
+  size46       Int      @default(0)
+  quantity     Int      @default(0)
+  unitPrice    Float    @map("unit_price")
+  totalPrice   Float    @map("total_price")
+  createdAt    DateTime @default(now()) @map("created_at")
+  dispL32      Int      @default(0) @map("disp_l32")
+  dispM30      Int      @default(0) @map("disp_m30")
+  dispQuantity Int      @default(0) @map("disp_quantity")
+  dispS28      Int      @default(0) @map("disp_s28")
+  dispSize38   Int      @default(0) @map("disp_size38")
+  dispSize40   Int      @default(0) @map("disp_size40")
+  dispSize42   Int      @default(0) @map("disp_size42")
+  dispSize44   Int      @default(0) @map("disp_size44")
+  dispSize46   Int      @default(0) @map("disp_size46")
+  dispXL34     Int      @default(0) @map("disp_xl34")
+  dispXXL36    Int      @default(0) @map("disp_xxl36")
+  dispSize48   Int      @default(0) @map("disp_size48")
+  dispSize50   Int      @default(0) @map("disp_size50")
+  dispSize52   Int      @default(0) @map("disp_size52")
+  size48       Int      @default(0)
+  size50       Int      @default(0)
+  size52       Int      @default(0)
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }
 
 model Sale {
-  id              String     @id @default(cuid())
-  invoiceNumber   String?    @unique @map("invoice_number")
-  clientId        String?    @map("client_id")
-  client          Client?    @relation(fields: [clientId], references: [id])
-  totalAmount     Float      @map("total_amount")
-  totalCost       Float      @default(0) @map("total_cost")
-  paymentMethod   String     @map("payment_method") // EFECTIVO, TARJETA, TRANSFERENCIA
-  status          String     @default("COMPLETADO") // COMPLETADO, ANULADO
-  paymentStatus   String     @default("PENDIENTE") @map("payment_status") // PENDIENTE, PARCIAL, CANCELADO
-  items           SaleItem[]
-  payments        SalePayment[]
-  sellerId        String     @map("seller_id")
-  seller          User       @relation("UserSales", fields: [sellerId], references: [id])
-  notes           String?    @db.Text
-  referralGuide   String?    @map("referral_guide")
-  sunatStatus     String?    @map("sunat_status") // PENDIENTE, ENVIADO, ACEPTADO, RECHAZADO, ERROR
-  sunatResponse   String?    @map("sunat_response") @db.Text
-  sunatXmlUrl     String?    @map("sunat_xml_url")
-  sunatPdfUrl     String?    @map("sunat_pdf_url")
-  sunatCdrUrl     String?    @map("sunat_cdr_url")
-  sunatGuidePdfUrl String?    @map("sunat_guide_pdf_url")
-  cargoUrl        String?    @map("cargo_url")
-  deliveryAddress String?    @map("delivery_address") @db.Text
-  letraGroupId    String?    @map("letra_group_id")
-  letraGroup      LetraGroup? @relation("LetraGroupSales", fields: [letraGroupId], references: [id])
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  id               String        @id @default(cuid())
+  invoiceNumber    String?       @unique @map("invoice_number")
+  clientId         String?       @map("client_id")
+  totalAmount      Float         @map("total_amount")
+  paymentMethod    String        @map("payment_method")
+  status           String        @default("COMPLETADO")
+  sellerId         String        @map("seller_id")
+  notes            String?
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  paymentStatus    String        @default("PENDIENTE") @map("payment_status")
+  sunatCdrUrl      String?       @map("sunat_cdr_url")
+  sunatPdfUrl      String?       @map("sunat_pdf_url")
+  sunatResponse    String?       @map("sunat_response")
+  sunatStatus      String?       @map("sunat_status")
+  sunatXmlUrl      String?       @map("sunat_xml_url")
+  totalCost        Float         @default(0) @map("total_cost")
+  referralGuide    String?       @map("referral_guide")
+  sunatGuidePdfUrl String?       @map("sunat_guide_pdf_url")
+  cargoUrl         String?       @map("cargo_url")
+  deliveryAddress  String?       @map("delivery_address")
+  letraGroupId     String?       @map("letra_group_id")
+  items            SaleItem[]
+  payments         SalePayment[]
+  client           Client?       @relation(fields: [clientId], references: [id])
+  letraGroup       LetraGroup?   @relation("LetraGroupSales", fields: [letraGroupId], references: [id])
+  seller           User          @relation("UserSales", fields: [sellerId], references: [id])
 
   @@map("sales")
 }
 
 model SalePayment {
-  id              String   @id @default(cuid())
-  saleId          String   @map("sale_id")
-  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  amount          Float
-  paymentDate     DateTime @default(now()) @map("payment_date")
-  method          String   // EFECTIVO, TRANSFERENCIA, etc.
-  evidenceUrl     String?  @map("evidence_url") // Voucher image
-  notes           String?  @db.Text
-  status          String   @default("APROBADO") // APROBADO, PENDIENTE, RECHAZADO
-  registeredById  String?  @map("registered_by_id")
-  registeredByName String? @map("registered_by_name")
-  
-  // Credit Note and SUNAT details
-  creditNoteNumber  String?  @map("credit_note_number")
-  creditNoteMotive  String?  @map("credit_note_motive")
-  sunatStatus       String?  @map("sunat_status")
-  sunatResponse     String?  @map("sunat_response") @db.Text
-  sunatXmlUrl       String?  @map("sunat_xml_url")
-  sunatPdfUrl       String?  @map("sunat_pdf_url")
-  sunatCdrUrl       String?  @map("sunat_cdr_url")
-  letraDetails      LetraDetail[]
-
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id               String        @id @default(cuid())
+  saleId           String        @map("sale_id")
+  amount           Float
+  paymentDate      DateTime      @default(now()) @map("payment_date")
+  method           String
+  evidenceUrl      String?       @map("evidence_url")
+  notes            String?
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  registeredById   String?       @map("registered_by_id")
+  registeredByName String?       @map("registered_by_name")
+  status           String        @default("APROBADO")
+  creditNoteMotive String?       @map("credit_note_motive")
+  creditNoteNumber String?       @map("credit_note_number")
+  sunatCdrUrl      String?       @map("sunat_cdr_url")
+  sunatPdfUrl      String?       @map("sunat_pdf_url")
+  sunatResponse    String?       @map("sunat_response")
+  sunatStatus      String?       @map("sunat_status")
+  sunatXmlUrl      String?       @map("sunat_xml_url")
+  letraDetails     LetraDetail[]
+  sale             Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@map("sale_payments")
 }
 
 model LetraDetail {
-  id              String      @id @default(cuid())
-  paymentId       String      @map("payment_id")
-  payment         SalePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  number          Int
-  dueDate         DateTime    @map("due_date")
-  amount          Float
-  uniqueNumber    String?     @map("unique_number")
-  observation     String?     @db.Text
-  status          String      @default("PENDIENTE") // PENDIENTE, PAGADO
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id           String      @id @default(cuid())
+  paymentId    String      @map("payment_id")
+  number       Int
+  dueDate      DateTime    @map("due_date")
+  amount       Float
+  uniqueNumber String?     @map("unique_number")
+  observation  String?
+  status       String      @default("PENDIENTE")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  payment      SalePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
   @@map("letra_details")
 }
 
 model SaleItem {
-  id              String         @id @default(cuid())
-  saleId          String         @map("sale_id")
-  sale            Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  variantId       String         @map("variant_id")
-  variant         ProductVariant @relation(fields: [variantId], references: [id])
-  quantity        Float
-  unitPrice       Float          @map("unit_price") // Selling price at the time of sale
-  costPrice       Float          @default(0) @map("cost_price")
-  totalPrice      Float          @map("total_price")
-  createdAt       DateTime       @default(now()) @map("created_at")
+  id         String         @id @default(cuid())
+  saleId     String         @map("sale_id")
+  variantId  String         @map("variant_id")
+  quantity   Float
+  unitPrice  Float          @map("unit_price")
+  totalPrice Float          @map("total_price")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  costPrice  Float          @default(0) @map("cost_price")
+  sale       Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  variant    ProductVariant @relation(fields: [variantId], references: [id])
 
   @@map("sale_items")
 }
 
 model ProductSample {
-  id              String           @id @default(cuid())
-  name            String
-  description     String?          @db.Text
-  characteristics String?          @db.Text
-  images          String[]         // Evidencias / Fotos de la muestra
-  status          String           @default("PENDIENTE") // PENDIENTE, OBSERVADO, APROBADO
-  observations    String?          @db.Text // Observaciones de comercial
-  recommendations String?          @db.Text // Recomendaciones de comercial
-  
-  op              String?          // Orden de Producción asignada por comercial
-  barcode         String?          // Código de barras generado para la OP
-  productionQuantity Float?        @map("production_quantity") // Cantidad total
-  productionColor    String?       @map("production_color")
-  productionSizeData Json?         @map("production_size_data") // e.g. { "S": 10, "M": 20 }
-  
-  udpId           String           @map("udp_id")
-  udp             User             @relation("SampleCreator", fields: [udpId], references: [id])
-  
-  commercialId    String?          @map("commercial_id") // El comercial que revisa
-  commercial      User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
-  
-  materials       SampleMaterial[]
-  processAudits   ProcessAudit[]
-  
-  code            String?          @unique
-  udpRequirements Json?          @map("udp_requirements")
-  approvedAt      DateTime?        @map("approved_at")
-  
-  // New Material Workflow fields
-  materialReceiptStatus String?      @default("PENDIENTE_ADMIN") @map("material_receipt_status") // PENDIENTE_ADMIN, APROBADO_ADMIN, ENTREGADO_LOGISTICA, RECIBIDO_UDP
-  adminMaterialNotes    String?      @map("admin_material_notes") @db.Text
-  logisticsMaterialDate DateTime?    @map("logistics_material_date")
-  udpMaterialReceivedAt DateTime?    @map("udp_material_received_at")
-  
-  // OP Admin Approval
-  adminOpApprovalStatus String       @default("PENDIENTE") @map("admin_op_approval_status") // PENDIENTE, APROBADO, RECHAZADO
-  
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id                    String           @id @default(cuid())
+  name                  String
+  description           String?
+  characteristics       String?
+  images                String[]
+  status                String           @default("PENDIENTE")
+  observations          String?
+  recommendations       String?
+  op                    String?
+  productionQuantity    Float?           @map("production_quantity")
+  productionColor       String?          @map("production_color")
+  productionSizeData    Json?            @map("production_size_data")
+  udpId                 String           @map("udp_id")
+  commercialId          String?          @map("commercial_id")
+  approvedAt            DateTime?        @map("approved_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+  adminMaterialNotes    String?          @map("admin_material_notes")
+  logisticsMaterialDate DateTime?        @map("logistics_material_date")
+  materialReceiptStatus String?          @default("PENDIENTE_ADMIN") @map("material_receipt_status")
+  udpMaterialReceivedAt DateTime?        @map("udp_material_received_at")
+  code                  String?          @unique
+  udpRequirements       Json?            @map("udp_requirements")
+  adminOpApprovalStatus String           @default("PENDIENTE") @map("admin_op_approval_status")
+  barcode               String?
+  processAudits         ProcessAudit[]
+  commercial            User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
+  udp                   User             @relation("SampleCreator", fields: [udpId], references: [id])
+  materials             SampleMaterial[]
 
   @@map("product_samples")
 }
@@ -548,63 +491,57 @@ model ProductSample {
 model SampleMaterial {
   id              String        @id @default(cuid())
   sampleId        String        @map("sample_id")
-  sample          ProductSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
-  
   productId       String?       @map("product_id")
-  product         Product?      @relation(fields: [productId], references: [id])
-  
-  customMaterial  String?       @map("custom_material") // En caso no exista en inventario
-  
-  quantity        Float         @default(1)
-  unitPriceAtTime Float         @map("unit_price_at_time") // Precio del inventario al momento de definir
-
+  unitPriceAtTime Float         @map("unit_price_at_time")
   createdAt       DateTime      @default(now()) @map("created_at")
+  customMaterial  String?       @map("custom_material")
+  quantity        Float         @default(1)
+  product         Product?      @relation(fields: [productId], references: [id])
+  sample          ProductSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
 
   @@map("sample_materials")
 }
 
 model Agency {
-  id              String   @id @default(cuid())
-  name            String
-  address         String?
-  phone           String?
-  zone            String   // LIMA, ORIENTE, COMERCIAL
-  ruc             String?
-  contactName     String?  @map("contact_name")
-  
-  createdById     String   @map("created_by_id")
-  createdBy       User     @relation("AgencyCreator", fields: [createdById], references: [id])
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  phone       String?
+  zone        String
+  ruc         String?
+  contactName String?  @map("contact_name")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   User     @relation("AgencyCreator", fields: [createdById], references: [id])
 
   @@map("agencies")
 }
 
 model InvoiceConfig {
-  id              String   @id @default(cuid())
-  type            String   @unique // FACTURA, BOLETA
-  series          String   // e.g. F001, B001
-  nextNumber      Int      @default(1)
-  
+  id         String @id @default(cuid())
+  type       String @unique
+  series     String
+  nextNumber Int    @default(1)
+
   @@map("invoice_configs")
 }
 
 model ReturnRequest {
-  id                 String              @id @default(cuid())
-  returnNumber       String              @unique @map("return_number")
-  clientId           String              @map("client_id")
-  client             Client              @relation(fields: [clientId], references: [id])
-  sellerId           String              @map("seller_id")
-  seller             User                @relation("UserReturnRequests", fields: [sellerId], references: [id])
-  status             String              @default("PENDIENTE_COMERCIAL") // PENDIENTE_COMERCIAL, RECHAZADO_COMERCIAL, PENDIENTE_ADMIN, RECHAZADO_ADMIN, PENDIENTE_UDP, RECHAZADO_UDP, PENDIENTE_LOGISTICA, COMPLETADO
-  reason             String              @db.Text
-  evidenceUrl        String?             @map("evidence_url")
-  rejectionReason    String?             @map("rejection_reason") @db.Text
-  qualityObservations String?            @map("quality_observations") @db.Text
-  items              ReturnRequestItem[]
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  id                  String              @id @default(cuid())
+  returnNumber        String              @unique @map("return_number")
+  clientId            String              @map("client_id")
+  sellerId            String              @map("seller_id")
+  status              String              @default("PENDIENTE_COMERCIAL")
+  reason              String
+  evidenceUrl         String?             @map("evidence_url")
+  rejectionReason     String?             @map("rejection_reason")
+  qualityObservations String?             @map("quality_observations")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  items               ReturnRequestItem[]
+  client              Client              @relation(fields: [clientId], references: [id])
+  seller              User                @relation("UserReturnRequests", fields: [sellerId], references: [id])
 
   @@map("return_requests")
 }
@@ -612,7 +549,6 @@ model ReturnRequest {
 model ReturnRequestItem {
   id              String        @id @default(cuid())
   returnRequestId String        @map("return_request_id")
-  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
   modelName       String        @map("model_name")
   color           String
   s28             Int           @default(0)
@@ -625,10 +561,11 @@ model ReturnRequestItem {
   size42          Int           @default(0)
   size44          Int           @default(0)
   size46          Int           @default(0)
+  quantity        Int           @default(0)
   size48          Int           @default(0)
   size50          Int           @default(0)
   size52          Int           @default(0)
-  quantity        Int           @default(0)
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
 
   @@map("return_request_items")
 }
@@ -641,9 +578,9 @@ model Employee {
   email          String?
   hourlyRate     Float       @map("hourly_rate")
   isActive       Boolean     @default(true) @map("is_active")
-  shifts         WorkShift[]
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
+  shifts         WorkShift[]
 
   @@map("employees")
 }
@@ -651,15 +588,15 @@ model Employee {
 model WorkShift {
   id           String   @id @default(cuid())
   employeeId   String   @map("employee_id")
-  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   date         DateTime
   startTime    DateTime @map("start_time")
   endTime      DateTime @map("end_time")
   hoursWorked  Float    @map("hours_worked")
   totalPayment Float    @map("total_payment")
-  status       String   @default("ASISTIO")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  status       String   @default("ASISTIO")
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("work_shifts")
 }
@@ -667,39 +604,39 @@ model WorkShift {
 model LetraGroup {
   id                String           @id @default(cuid())
   clientId          String           @map("client_id")
-  client            Client           @relation(fields: [clientId], references: [id])
   totalSalesAmount  Float            @map("total_sales_amount")
   totalLetrasAmount Float            @map("total_letras_amount")
   pendingBalance    Float            @map("pending_balance")
-  status            String           @default("PENDIENTE") // PENDIENTE, APROBADO, RECHAZADO
-  notes             String?          @db.Text
-  sales             Sale[]           @relation("LetraGroupSales")
-  letras            LetraGroupItem[]
+  status            String           @default("PENDIENTE")
+  notes             String?
   registeredById    String?          @map("registered_by_id")
   registeredByName  String?          @map("registered_by_name")
   creditNoteNumber  String?          @map("credit_note_number")
   creditNoteMotive  String?          @map("credit_note_motive")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
+  letras            LetraGroupItem[]
+  client            Client           @relation(fields: [clientId], references: [id])
+  sales             Sale[]           @relation("LetraGroupSales")
 
   @@map("letra_groups")
 }
 
 model LetraGroupItem {
-  id              String      @id @default(cuid())
-  groupId         String      @map("group_id")
-  group           LetraGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  number          Int
-  dueDate         DateTime    @map("due_date")
-  amount          Float
-  uniqueNumber    String?     @map("unique_number")
-  observation     String?     @db.Text
-  status          String      @default("PENDIENTE") // PENDIENTE, PAGADO
-  paymentDate     DateTime?   @map("payment_date")
-  voucherUrl      String?     @map("voucher_url")
-  paymentNotes    String?     @map("payment_notes")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id           String     @id @default(cuid())
+  groupId      String     @map("group_id")
+  number       Int
+  dueDate      DateTime   @map("due_date")
+  amount       Float
+  uniqueNumber String?    @map("unique_number")
+  observation  String?
+  status       String     @default("PENDIENTE")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  paymentDate  DateTime?  @map("payment_date")
+  paymentNotes String?    @map("payment_notes")
+  voucherUrl   String?    @map("voucher_url")
+  group        LetraGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@map("letra_group_items")
 }

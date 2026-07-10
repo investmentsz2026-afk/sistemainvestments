@@ -58,9 +58,10 @@ export default function PaymentApprovalsModal({ isOpen, onClose, onUpdate }: Pay
             toast.success('Pago aprobado correctamente');
             await fetchPendingPayments();
             if (onUpdate) onUpdate();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error approving payment:', error);
-            toast.error('Error al aprobar el pago');
+            const errMsg = error.response?.data?.message || 'Error al aprobar el pago';
+            toast.error(errMsg);
         } finally {
             setProcessingId(null);
         }
@@ -73,9 +74,10 @@ export default function PaymentApprovalsModal({ isOpen, onClose, onUpdate }: Pay
             toast.success('Pago rechazado correctamente. El vendedor verá el rechazo en su historial.');
             await fetchPendingPayments();
             if (onUpdate) onUpdate();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error rejecting payment:', error);
-            toast.error('Error al rechazar el pago');
+            const errMsg = error.response?.data?.message || 'Error al rechazar el pago';
+            toast.error(errMsg);
         } finally {
             setProcessingId(null);
         }

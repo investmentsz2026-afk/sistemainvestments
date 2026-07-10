@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
+
 export default function LetrasCollectionPage() {
     const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
@@ -74,7 +76,6 @@ export default function LetrasCollectionPage() {
     const getImageUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http://') || url.startsWith('https://')) return url;
-        const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
         return `${SERVER_URL}${url}`;
     };
 

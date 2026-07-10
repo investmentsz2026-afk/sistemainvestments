@@ -1466,8 +1466,8 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                             </div>
                         </div>
 
-                        {/* Selector de tipo de inventario - Solo para Comercial/Admin */}
-                        {!readOnly && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
+                        {/* Selector de tipo de inventario */}
+                        {!readOnly && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || user?.role?.startsWith('VENDEDOR')) && (
                             <div className="flex justify-end gap-2">
                                 <button
                                     type="button"

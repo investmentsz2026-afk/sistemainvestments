@@ -588,9 +588,10 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             // Refresh data
             await fetchSaleDetails();
             if (onUpdate) onUpdate();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding payment:', error);
-            toast.error('Error al registrar la operación');
+            const errMsg = error.response?.data?.message || 'Error al registrar la operación';
+            toast.error(errMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -609,9 +610,10 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             }
             await fetchSaleDetails();
             if (onUpdate) onUpdate();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error finalizing sale:', error);
-            toast.error('Error al liquidar la venta');
+            const errMsg = error.response?.data?.message || 'Error al liquidar la venta';
+            toast.error(errMsg);
         } finally {
             setIsSubmitting(false);
         }
