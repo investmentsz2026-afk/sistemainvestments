@@ -479,6 +479,9 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         try {
             const resp = await api.get(`/sales/${saleId}`);
             setSale(resp.data);
+            if (!resp.data.invoiceNumber) {
+                setIsElectronic(false);
+            }
         } catch (error) {
             console.error('Error fetching sale payments:', error);
         } finally {
@@ -1075,6 +1078,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
+                                                        disabled={!sale?.invoiceNumber}
                                                         onClick={() => {
                                                             setIsElectronic(true);
                                                             setErrorMsg(null);
@@ -1083,7 +1087,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             isElectronic 
                                                                 ? 'bg-indigo-600 text-white shadow-sm' 
                                                                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                                        }`}
+                                                        } ${!sale?.invoiceNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        title={!sale?.invoiceNumber ? 'La venta debe estar facturada para generar una Nota de Crédito electrónica' : ''}
                                                     >
                                                         Electrónica
                                                     </button>
@@ -1103,6 +1108,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {!sale?.invoiceNumber && (
+                                                <div className="text-[9.5px] text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                                                    <span>⚠️ Esta venta no cuenta con un comprobante (Factura o Boleta) emitido. Solo se puede registrar una Nota de Crédito de forma Manual.</span>
+                                                </div>
+                                            )}
 
                                             {isElectronic ? (
                                                 <div className="space-y-3">
