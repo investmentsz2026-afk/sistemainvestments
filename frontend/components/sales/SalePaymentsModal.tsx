@@ -479,7 +479,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         try {
             const resp = await api.get(`/sales/${saleId}`);
             setSale(resp.data);
-            if (!resp.data.invoiceNumber) {
+            if (!resp.data.invoiceNumber || resp.data.sunatStatus !== 'ACEPTADO') {
                 setIsElectronic(false);
             }
         } catch (error) {
@@ -1078,7 +1078,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
-                                                        disabled={!sale?.invoiceNumber}
+                                                        disabled={!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO'}
                                                         onClick={() => {
                                                             setIsElectronic(true);
                                                             setErrorMsg(null);
@@ -1087,8 +1087,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             isElectronic 
                                                                 ? 'bg-indigo-600 text-white shadow-sm' 
                                                                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                                        } ${!sale?.invoiceNumber ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                        title={!sale?.invoiceNumber ? 'La venta debe estar facturada para generar una Nota de Crédito electrónica' : ''}
+                                                        } ${(!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        title={!sale?.invoiceNumber 
+                                                            ? 'La venta debe estar facturada para generar una Nota de Crédito electrónica' 
+                                                            : sale?.sunatStatus !== 'ACEPTADO' 
+                                                            ? 'El comprobante debe estar aceptado por SUNAT' 
+                                                            : ''}
                                                     >
                                                         Electrónica
                                                     </button>
@@ -1109,9 +1113,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 </div>
                                             </div>
 
-                                            {!sale?.invoiceNumber && (
-                                                <div className="text-[9.5px] text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-                                                    <span>⚠️ Esta venta no cuenta con un comprobante (Factura o Boleta) emitido. Solo se puede registrar una Nota de Crédito de forma Manual.</span>
+                                            {(!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO') && (
+                                                <div className="text-[9.5px] text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-1">
+                                                    <div className="flex items-start gap-1.5">
+                                                        <span>⚠️</span>
+                                                        <span>
+                                                            {!sale?.invoiceNumber 
+                                                                ? 'Esta venta no cuenta con un comprobante (Factura o Boleta) emitido. Solo se puede registrar una Nota de Crédito de forma Manual.'
+                                                                : `El comprobante de esta venta (${sale.invoiceNumber}) no ha sido aceptado por SUNAT (Estado actual: ${sale.sunatStatus || 'PENDIENTE'}). No se puede emitir una Nota de Crédito electrónica sobre un documento no aceptado. Utilice la opción Manual.`
+                                                            }
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             )}
 
