@@ -668,9 +668,9 @@ export class SalesService {
       total_pago_con_monto_fijo_por_item: null,
       total: parseFloat(total.toFixed(2)),
       enviar_a_sunat: true,
-      documento_que_modifica_tipo: docModificaTipo,
-      documento_que_modifica_serie: refSerie,
-      documento_que_modifica_numero: refNumero,
+      documento_que_se_modifica_tipo: docModificaTipo,
+      documento_que_se_modifica_serie: refSerie,
+      documento_que_se_modifica_numero: refNumero,
       tipo_de_nota_de_credito: parseInt(motiveCode) || 4, // Descuento global por defecto
       motivo_o_sustento: sustentoText,
       items: [
