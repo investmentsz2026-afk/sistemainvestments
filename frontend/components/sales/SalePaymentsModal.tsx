@@ -479,7 +479,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         try {
             const resp = await api.get(`/sales/${saleId}`);
             setSale(resp.data);
-            if (!resp.data.invoiceNumber || resp.data.sunatStatus !== 'ACEPTADO') {
+            if (!resp.data.invoiceNumber || (resp.data.sunatStatus !== 'ACEPTADO' && resp.data.sunatStatus !== 'ENVIADO')) {
                 setIsElectronic(false);
             }
         } catch (error) {
@@ -1078,7 +1078,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
-                                                        disabled={!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO'}
+                                                        disabled={!sale?.invoiceNumber || (sale?.sunatStatus !== 'ACEPTADO' && sale?.sunatStatus !== 'ENVIADO')}
                                                         onClick={() => {
                                                             setIsElectronic(true);
                                                             setErrorMsg(null);
@@ -1087,11 +1087,11 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             isElectronic 
                                                                 ? 'bg-indigo-600 text-white shadow-sm' 
                                                                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                                        } ${(!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        } ${(!sale?.invoiceNumber || (sale?.sunatStatus !== 'ACEPTADO' && sale?.sunatStatus !== 'ENVIADO')) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                         title={!sale?.invoiceNumber 
                                                             ? 'La venta debe estar facturada para generar una Nota de Crédito electrónica' 
-                                                            : sale?.sunatStatus !== 'ACEPTADO' 
-                                                            ? 'El comprobante debe estar aceptado por SUNAT' 
+                                                            : (sale?.sunatStatus !== 'ACEPTADO' && sale?.sunatStatus !== 'ENVIADO')
+                                                            ? 'El comprobante debe estar aceptado/enviado a SUNAT' 
                                                             : ''}
                                                     >
                                                         Electrónica
@@ -1113,7 +1113,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 </div>
                                             </div>
 
-                                            {(!sale?.invoiceNumber || sale?.sunatStatus !== 'ACEPTADO') && (
+                                            {(!sale?.invoiceNumber || (sale?.sunatStatus !== 'ACEPTADO' && sale?.sunatStatus !== 'ENVIADO')) && (
                                                 <div className="text-[9.5px] text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-1">
                                                     <div className="flex items-start gap-1.5">
                                                         <span>⚠️</span>
