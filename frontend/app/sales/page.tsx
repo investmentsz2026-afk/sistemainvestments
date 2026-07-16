@@ -200,11 +200,47 @@ export default function SalesPage() {
         return data;
     };
 
+    const getSummaryExportData = () => {
+        return filteredSales.map(sale => {
+            const date = formatDate(sale.createdAt);
+            const doc = sale.invoiceNumber || 'S/N';
+            const clientName = sale.client?.name || 'Cliente Varios';
+            
+            const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO');
+            const sortedPayments = [...approvedPayments].sort((a: any, b: any) => 
+                new Date(a.paymentDate || a.createdAt).getTime() - new Date(b.paymentDate || b.createdAt).getTime()
+            );
+            
+            const dep1 = sortedPayments[0] ? sortedPayments[0].amount : '';
+            const dep2 = sortedPayments[1] ? sortedPayments[1].amount : '';
+            
+            const totalCobranza = approvedPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
+            const saldo = sale.totalAmount - totalCobranza;
+
+            return {
+                'F.E.': date,
+                'DOC': doc,
+                'CLIENTE': clientName,
+                'MONTO SEGÚN FACTURA': sale.totalAmount,
+                'DEPOSITO 1': dep1,
+                'DEPOSITO 2': dep2,
+                'TOTAL COBRANZA': totalCobranza,
+                'SALDO': saldo
+            };
+        });
+    };
+
     const exportToExcel = () => {
-        const data = getExportData();
-        const ws = XLSX.utils.json_to_sheet(data);
+        const summaryData = getSummaryExportData();
+        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+
+        const detailedData = getExportData();
+        const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+        XLSX.utils.book_append_sheet(wb, wsSummary, "General");
+        XLSX.utils.book_append_sheet(wb, wsDetailed, "Ventas Detallado");
+
         XLSX.writeFile(wb, `Reporte_Ventas_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
