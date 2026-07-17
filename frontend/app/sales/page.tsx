@@ -221,6 +221,7 @@ export default function SalesPage() {
                 'F.E.': date,
                 'DOC': doc,
                 'CLIENTE': clientName,
+                'VENDEDOR': sale.seller?.name || 'N/A',
                 'MONTO SEGÚN FACTURA': sale.totalAmount,
                 'DEPOSITO 1': dep1,
                 'DEPOSITO 2': dep2,
