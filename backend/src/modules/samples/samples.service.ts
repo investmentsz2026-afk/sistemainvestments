@@ -55,12 +55,6 @@ export class SamplesService {
 
   async findAll(user?: any) {
     const where: any = {};
-    if (user?.role === 'COMERCIAL') {
-      where.OR = [
-        { status: { not: 'PENDIENTE' } },
-        { materialReceiptStatus: 'DESARROLLO_COMPLETADO' }
-      ];
-    }
     return (this.prisma as any).productSample.findMany({
       where,
       include: {
