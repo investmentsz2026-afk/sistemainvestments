@@ -315,6 +315,28 @@ export class ProductsService {
     });
   }
 
+  async searchMaterials(query: string) {
+    if (!query) return [];
+    return this.prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { sku: { contains: query, mode: 'insensitive' } },
+        ],
+        isActive: true,
+        NOT: {
+          inventoryType: {
+            in: ['TERMINADOS', 'PROCESO', 'SEGUNDA', 'ESPECIALES']
+          }
+        }
+      },
+      include: {
+        variants: true,
+      },
+      take: 10,
+    });
+  }
+
   async getLowStockProducts() {
     const products = await this.prisma.product.findMany({
       where: { isActive: true },

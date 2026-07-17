@@ -18,13 +18,15 @@ import {
     FileText,
     Settings
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 export default function NewSamplePage() {
     const { user } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const isExisting = searchParams.get('existing') === 'true';
     const [isLoading, setIsLoading] = useState(false);
 
     // Form State
@@ -64,7 +66,8 @@ export default function NewSamplePage() {
         }
         setIsSearching(true);
         try {
-            const resp = await api.get(`/products/search?q=${q}`);
+            const url = isExisting ? `/products/search-materials?q=${q}` : `/products/search?q=${q}`;
+            const resp = await api.get(url);
             setSearchResults(resp.data);
         } catch (error) {
             console.error('Error searching products:', error);
@@ -113,6 +116,12 @@ export default function NewSamplePage() {
         setMaterials(newMats);
     };
 
+    const updateMaterialPrice = (index: number, price: number) => {
+        const newMats = [...materials];
+        newMats[index].unitPriceAtTime = price;
+        setMaterials(newMats);
+    };
+
     const generateCode = () => {
         const random = Math.floor(1000 + Math.random() * 9000);
         const prefix = formData.name ? formData.name.substring(0, 3).toUpperCase() : 'SMP';
@@ -126,6 +135,7 @@ export default function NewSamplePage() {
         try {
             await api.post('/samples', {
                 ...formData,
+                isExisting,
                 materials: materials.map(m => ({
                     productId: m.productId,
                     customMaterial: m.customMaterial,
@@ -133,7 +143,7 @@ export default function NewSamplePage() {
                     unitPriceAtTime: m.unitPriceAtTime
                 }))
             });
-            toast.success(materials.length > 0 ? 'Solicitud enviada a Administrador' : 'Muestra creada con éxito');
+            toast.success(isExisting ? 'Muestra existente registrada con éxito' : (materials.length > 0 ? 'Solicitud enviada a Administrador' : 'Muestra creada con éxito'));
             router.push('/samples');
         } catch (error) {
             console.error('Error creating sample:', error);
@@ -157,8 +167,14 @@ export default function NewSamplePage() {
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">Nuevo Prototipo</h1>
-                        <p className="text-gray-500 font-medium text-lg mt-1">Registra una nueva muestra para evaluación comercial.</p>
+                        <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">
+                            {isExisting ? 'Crear Muestra Existente' : 'Nuevo Prototipo'}
+                        </h1>
+                        <p className="text-gray-500 font-medium text-lg mt-1">
+                            {isExisting 
+                                ? 'Registra una muestra ya fabricada anteriormente para asociar sus requerimientos.'
+                                : 'Registra una nueva muestra para evaluación comercial.'}
+                        </p>
                     </div>
                 </div>
 
@@ -321,9 +337,18 @@ export default function NewSamplePage() {
                                                     className="w-12 bg-transparent font-black text-center outline-none"
                                                 />
                                             </div>
-                                            <div className="text-right min-w-[80px]">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Precio Unit.</p>
-                                                <p className="font-black text-emerald-600">S/ {m.unitPriceAtTime || 0}</p>
+                                            <div className="text-right min-w-[100px]">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Unit.</p>
+                                                <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
+                                                    <span className="text-[10px] font-black text-emerald-600 mr-1">S/</span>
+                                                    <input 
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={m.unitPriceAtTime}
+                                                        onChange={e => updateMaterialPrice(i, parseFloat(e.target.value) || 0)}
+                                                        className="w-16 bg-transparent font-black text-center outline-none text-emerald-600"
+                                                    />
+                                                </div>
                                             </div>
                                             <button 
                                                 type="button"

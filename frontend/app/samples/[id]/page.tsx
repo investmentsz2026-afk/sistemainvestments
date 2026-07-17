@@ -800,6 +800,27 @@ export default function SampleDetailPage() {
                                         </div>
                                     )}
 
+                                    {user?.role === 'LOGISTICA' && sample.isExisting && sample.adminOpApprovalStatus === 'APROBADO' && sample.materialReceiptStatus !== 'DESCARGADO_LOGISTICA' && (
+                                        <div className="flex flex-col gap-4">
+                                            <button 
+                                                onClick={() => {
+                                                    setDischarges(sample.materials
+                                                        .filter((m: any) => m.productId)
+                                                        .map((m: any) => ({
+                                                            materialId: m.id,
+                                                            variantId: m.product?.variants?.[0]?.id || '',
+                                                            quantity: m.quantity,
+                                                            name: m.product?.name || 'Material'
+                                                        })));
+                                                    setShowDischargeModal(true);
+                                                }}
+                                                className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition shadow-xl shadow-amber-200"
+                                            >
+                                                <Calculator className="w-5 h-5 inline mr-2" /> Descargar productos del inventario para la muestra {sample.code || ''}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {user?.role === 'UDP' && sample.materialReceiptStatus === 'ENTREGADO_LOGISTICA' && (
                                         <button 
                                             onClick={handleUDPConfirmMaterials}

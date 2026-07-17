@@ -33,6 +33,11 @@ export class ProductsController {
     return this.productsService.searchProducts(query);
   }
 
+  @Get('search-materials')
+  searchMaterials(@Query('q') query: string) {
+    return this.productsService.searchMaterials(query);
+  }
+
   @Get('low-stock')
   getLowStock() {
     return this.productsService.getLowStockProducts();

@@ -480,6 +480,7 @@ model ProductSample {
   udpRequirements       Json?            @map("udp_requirements")
   adminOpApprovalStatus String           @default("PENDIENTE") @map("admin_op_approval_status")
   barcode               String?
+  isExisting            Boolean          @default(false) @map("is_existing")
   processAudits         ProcessAudit[]
   commercial            User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
   udp                   User             @relation("SampleCreator", fields: [udpId], references: [id])

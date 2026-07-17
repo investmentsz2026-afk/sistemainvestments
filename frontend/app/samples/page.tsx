@@ -74,12 +74,20 @@ export default function SamplesPage() {
                         </div>
                     </div>
                     {user?.role === 'UDP' && (
-                        <Link 
-                            href="/samples/new"
-                            className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-black transition active:scale-95"
-                        >
-                            <Plus className="w-5 h-5" /> Nueva Muestra
-                        </Link>
+                        <div className="flex gap-4 flex-wrap">
+                            <Link 
+                                href="/samples/new?existing=true"
+                                className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-indigo-700 transition active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" /> Crear Muestra Existente
+                            </Link>
+                            <Link 
+                                href="/samples/new"
+                                className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold shadow-2xl hover:bg-black transition active:scale-95"
+                            >
+                                <Plus className="w-5 h-5" /> Nueva Muestra
+                            </Link>
+                        </div>
                     )}
                 </div>
 

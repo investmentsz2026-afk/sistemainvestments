@@ -11,7 +11,7 @@ export class SamplesService {
   ) { }
 
   async create(udpId: string, data: any) {
-    const { name, code, description, characteristics, images, materials } = data;
+    const { name, code, description, characteristics, images, materials, isExisting } = data;
     
     return await this.prisma.$transaction(async (tx) => {
       const sample = await (tx as any).productSample.create({
@@ -22,7 +22,8 @@ export class SamplesService {
           characteristics,
           images: images || [],
           udpId,
-          materialReceiptStatus: materials && materials.length > 0 ? 'PENDIENTE_ADMIN' : null,
+          isExisting: !!isExisting,
+          materialReceiptStatus: isExisting ? 'DESARROLLO_COMPLETADO' : (materials && materials.length > 0 ? 'PENDIENTE_ADMIN' : null),
         },
       });
 
@@ -40,13 +41,15 @@ export class SamplesService {
         }
 
         // Notify Admin
-        await this.notifications.create({
-          title: 'Nueva Solicitud de Materiales para Muestra',
-          message: `UDP ha solicitado materiales para la muestra: ${name} ${code ? `(Código: ${code})` : ''}`,
-          type: 'SAMPLE_MATERIAL_REQUEST',
-          referenceId: sample.id,
-          targetRole: 'ADMIN',
-        });
+        if (!isExisting) {
+          await this.notifications.create({
+            title: 'Nueva Solicitud de Materiales para Muestra',
+            message: `UDP ha solicitado materiales para la muestra: ${name} ${code ? `(Código: ${code})` : ''}`,
+            type: 'SAMPLE_MATERIAL_REQUEST',
+            referenceId: sample.id,
+            targetRole: 'ADMIN',
+          });
+        }
       }
 
       return sample;
@@ -228,6 +231,14 @@ export class SamplesService {
           data: { stock: newStock }
         });
       }
+
+      if ((sample as any).isExisting) {
+        await tx.productSample.update({
+          where: { id },
+          data: { materialReceiptStatus: 'DESCARGADO_LOGISTICA' }
+        });
+      }
+
       return { success: true };
     });
   }
