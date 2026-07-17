@@ -368,6 +368,176 @@ export class SalesService {
     });
   }
 
+  async updatePayment(paymentId: string, data: any, currentUser?: any) {
+    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic, paymentDate } = data;
+
+    const payment = await this.prisma.salePayment.findUnique({
+      where: { id: paymentId },
+      include: { letraDetails: true, sale: { include: { payments: true } } }
+    });
+
+    if (!payment) throw new NotFoundException('Cobro no encontrado');
+
+    const sale = payment.sale;
+    const otherPayments = sale.payments.filter(p => p.id !== paymentId);
+
+    const totalPaid = otherPayments
+      .filter(p => p.status === 'APROBADO')
+      .reduce((acc, p) => acc + p.amount, 0);
+
+    const remainingToPay = sale.totalAmount - totalPaid;
+
+    const inputAmount = parseFloat(amount);
+    if (isNaN(inputAmount) || inputAmount <= 0) {
+      throw new BadRequestException('El monto debe ser mayor a cero.');
+    }
+
+    if (method === 'LETRAS') {
+      if (!data.letras || !Array.isArray(data.letras) || data.letras.length === 0) {
+        throw new BadRequestException('Debe especificar al menos una letra.');
+      }
+      const sumOfLetras = data.letras.reduce((sum: number, l: any) => sum + parseFloat(l.amount || 0), 0);
+      if (Math.abs(sumOfLetras - inputAmount) > 0.01) {
+        throw new BadRequestException(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no coincide con el monto total del abono (S/ ${inputAmount.toFixed(2)}).`);
+      }
+    } else {
+      if (inputAmount > remainingToPay + 0.01) {
+        throw new BadRequestException(`El monto ingresado (S/ ${inputAmount}) supera el saldo pendiente real disponible de S/ ${remainingToPay.toFixed(2)}.`);
+      }
+    }
+
+    const isVendor = currentUser?.role === 'VENDEDOR_LIMA' || currentUser?.role === 'VENDEDOR_ORIENTE';
+    const isElecCN = isElectronic === true || isElectronic === 'true';
+
+    return await this.prisma.$transaction(async (tx) => {
+      if (payment.method === 'LETRAS') {
+        await tx.letraDetail.deleteMany({
+          where: { paymentId }
+        });
+      }
+
+      let paymentData: any = {
+        amount: parseFloat(amount),
+        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+        method: method || 'EFECTIVO',
+        notes,
+        evidenceUrl,
+        status: isVendor ? 'PENDIENTE' : 'APROBADO',
+        creditNoteMotive: null,
+        creditNoteNumber: null,
+        sunatStatus: null,
+        sunatResponse: null,
+        sunatXmlUrl: null,
+        sunatPdfUrl: null,
+        sunatCdrUrl: null,
+      };
+
+      if (method === 'LETRAS' && data.letras && Array.isArray(data.letras)) {
+        paymentData.letraDetails = {
+          create: data.letras.map((letra: any) => ({
+            number: parseInt(letra.number),
+            dueDate: new Date(letra.dueDate),
+            amount: parseFloat(letra.amount),
+            uniqueNumber: letra.uniqueNumber || null,
+            observation: letra.observation || null,
+            status: 'PENDIENTE',
+          })),
+        };
+      }
+
+      if (method === 'NOTA_CREDITO') {
+        paymentData.creditNoteMotive = creditNoteMotive;
+        if (isVendor) {
+          paymentData.status = 'PENDIENTE';
+          paymentData.creditNoteNumber = creditNoteNumber || null;
+        } else {
+          paymentData.status = 'APROBADO';
+          if (isElecCN) {
+            const sunatResult = await this.sendCreditNoteToSunat(tx, sale.id, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito');
+            paymentData.creditNoteNumber = sunatResult.creditNoteNumber;
+            paymentData.sunatStatus = sunatResult.sunatStatus;
+            paymentData.sunatResponse = sunatResult.sunatResponse;
+            paymentData.sunatXmlUrl = sunatResult.sunatXmlUrl;
+            paymentData.sunatPdfUrl = sunatResult.sunatPdfUrl;
+            paymentData.sunatCdrUrl = sunatResult.sunatCdrUrl;
+          } else {
+            paymentData.creditNoteNumber = creditNoteNumber || null;
+            paymentData.creditNoteMotive = creditNoteMotive || 'Manual';
+          }
+        }
+      }
+
+      const updatedPayment = await tx.salePayment.update({
+        where: { id: paymentId },
+        data: paymentData,
+        include: { letraDetails: true }
+      });
+
+      const allPayments = await tx.salePayment.findMany({
+        where: { saleId: sale.id }
+      });
+
+      const newTotalPaid = allPayments
+        .filter(p => p.status === 'APROBADO')
+        .reduce((acc, p) => acc + p.amount, 0);
+
+      let paymentStatus = 'PARCIAL';
+      if (newTotalPaid >= sale.totalAmount) {
+        paymentStatus = 'CANCELADO';
+      }
+
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { paymentStatus }
+      });
+
+      return updatedPayment;
+    });
+  }
+
+  async deletePayment(paymentId: string, currentUser?: any) {
+    const payment = await this.prisma.salePayment.findUnique({
+      where: { id: paymentId },
+      include: { letraDetails: true, sale: { include: { payments: true } } }
+    });
+
+    if (!payment) throw new NotFoundException('Cobro no encontrado');
+
+    const sale = payment.sale;
+
+    return await this.prisma.$transaction(async (tx) => {
+      if (payment.method === 'LETRAS') {
+        await tx.letraDetail.deleteMany({
+          where: { paymentId }
+        });
+      }
+
+      await tx.salePayment.delete({
+        where: { id: paymentId }
+      });
+
+      const remainingPayments = await tx.salePayment.findMany({
+        where: { saleId: sale.id }
+      });
+
+      const newTotalPaid = remainingPayments
+        .filter(p => p.status === 'APROBADO')
+        .reduce((acc, p) => acc + p.amount, 0);
+
+      let paymentStatus = 'PENDIENTE';
+      if (newTotalPaid > 0) {
+        paymentStatus = newTotalPaid >= sale.totalAmount ? 'CANCELADO' : 'PARCIAL';
+      }
+
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { paymentStatus }
+      });
+
+      return { success: true };
+    });
+  }
+
   async finalizePayment(saleId: string, currentUser?: any) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },

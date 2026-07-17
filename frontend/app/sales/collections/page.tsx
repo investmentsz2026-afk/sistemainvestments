@@ -54,7 +54,8 @@ export default function CollectionsPage() {
                              s.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              s.id.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'ALL' || s.paymentStatus === statusFilter;
-        return matchesSearch && matchesStatus;
+        const isNotAnnulled = s.status !== 'ANULADO';
+        return matchesSearch && matchesStatus && isNotAnnulled;
     });
 
     const openDetails = (id: string) => {

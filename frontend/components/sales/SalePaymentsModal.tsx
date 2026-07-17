@@ -22,7 +22,8 @@ import {
     HelpCircle,
     Clock,
     RotateCw,
-    Printer
+    Printer,
+    Edit2
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -380,6 +381,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
     const [evidenceUrl, setEvidenceUrl] = useState('');
+    const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
 
     // Credit Note specific form state
     const [isElectronic, setIsElectronic] = useState(true);
@@ -551,7 +553,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         setIsSubmitting(true);
         const isVendor = user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE';
         try {
-            await api.post(`/sales/${saleId}/payments`, {
+            const payload = {
                 amount: numericAmount,
                 method,
                 paymentDate,
@@ -561,7 +563,13 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 creditNoteNumber: method === 'NOTA_CREDITO' && !isElectronic ? creditNoteNumber : undefined,
                 isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined,
                 letras: method === 'LETRAS' ? letrasList : undefined
-            });
+            };
+
+            if (editingPaymentId) {
+                await api.patch(`/sales/payments/${editingPaymentId}`, payload);
+            } else {
+                await api.post(`/sales/${saleId}/payments`, payload);
+            }
             
             // Reset form
             setAmount('');
@@ -574,17 +582,22 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             setCantidadLetras(1);
             setLetrasList([{ number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }]);
             setShowAddForm(false);
+            setEditingPaymentId(null);
             
             if (isVendor) {
-                toast.success(method === 'LETRAS' 
-                    ? 'Letras registradas. En espera de confirmación por el área Comercial.' 
-                    : 'Abono registrado. En espera de confirmación por el área Comercial.', 
+                toast.success(editingPaymentId 
+                    ? 'Cobro modificado. En espera de confirmación por el área Comercial.' 
+                    : (method === 'LETRAS' 
+                        ? 'Letras registradas. En espera de confirmación por el área Comercial.' 
+                        : 'Abono registrado. En espera de confirmación por el área Comercial.'), 
                     { duration: 6000 }
                 );
             } else {
-                toast.success(method === 'LETRAS' 
-                    ? 'Letras procesadas correctamente.' 
-                    : 'Abono procesado correctamente.'
+                toast.success(editingPaymentId
+                    ? 'Cobro modificado correctamente.'
+                    : (method === 'LETRAS' 
+                        ? 'Letras procesadas correctamente.' 
+                        : 'Abono procesado correctamente.')
                 );
             }
 
@@ -619,6 +632,45 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             toast.error(errMsg);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleEditClick = (payment: any) => {
+        setEditingPaymentId(payment.id);
+        setAmount(payment.amount.toString());
+        setMethod(payment.method);
+        setPaymentDate(payment.paymentDate ? payment.paymentDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+        setNotes(payment.notes || '');
+        setEvidenceUrl(payment.evidenceUrl || '');
+        
+        if (payment.method === 'NOTA_CREDITO') {
+            setCreditNoteMotive(payment.creditNoteMotive || '4');
+            setCreditNoteNumber(payment.creditNoteNumber || '');
+            setIsElectronic(!!payment.isElectronic);
+        } else if (payment.method === 'LETRAS') {
+            setCantidadLetras(payment.letraDetails?.length || 1);
+            setLetrasList((payment.letraDetails || []).map((l: any) => ({
+                number: l.number,
+                dueDate: l.dueDate ? l.dueDate.split('T')[0] : '',
+                amount: l.amount.toString(),
+                uniqueNumber: l.uniqueNumber || '',
+                observation: l.observation || ''
+            })));
+        }
+        setShowAddForm(true);
+    };
+
+    const handleDeleteClick = async (paymentId: string) => {
+        if (!window.confirm('¿Está seguro de que desea eliminar este cobro? Esta acción no se puede deshacer.')) return;
+        try {
+            await api.delete(`/sales/payments/${paymentId}`);
+            toast.success('Cobro eliminado correctamente.');
+            await fetchSaleDetails();
+            if (onUpdate) onUpdate();
+        } catch (error: any) {
+            console.error('Error deleting payment:', error);
+            const errMsg = error.response?.data?.message || 'Error al eliminar el cobro';
+            toast.error(errMsg);
         }
     };
 
@@ -845,6 +897,26 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 <HelpCircle className="w-4 h-4" />
                                                             </a>
                                                         )}
+                                                        {payment.method !== 'LIQUIDACION' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleEditClick(payment)}
+                                                                className="w-10 h-10 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white border border-amber-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                                title="Editar Cobro"
+                                                            >
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {payment.method !== 'LIQUIDACION' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteClick(payment.id)}
+                                                                className="w-10 h-10 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                                                                title="Eliminar Cobro"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                         {payment.evidenceUrl && (
                                                             <a 
                                                                 href={`${SERVER_URL}${payment.evidenceUrl}`} 
@@ -966,15 +1038,19 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                 <div className="w-full flex justify-between items-start mb-6">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                                            <Plus className="w-5 h-5 text-white" />
+                                            {editingPaymentId ? <Edit2 className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
                                         </div>
                                         <div>
-                                            <h3 className="text-base font-black uppercase tracking-tighter text-slate-900 leading-none">Nuevo Abono</h3>
-                                            <p className="text-[7px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-1.5">Registro de cobro</p>
+                                            <h3 className="text-base font-black uppercase tracking-tighter text-slate-900 leading-none">
+                                                {editingPaymentId ? 'Editar Abono' : 'Nuevo Abono'}
+                                            </h3>
+                                            <p className="text-[7px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-1.5">
+                                                {editingPaymentId ? 'Modificar cobro' : 'Registro de cobro'}
+                                            </p>
                                         </div>
                                     </div>
                                     <button 
-                                        onClick={() => setShowAddForm(false)}
+                                        onClick={() => { setShowAddForm(false); setEditingPaymentId(null); }}
                                         className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition text-slate-400"
                                     >
                                         <X className="w-4 h-4" />
@@ -1051,6 +1127,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                             >
                                                 <option value="EFECTIVO">EFECTIVO</option>
                                                 <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                                                <option value="DEPOSITO">DEPÓSITO</option>
                                                 <option value="YAPE/PLIN">YAPE/PLIN</option>
                                                 <option value="TARJETA">TARJETA</option>
                                                 <option value="NOTA_CREDITO">NOTA DE CRÉDITO</option>
@@ -1322,7 +1399,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                     <div className="pt-4 flex gap-3">
                                         <button 
                                             type="button"
-                                            onClick={() => setShowAddForm(false)}
+                                            onClick={() => { setShowAddForm(false); setEditingPaymentId(null); }}
                                             className="flex-1 px-4 py-4 rounded-2xl text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 hover:bg-slate-50 transition-all"
                                         >
                                             Cerrar
@@ -1332,7 +1409,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                             disabled={isSubmitting || isUploading || !amount}
                                             className="flex-[2] bg-indigo-600 text-white px-4 py-4 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] hover:bg-slate-900 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                                         >
-                                            {isSubmitting ? 'Cargando...' : 'Confirmar'}
+                                            {isSubmitting ? 'Cargando...' : (editingPaymentId ? 'Guardar Cambios' : 'Confirmar')}
                                         </button>
                                     </div>
                                 </form>

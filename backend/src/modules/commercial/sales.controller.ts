@@ -125,6 +125,16 @@ export class SalesController {
     return this.salesService.addPayment(id, data, req.user);
   }
 
+  @Patch('payments/:paymentId')
+  updatePayment(@Param('paymentId') paymentId: string, @Req() req: any, @Body() data: any) {
+    return this.salesService.updatePayment(paymentId, data, req.user);
+  }
+
+  @Delete('payments/:paymentId')
+  deletePayment(@Param('paymentId') paymentId: string, @Req() req: any) {
+    return this.salesService.deletePayment(paymentId, req.user);
+  }
+
   @Patch(':id/finalize')
   finalizePayment(@Param('id') id: string, @Req() req: any) {
     return this.salesService.finalizePayment(id, req.user);
