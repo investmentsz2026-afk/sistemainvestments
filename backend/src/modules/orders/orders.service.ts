@@ -21,15 +21,19 @@ export class OrdersService {
     // Validate colors against the product catalog
     for (const item of items) {
       if (item.modelName && item.color) {
-        const product = await this.prisma.product.findFirst({
+        const products = await this.prisma.product.findMany({
           where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
           include: { variants: true }
         });
-        if (product) {
-          const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
-          const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
-          const allColors = Array.from(new Set([...prodColors, ...variantColors]));
-          if (!allColors.includes(item.color.trim().toUpperCase())) {
+        if (products.length > 0) {
+          const allColors = new Set<string>();
+          for (const product of products) {
+            const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
+            const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
+            prodColors.forEach(c => allColors.add(c));
+            variantColors.forEach(c => allColors.add(c));
+          }
+          if (!allColors.has(item.color.trim().toUpperCase())) {
             throw new BadRequestException(`El color "${item.color}" no está disponible para el modelo "${item.modelName}".`);
           }
         }
@@ -171,15 +175,19 @@ export class OrdersService {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         if (item.modelName && item.color) {
-          const product = await this.prisma.product.findFirst({
+          const products = await this.prisma.product.findMany({
             where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
             include: { variants: true }
           });
-          if (product) {
-            const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
-            const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
-            const allColors = Array.from(new Set([...prodColors, ...variantColors]));
-            if (!allColors.includes(item.color.trim().toUpperCase())) {
+          if (products.length > 0) {
+            const allColors = new Set<string>();
+            for (const product of products) {
+              const prodColors = (product.colors || []).map((c: string) => c.trim().toUpperCase());
+              const variantColors = (product.variants || []).map((v: any) => v.color.trim().toUpperCase());
+              prodColors.forEach(c => allColors.add(c));
+              variantColors.forEach(c => allColors.add(c));
+            }
+            if (!allColors.has(item.color.trim().toUpperCase())) {
               throw new BadRequestException(`El color "${item.color}" no está disponible para el modelo "${item.modelName}".`);
             }
           }
