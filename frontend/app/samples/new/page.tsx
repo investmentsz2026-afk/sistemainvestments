@@ -153,7 +153,9 @@ export default function NewSamplePage() {
         }
     };
 
-    const cardClass = "bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-xl shadow-gray-200/20";
+    const cardClass = isExisting 
+        ? "bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-xl shadow-gray-200/20" 
+        : "bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-xl shadow-gray-200/20";
 
     return (
         <Layout>
@@ -179,16 +181,16 @@ export default function NewSamplePage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className={cardClass}>
-                    <div className="space-y-8">
+                    <div className={isExisting ? 'space-y-4' : 'space-y-8'}>
                         {/* NAME */}
-                        <div className="space-y-3">
+                        <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre de la Muestra / Prototipo</label>
                             <div className="relative">
-                                <Beaker className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                <Beaker className={`absolute ${isExisting ? 'left-4 w-4 h-4' : 'left-6 w-5 h-5'} top-1/2 -translate-y-1/2 text-indigo-400`} />
                                 <input 
                                     type="text" required
                                     placeholder="Ej: Camisa Slim Fit Algodón Pima V1"
-                                    className="w-full bg-gray-50 border-none rounded-[1.5rem] pl-16 pr-6 py-6 font-black text-lg text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                    className={`w-full bg-gray-50 border-none ${isExisting ? 'rounded-xl pl-12 pr-4 py-3 text-sm font-bold shadow-sm' : 'rounded-[1.5rem] pl-16 pr-6 py-6 font-black text-lg shadow-inner'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition`}
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
@@ -196,15 +198,15 @@ export default function NewSamplePage() {
                         </div>
 
                         {/* CODE */}
-                        <div className="space-y-3">
+                        <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Código de Muestra</label>
                             <div className="flex gap-4">
                                 <div className="relative flex-1">
-                                    <FileText className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                    <FileText className={`absolute ${isExisting ? 'left-4 w-4 h-4' : 'left-6 w-5 h-5'} top-1/2 -translate-y-1/2 text-indigo-400`} />
                                     <input 
                                         type="text" required
                                         placeholder="Ej: SMP-2024-001"
-                                        className="w-full bg-gray-50 border-none rounded-[1.5rem] pl-16 pr-6 py-6 font-black text-lg text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                        className={`w-full bg-gray-50 border-none ${isExisting ? 'rounded-xl pl-12 pr-4 py-3 text-sm font-bold shadow-sm' : 'rounded-[1.5rem] pl-16 pr-6 py-6 font-black text-lg shadow-inner'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition`}
                                         value={formData.code}
                                         onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                                     />
@@ -212,7 +214,7 @@ export default function NewSamplePage() {
                                 <button 
                                     type="button"
                                     onClick={generateCode}
-                                    className="px-8 py-6 bg-indigo-50 text-indigo-600 rounded-[1.5rem] font-black hover:bg-indigo-100 transition shadow-sm border border-indigo-100"
+                                    className={`${isExisting ? 'px-4 py-3 rounded-xl font-bold text-xs' : 'px-8 py-6 rounded-[1.5rem] font-black'} bg-indigo-50 text-indigo-600 transition shadow-sm border border-indigo-100`}
                                 >
                                     Generar Código
                                 </button>
@@ -220,14 +222,14 @@ export default function NewSamplePage() {
                         </div>
 
                         {/* CHARACTERISTICS */}
-                        <div className="space-y-3">
+                        <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ficha Técnica / Características</label>
                             <div className="relative">
-                                <Settings className="absolute left-6 top-8 w-5 h-5 text-indigo-400" />
+                                <Settings className={`absolute ${isExisting ? 'left-4 top-4 w-4 h-4' : 'left-6 top-8 w-5 h-5'} text-indigo-400`} />
                                 <textarea 
                                     required
                                     placeholder="Detalles de tela, avios, puntadas, medidas críticas..."
-                                    className="w-full bg-gray-50 border-none rounded-[1.5rem] pl-16 pr-6 py-6 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner min-h-[150px] resize-none"
+                                    className={`w-full bg-gray-50 border-none ${isExisting ? 'rounded-xl pl-12 pr-4 py-3 text-sm font-bold shadow-sm min-h-[70px]' : 'rounded-[1.5rem] pl-16 pr-6 py-6 font-bold shadow-inner min-h-[150px]'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition resize-none`}
                                     value={formData.characteristics}
                                     onChange={e => setFormData({ ...formData, characteristics: e.target.value })}
                                 />
@@ -235,13 +237,13 @@ export default function NewSamplePage() {
                         </div>
 
                         {/* DESCRIPTION */}
-                        <div className="space-y-3">
+                        <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descripción del Desarrollo</label>
                             <div className="relative">
-                                <FileText className="absolute left-6 top-8 w-5 h-5 text-indigo-400" />
+                                <FileText className={`absolute ${isExisting ? 'left-4 top-4 w-4 h-4' : 'left-6 top-8 w-5 h-5'} text-indigo-400`} />
                                 <textarea 
                                     placeholder="Contexto del diseño, inspiración o notas generales..."
-                                    className="w-full bg-gray-50 border-none rounded-[1.5rem] pl-16 pr-6 py-6 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner min-h-[120px] resize-none"
+                                    className={`w-full bg-gray-50 border-none ${isExisting ? 'rounded-xl pl-12 pr-4 py-3 text-sm font-bold shadow-sm min-h-[60px]' : 'rounded-[1.5rem] pl-16 pr-6 py-6 font-bold shadow-inner min-h-[120px]'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition resize-none`}
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                                 />
@@ -257,11 +259,11 @@ export default function NewSamplePage() {
 
                             <div className="relative">
                                 <div className="relative">
-                                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                                    <Search className={`absolute ${isExisting ? 'left-4 w-4 h-4' : 'left-6 w-5 h-5'} top-1/2 -translate-y-1/2 text-indigo-400`} />
                                     <input 
                                         type="text"
                                         placeholder="Buscar materiales en inventario (nombre o SKU)..."
-                                        className="w-full bg-gray-50 border-none rounded-2xl pl-16 pr-6 py-5 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                        className={`w-full bg-gray-50 border-none ${isExisting ? 'rounded-xl pl-12 pr-4 py-3 text-sm' : 'rounded-2xl pl-16 pr-6 py-5 font-bold'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner`}
                                         value={searchQuery}
                                         onChange={e => handleSearchMaterials(e.target.value)}
                                     />
@@ -297,77 +299,141 @@ export default function NewSamplePage() {
                                 <input 
                                     type="text"
                                     placeholder="Otro material no encontrado en inventario..."
-                                    className="flex-1 bg-gray-50 border-none rounded-xl px-6 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
+                                    className={`flex-1 bg-gray-50 border-none ${isExisting ? 'rounded-xl px-4 py-2.5 text-sm' : 'rounded-xl px-6 py-4 font-bold'} text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner`}
                                     value={customMatName}
                                     onChange={e => setCustomMatName(e.target.value)}
                                 />
                                 <button 
                                     type="button"
                                     onClick={addCustomMaterial}
-                                    className="px-6 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition"
+                                    className={`${isExisting ? 'px-4 py-2.5 rounded-xl text-sm' : 'px-6 py-4 rounded-xl font-bold'} bg-gray-100 text-gray-600 hover:bg-gray-200 transition`}
                                 >
                                     Agregar Manual
                                 </button>
                             </div>
 
-                            {/* MATERIALS LIST */}
+                            {/* MATERIALS LIST / TABLE */}
                             <div className="space-y-3">
-                                {materials.map((m, i) => (
-                                    <div key={i} className="flex items-center justify-between bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${m.productId ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                {m.productId ? <Box className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
-                                            </div>
-                                            <div>
-                                                <p className="font-black text-gray-900 text-sm uppercase">{m.name}</p>
-                                                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
-                                                    {m.productId ? 'De Inventario' : 'Manual / Externo'}
-                                                </p>
-                                            </div>
+                                {isExisting ? (
+                                    materials.length > 0 && (
+                                        <div className="overflow-x-auto border border-gray-100 rounded-2xl shadow-sm">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                        <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">Material / Insumo</th>
+                                                        <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center w-24">Cantidad</th>
+                                                        <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center w-36">Precio Unit.</th>
+                                                        <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right w-24">Total</th>
+                                                        <th className="px-4 py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center w-12"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {materials.map((m, i) => (
+                                                        <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/20 transition-colors">
+                                                            <td className="px-4 py-2.5">
+                                                                <p className="font-bold text-gray-900 text-[11px] uppercase">{m.name}</p>
+                                                                <p className="text-[8.5px] font-bold text-indigo-500 uppercase tracking-wider mt-0.5">
+                                                                    {m.productId ? 'De Inventario' : 'Manual / Externo'}
+                                                                </p>
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-center">
+                                                                <input 
+                                                                    type="number"
+                                                                    min="0.01"
+                                                                    step="any"
+                                                                    value={m.quantity}
+                                                                    onChange={e => updateMaterialQty(i, parseFloat(e.target.value) || 1)}
+                                                                    className="w-16 bg-gray-50 border border-gray-100 rounded-lg py-1 px-1.5 font-black text-[11px] text-center outline-none focus:border-indigo-500"
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-center">
+                                                                <div className="flex items-center justify-center bg-gray-50 border border-gray-100 rounded-lg py-1 px-1.5 w-24 mx-auto">
+                                                                    <span className="text-[9px] font-black text-emerald-600 mr-1">S/</span>
+                                                                    <input 
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={m.unitPriceAtTime}
+                                                                        onChange={e => updateMaterialPrice(i, parseFloat(e.target.value) || 0)}
+                                                                        className="w-14 bg-transparent font-black text-center outline-none text-emerald-600 text-[11px]"
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-right font-black text-gray-900 text-[11px]">
+                                                                S/ {(m.quantity * m.unitPriceAtTime).toFixed(2)}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-center">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => removeMaterial(i)}
+                                                                    className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-
-                                        <div className="flex items-center gap-6">
-                                            <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
-                                                <span className="text-[10px] font-black text-gray-400 uppercase mr-3">Cant</span>
-                                                <input 
-                                                    type="number"
-                                                    min="1"
-                                                    value={m.quantity}
-                                                    onChange={e => updateMaterialQty(i, parseFloat(e.target.value) || 1)}
-                                                    className="w-12 bg-transparent font-black text-center outline-none"
-                                                />
-                                            </div>
-                                            <div className="text-right min-w-[100px]">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Unit.</p>
-                                                <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
-                                                    <span className="text-[10px] font-black text-emerald-600 mr-1">S/</span>
-                                                    <input 
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={m.unitPriceAtTime}
-                                                        onChange={e => updateMaterialPrice(i, parseFloat(e.target.value) || 0)}
-                                                        className="w-16 bg-transparent font-black text-center outline-none text-emerald-600"
-                                                    />
+                                    )
+                                ) : (
+                                    materials.map((m, i) => (
+                                        <div key={i} className="flex items-center justify-between bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${m.productId ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                    {m.productId ? <Box className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-gray-900 text-sm uppercase">{m.name}</p>
+                                                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
+                                                        {m.productId ? 'De Inventario' : 'Manual / Externo'}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeMaterial(i)}
-                                                className="p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
+
+                                            <div className="flex items-center gap-6">
+                                                <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
+                                                    <span className="text-[10px] font-black text-gray-400 uppercase mr-3">Cant</span>
+                                                    <input 
+                                                        type="number"
+                                                        min="1"
+                                                        value={m.quantity}
+                                                        onChange={e => updateMaterialQty(i, parseFloat(e.target.value) || 1)}
+                                                        className="w-12 bg-transparent font-black text-center outline-none"
+                                                    />
+                                                </div>
+                                                <div className="text-right min-w-[100px]">
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Unit.</p>
+                                                    <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
+                                                        <span className="text-[10px] font-black text-emerald-600 mr-1">S/</span>
+                                                        <input 
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={m.unitPriceAtTime}
+                                                            onChange={e => updateMaterialPrice(i, parseFloat(e.target.value) || 0)}
+                                                            className="w-16 bg-transparent font-black text-center outline-none text-emerald-600"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => removeMaterial(i)}
+                                                    className="p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                                 
                                 {materials.length > 0 && (
-                                    <div className="flex justify-end p-6 bg-gray-900 rounded-[2rem] text-white mt-6 shadow-xl shadow-gray-200">
+                                    <div className={`flex justify-end ${isExisting ? 'p-4 rounded-2xl mt-4' : 'p-6 rounded-[2rem] mt-6'} bg-gray-900 text-white shadow-xl shadow-gray-200`}>
                                         <div className="text-right">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Costo Estimado de Insumos</p>
-                                            <div className="flex items-center justify-end gap-3">
-                                                <DollarSign className="w-6 h-6 text-emerald-400" />
-                                                <span className="text-3xl font-black">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Costo Estimado de Insumos</p>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <DollarSign className={`text-emerald-400 ${isExisting ? 'w-5 h-5' : 'w-6 h-6'}`} />
+                                                <span className={`font-black ${isExisting ? 'text-xl' : 'text-3xl'}`}>
                                                     S/ {materials.reduce((acc, m) => acc + (m.quantity * m.unitPriceAtTime), 0).toFixed(2)}
                                                 </span>
                                             </div>
@@ -420,21 +486,21 @@ export default function NewSamplePage() {
                         </div>
 
                         {/* SUBMIT */}
-                        <div className="pt-10">
+                        <div className={isExisting ? 'pt-6' : 'pt-10'}>
                             <button 
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full py-8 bg-gray-900 text-white rounded-[2.5rem] font-black text-2xl flex items-center justify-center gap-4 shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50"
+                                className={`w-full ${isExisting ? 'py-4 rounded-2xl text-lg gap-2' : 'py-8 rounded-[2.5rem] text-2xl gap-4'} bg-gray-900 text-white font-black flex items-center justify-center shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50`}
                             >
                                 {isLoading ? (
                                     <>Enviando...</>
                                 ) : (
                                     <>
-                                        <Send className="w-8 h-8" /> {materials.length > 0 ? 'Enviar a Administrador' : 'Enviar a Comercial'}
+                                        <Send className={isExisting ? 'w-5 h-5' : 'w-8 h-8'} /> {isExisting ? 'Enviar a Comercial' : (materials.length > 0 ? 'Enviar a Administrador' : 'Enviar a Comercial')}
                                     </>
                                 )}
                             </button>
-                            <p className="text-center text-[10px] text-gray-400 font-bold mt-6 uppercase tracking-[0.2em]">
+                            <p className="text-center text-[10px] text-gray-400 font-bold mt-4 uppercase tracking-[0.2em]">
                                 Al enviar, el equipo comercial recibirá una notificación para su revisión.
                             </p>
                         </div>
