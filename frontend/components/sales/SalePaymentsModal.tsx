@@ -516,11 +516,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         e.preventDefault();
         setErrorMsg(null);
         
-        const numericAmount = parseFloat(amount);
+        const parsedAmountStr = amount.toString().replace(',', '.');
+        const numericAmount = Math.round(parseFloat(parsedAmountStr) * 100) / 100;
         if (!amount || numericAmount <= 0) return;
 
         const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-        const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
+        const pendingAmount = Math.round((sale ? sale.totalAmount - totalPaid : 0) * 100) / 100;
 
         if (method === 'LETRAS') {
             const sumOfLetras = letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
