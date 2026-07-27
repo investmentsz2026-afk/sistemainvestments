@@ -985,6 +985,8 @@ export class SalesService {
         cliente_email: sale.client?.email || "",
         fecha_de_emision: fechaEmision,
         condicion_de_pago: (sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? 2 : 1,
+        condiciones_de_pago: (sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? 'CRÉDITO' : 'CONTADO',
+        medio_de_pago: sale.paymentMethod || 'CONTADO',
         ...((sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? {
           cuotas: [
             {
@@ -994,7 +996,7 @@ export class SalesService {
             }
           ]
         } : {}),
-        observaciones: `METODO DE PAGO: ${sale.paymentMethod || 'NO ESPECIFICADO'}`,
+        observaciones: sale.notes || '',
         moneda: 1, // Soles
         tipo_de_cambio: null,
         porcentaje_de_igv: 18.0,
