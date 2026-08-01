@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import api from '../../../lib/axios';
-import { Ruler, Search, Save, Plus, Trash2, Tag } from 'lucide-react';
+import { Ruler, Search, Save, Plus, Trash2, Tag, Info } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 interface ColumnType {
-  id: string; // unique, e.g. "PRELAVADO" or "OP-02|Camello"
-  op: string; // e.g. "" or "OP-02"
-  color: string; // e.g. "PRELAVADO" or "Camello"
+  id: string; // unique, e.g. "OP-02|Camello"
+  op: string; // e.g. "OP-02"
+  color: string; // e.g. "Camello"
 }
 
 const MEASUREMENT_KEYS = [
@@ -40,10 +40,8 @@ export default function MeasurementsPage() {
   const [selectedSize, setSelectedSize] = useState('32');
   const [activeStage, setActiveStage] = useState('OFICIAL');
   
-  // Columns/Colors listed in the table
-  const [columns, setColumns] = useState<ColumnType[]>([
-    { id: 'PRELAVADO', op: '', color: 'PRELAVADO' }
-  ]);
+  // Columns/Colors listed in the table (no prelavado column as input anymore)
+  const [columns, setColumns] = useState<ColumnType[]>([]);
   const [customOp, setCustomOp] = useState('');
   const [customColor, setCustomColor] = useState('');
   
@@ -78,8 +76,13 @@ export default function MeasurementsPage() {
   useEffect(() => {
     if (!selectedItem) return;
     
-    // Set initial columns: PRELAVADO + variants colors/OPs of the item
-    const baseCols: ColumnType[] = [{ id: 'PRELAVADO', op: '', color: 'PRELAVADO' }];
+    // Auto-select first available size if current selectedSize is not in the item's sizes
+    const availableSizes = selectedItem.sizes || [];
+    if (availableSizes.length > 0 && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(availableSizes[0]);
+    }
+
+    const baseCols: ColumnType[] = [];
     
     if (inventoryType === 'MUESTRAS') {
       if (selectedItem.productionColor) {
@@ -111,26 +114,28 @@ export default function MeasurementsPage() {
     if (!selectedItem) return;
     setIsLoading(true);
     try {
-      const params: any = {
-        size: selectedSize,
-      };
+      let stageMeasurements: any[] = [];
       if (inventoryType === 'MUESTRAS') {
-        params.sampleId = selectedItem.id;
+        const resp = await api.get('/products-measurements', { params: { sampleId: selectedItem.id, size: selectedSize } });
+        stageMeasurements = (resp.data || []).filter((m: any) => m.stage === activeStage);
       } else {
-        params.productId = selectedItem.id;
+        const ids = selectedItem.siblingIds || [selectedItem.id];
+        const promises = ids.map((id: string) => api.get('/products-measurements', { params: { productId: id, size: selectedSize } }));
+        const responses = await Promise.all(promises);
+        stageMeasurements = responses.flatMap((resp: any) => resp.data || []).filter((m: any) => m.stage === activeStage);
       }
-      
-      const resp = await api.get('/products-measurements', { params });
-      const stageMeasurements = (resp.data || []).filter((m: any) => m.stage === activeStage);
+
       const newMatrix: Record<string, Record<string, string>> = {};
       
       // Prefill columns list from measurements if they have custom values
       setColumns(prev => {
-        const existingCols = stageMeasurements.map((m: any) => ({
-          id: m.color ? `${m.op || ''}|${m.color}` : 'PRELAVADO',
-          op: m.op || '',
-          color: m.color || 'PRELAVADO'
-        }));
+        const existingCols = stageMeasurements
+          .filter((m: any) => m.color)
+          .map((m: any) => ({
+            id: `${m.op || ''}|${m.color}`,
+            op: m.op || '',
+            color: m.color
+          }));
         
         const map = new Map<string, ColumnType>();
         prev.forEach(c => map.set(c.id, c));
@@ -140,7 +145,8 @@ export default function MeasurementsPage() {
       });
 
       stageMeasurements.forEach((m: any) => {
-        const colId = m.color ? `${m.op || ''}|${m.color}` : 'PRELAVADO';
+        if (!m.color) return;
+        const colId = `${m.op || ''}|${m.color}`;
         if (!newMatrix[colId]) newMatrix[colId] = {};
         
         MEASUREMENT_KEYS.forEach(({ key }) => {
@@ -187,7 +193,6 @@ export default function MeasurementsPage() {
   };
 
   const removeColumn = (columnId: string) => {
-    if (columnId === 'PRELAVADO') return;
     setColumns(columns.filter(c => c.id !== columnId));
     setMatrix(prev => {
       const copy = { ...prev };
@@ -203,7 +208,7 @@ export default function MeasurementsPage() {
         const measurements = matrix[col.id] || {};
         const payload: any = {
           size: selectedSize,
-          color: col.color === 'PRELAVADO' ? null : col.color,
+          color: col.color,
           op: col.op || null,
           stage: activeStage,
           cintura: measurements.cintura || null,
@@ -219,7 +224,18 @@ export default function MeasurementsPage() {
         if (inventoryType === 'MUESTRAS') {
           payload.sampleId = selectedItem.id;
         } else {
-          payload.productId = selectedItem.id;
+          // Route to specific sibling product containing this variant if applicable
+          let targetProductId = selectedItem.id;
+          if (selectedItem.siblingIds) {
+            const matchingSibling = products.find((p: any) => 
+              selectedItem.siblingIds.includes(p.id) && 
+              (p.variants || []).some((v: any) => (v.op || '') === col.op && v.color === col.color)
+            );
+            if (matchingSibling) {
+              targetProductId = matchingSibling.id;
+            }
+          }
+          payload.productId = targetProductId;
         }
 
         return api.post('/products-measurements', payload);
@@ -234,13 +250,39 @@ export default function MeasurementsPage() {
     }
   };
 
-  // Autocomplete suggestions
+  // Group autocomplete suggestions by name to select unique models
   const itemsList = inventoryType === 'MUESTRAS' ? samples : products;
-  const filteredSuggestions = itemsList.filter((item: any) => {
+  const matched = itemsList.filter((item: any) => {
     const nameMatch = (item.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     const skuMatch = (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
     const opMatch = (item.op || '').toLowerCase().includes(searchQuery.toLowerCase());
     return nameMatch || skuMatch || opMatch;
+  });
+
+  const groupedSuggestions: any[] = [];
+  const seenNames = new Set<string>();
+
+  matched.forEach((item: any) => {
+    const nameKey = (item.name || '').trim().toLowerCase();
+    if (!seenNames.has(nameKey)) {
+      seenNames.add(nameKey);
+      
+      const siblings = itemsList.filter((x: any) => (x.name || '').trim().toLowerCase() === nameKey);
+      const allVariants: any[] = [];
+      siblings.forEach((sib: any) => {
+        if (sib.variants) allVariants.push(...sib.variants);
+      });
+      const allSizes = Array.from(new Set(siblings.flatMap((x: any) => x.sizes || [])));
+      const allColors = Array.from(new Set(siblings.flatMap((x: any) => x.colors || [])));
+
+      groupedSuggestions.push({
+        ...item,
+        variants: allVariants,
+        sizes: allSizes,
+        colors: allColors,
+        siblingIds: siblings.map((x: any) => x.id)
+      });
+    }
   });
 
   const getStageColorClass = (stageId: string) => {
@@ -293,11 +335,11 @@ export default function MeasurementsPage() {
 
           {/* Search autocomplete */}
           <div className="space-y-2 relative">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Buscar Modelo / OP / SKU</label>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Buscar Modelo / SKU</label>
             <div className="relative">
               <input
                 type="text"
-                placeholder={selectedItem ? `${selectedItem.name} (${selectedItem.op || 'Sin OP'})` : "Escribe nombre, OP o SKU..."}
+                placeholder={selectedItem ? `${selectedItem.name}` : "Escribe el nombre del modelo o SKU..."}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -311,8 +353,8 @@ export default function MeasurementsPage() {
 
             {showDropdown && searchQuery && (
               <div className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
-                {filteredSuggestions.length > 0 ? (
-                  filteredSuggestions.map((item: any) => (
+                {groupedSuggestions.length > 0 ? (
+                  groupedSuggestions.map((item: any) => (
                     <button
                       key={item.id}
                       onClick={() => {
@@ -326,11 +368,9 @@ export default function MeasurementsPage() {
                         <p>{item.name}</p>
                         <p className="text-xs text-gray-400">SKU: {item.sku || 'N/A'}</p>
                       </div>
-                      {item.op && (
-                        <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full uppercase border border-indigo-100">
-                          OP: {item.op}
-                        </span>
-                      )}
+                      <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full uppercase border border-indigo-100">
+                        MODELO ÚNICO
+                      </span>
                     </button>
                   ))
                 ) : (
@@ -354,24 +394,22 @@ export default function MeasurementsPage() {
                 <div>
                   <h2 className="text-2xl font-black text-gray-900 uppercase">{selectedItem.name}</h2>
                   <div className="flex items-center gap-4 mt-2">
-                    {/* Size Select placed next to model details */}
+                    {/* Size Select next to model details - only shows sizes this product has */}
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TALLA:</span>
                       <select
-                        className="bg-gray-100 px-3 py-1.5 rounded-xl font-bold text-sm outline-none border-none focus:ring-2 focus:ring-indigo-500 transition"
+                        className="bg-gray-100 px-3 py-1.5 rounded-xl font-bold text-sm outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 transition cursor-pointer"
                         value={selectedSize}
                         onChange={(e) => setSelectedSize(e.target.value)}
                       >
-                        {['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52'].map(sz => (
+                        {(selectedItem.sizes && selectedItem.sizes.length > 0
+                          ? selectedItem.sizes
+                          : ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52']
+                        ).map(sz => (
                           <option key={sz} value={sz}>{sz}</option>
                         ))}
                       </select>
                     </div>
-                    {selectedItem.op && (
-                      <span className="text-sm font-bold text-gray-400">
-                        OP Principal: {selectedItem.op}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -388,6 +426,15 @@ export default function MeasurementsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Stage Info Banner (Replacing prelavado column) */}
+            <div className="flex items-center gap-3 bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
+              <Info className="w-5 h-5 text-indigo-600 shrink-0" />
+              <p className="text-sm font-semibold text-indigo-900">
+                Estás visualizando/editando las medidas de tipo:{' '}
+                <span className="font-black uppercase">{STAGES.find(s => s.id === activeStage)?.label}</span>
+              </p>
             </div>
 
             {/* Custom Column / Color adder */}
@@ -431,21 +478,19 @@ export default function MeasurementsPage() {
                         <div className="flex flex-col items-center justify-center min-h-[44px]">
                           {/* OP on first row */}
                           <span className="text-[9px] text-gray-400 font-bold block leading-none mb-1">
-                            {col.op ? col.op : '--'}
+                            {col.op ? col.op : 'Sin OP'}
                           </span>
                           
                           {/* Color and delete action on second row */}
                           <div className="flex items-center justify-center gap-1.5">
                             <span className="text-xs truncate max-w-[110px]">{col.color}</span>
-                            {col.id !== 'PRELAVADO' && (
-                              <button
-                                onClick={() => removeColumn(col.id)}
-                                className="text-red-400 hover:text-red-600 transition"
-                                title="Remover columna"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => removeColumn(col.id)}
+                              className="text-red-400 hover:text-red-600 transition"
+                              title="Remover columna"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       </th>
@@ -490,7 +535,7 @@ export default function MeasurementsPage() {
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-12 text-center text-gray-400 flex flex-col items-center justify-center">
             <Ruler className="w-16 h-16 text-gray-200 mb-4" />
             <h3 className="text-lg font-black text-gray-700 uppercase">Ningún modelo seleccionado</h3>
-            <p className="text-sm mt-1 max-w-md">Escribe el nombre del modelo, SKU o número de OP en la barra superior para comenzar a registrar las medidas.</p>
+            <p className="text-sm mt-1 max-w-md">Escribe el nombre del modelo o SKU en la barra superior para comenzar a registrar las medidas.</p>
           </div>
         )}
       </div>
