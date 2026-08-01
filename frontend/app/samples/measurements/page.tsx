@@ -3,8 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import api from '../../../lib/axios';
-import { Ruler, Search, Save, Plus, Trash2, Tag, Layers, Settings } from 'lucide-react';
+import { Ruler, Search, Save, Plus, Trash2, Tag } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+
+interface ColumnType {
+  id: string; // unique, e.g. "PRELAVADO" or "OP-02|Camello"
+  op: string; // e.g. "" or "OP-02"
+  color: string; // e.g. "PRELAVADO" or "Camello"
+}
 
 const MEASUREMENT_KEYS = [
   { key: 'cintura', label: 'CINTURA' },
@@ -35,10 +41,13 @@ export default function MeasurementsPage() {
   const [activeStage, setActiveStage] = useState('OFICIAL');
   
   // Columns/Colors listed in the table
-  const [columns, setColumns] = useState<string[]>(['PRELAVADO']);
+  const [columns, setColumns] = useState<ColumnType[]>([
+    { id: 'PRELAVADO', op: '', color: 'PRELAVADO' }
+  ]);
+  const [customOp, setCustomOp] = useState('');
   const [customColor, setCustomColor] = useState('');
   
-  // Matrix data structure: { [column]: { [measurementKey]: value } }
+  // Matrix data structure: { [columnId]: { [measurementKey]: value } }
   const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -56,7 +65,6 @@ export default function MeasurementsPage() {
         setSamples(resp.data || []);
       } else {
         const resp = await api.get('/products');
-        // Filter by inventoryType
         const filtered = (resp.data || []).filter((p: any) => p.inventoryType === inventoryType);
         setProducts(filtered);
       }
@@ -70,11 +78,32 @@ export default function MeasurementsPage() {
   useEffect(() => {
     if (!selectedItem) return;
     
-    // Set initial columns: PRELAVADO + colors of the item
-    const baseCols = ['PRELAVADO'];
-    const itemColors = selectedItem.colors || [];
-    setColumns([...baseCols, ...itemColors]);
+    // Set initial columns: PRELAVADO + variants colors/OPs of the item
+    const baseCols: ColumnType[] = [{ id: 'PRELAVADO', op: '', color: 'PRELAVADO' }];
     
+    if (inventoryType === 'MUESTRAS') {
+      if (selectedItem.productionColor) {
+        baseCols.push({
+          id: `${selectedItem.op || ''}|${selectedItem.productionColor}`,
+          op: selectedItem.op || '',
+          color: selectedItem.productionColor
+        });
+      }
+    } else {
+      const variants = selectedItem.variants || [];
+      variants.forEach((v: any) => {
+        const id = `${v.op || ''}|${v.color}`;
+        if (!baseCols.some(c => c.id === id)) {
+          baseCols.push({
+            id,
+            op: v.op || '',
+            color: v.color
+          });
+        }
+      });
+    }
+
+    setColumns(baseCols);
     loadMeasurements();
   }, [selectedItem, selectedSize, activeStage]);
 
@@ -92,26 +121,30 @@ export default function MeasurementsPage() {
       }
       
       const resp = await api.get('/products-measurements', { params });
-      
-      // Filter measurements by stage
       const stageMeasurements = (resp.data || []).filter((m: any) => m.stage === activeStage);
-      
-      // Build matrix
       const newMatrix: Record<string, Record<string, string>> = {};
       
-      // Prefill columns list from measurements if they have custom colors
-      const existingColors = Array.from(new Set(stageMeasurements.map((m: any) => m.color || 'PRELAVADO')));
+      // Prefill columns list from measurements if they have custom values
       setColumns(prev => {
-        const merged = Array.from(new Set([...prev, ...existingColors]));
-        return merged.length > 0 ? (merged as string[]) : ['PRELAVADO'];
+        const existingCols = stageMeasurements.map((m: any) => ({
+          id: m.color ? `${m.op || ''}|${m.color}` : 'PRELAVADO',
+          op: m.op || '',
+          color: m.color || 'PRELAVADO'
+        }));
+        
+        const map = new Map<string, ColumnType>();
+        prev.forEach(c => map.set(c.id, c));
+        existingCols.forEach(c => map.set(c.id, c));
+        
+        return Array.from(map.values());
       });
 
       stageMeasurements.forEach((m: any) => {
-        const col = m.color || 'PRELAVADO';
-        if (!newMatrix[col]) newMatrix[col] = {};
+        const colId = m.color ? `${m.op || ''}|${m.color}` : 'PRELAVADO';
+        if (!newMatrix[colId]) newMatrix[colId] = {};
         
         MEASUREMENT_KEYS.forEach(({ key }) => {
-          newMatrix[col][key] = m[key] || '';
+          newMatrix[colId][key] = m[key] || '';
         });
       });
       
@@ -124,11 +157,11 @@ export default function MeasurementsPage() {
     }
   };
 
-  const handleCellChange = (column: string, key: string, value: string) => {
+  const handleCellChange = (columnId: string, key: string, value: string) => {
     setMatrix(prev => ({
       ...prev,
-      [column]: {
-        ...(prev[column] || {}),
+      [columnId]: {
+        ...(prev[columnId] || {}),
         [key]: value
       }
     }));
@@ -136,21 +169,29 @@ export default function MeasurementsPage() {
 
   const addColumn = () => {
     const colName = customColor.trim();
-    if (!colName) return;
-    if (columns.includes(colName)) {
-      toast.error('El color ya existe en la tabla');
+    const opName = customOp.trim();
+    if (!colName) {
+      toast.error('El color es obligatorio');
       return;
     }
-    setColumns([...columns, colName]);
+    
+    const id = `${opName}|${colName}`;
+    if (columns.some(c => c.id === id)) {
+      toast.error('Esta combinación de OP y Color ya existe en la tabla');
+      return;
+    }
+
+    setColumns([...columns, { id, op: opName, color: colName }]);
     setCustomColor('');
+    setCustomOp('');
   };
 
-  const removeColumn = (colName: string) => {
-    if (colName === 'PRELAVADO') return;
-    setColumns(columns.filter(c => c !== colName));
+  const removeColumn = (columnId: string) => {
+    if (columnId === 'PRELAVADO') return;
+    setColumns(columns.filter(c => c.id !== columnId));
     setMatrix(prev => {
       const copy = { ...prev };
-      delete copy[colName];
+      delete copy[columnId];
       return copy;
     });
   };
@@ -159,10 +200,11 @@ export default function MeasurementsPage() {
     if (!selectedItem) return;
     try {
       const promises = columns.map(col => {
-        const measurements = matrix[col] || {};
+        const measurements = matrix[col.id] || {};
         const payload: any = {
           size: selectedSize,
-          color: col === 'PRELAVADO' ? null : col,
+          color: col.color === 'PRELAVADO' ? null : col.color,
+          op: col.op || null,
           stage: activeStage,
           cintura: measurements.cintura || null,
           cadera: measurements.cadera || null,
@@ -176,10 +218,8 @@ export default function MeasurementsPage() {
 
         if (inventoryType === 'MUESTRAS') {
           payload.sampleId = selectedItem.id;
-          payload.op = selectedItem.op || null;
         } else {
           payload.productId = selectedItem.id;
-          payload.op = selectedItem.op || null;
         }
 
         return api.post('/products-measurements', payload);
@@ -235,7 +275,7 @@ export default function MeasurementsPage() {
         </div>
 
         {/* Filters Panel */}
-        <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+        <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
           {/* Inventory Type Select */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Inventario</label>
@@ -299,25 +339,11 @@ export default function MeasurementsPage() {
               </div>
             )}
           </div>
-
-          {/* Size Select */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Seleccionar Talla</label>
-            <select
-              className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
-              value={selectedSize}
-              onChange={(e) => setSelectedSize(e.target.value)}
-            >
-              {['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52'].map(sz => (
-                <option key={sz} value={sz}>Talla {sz}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Measurements Matrix Table */}
         {selectedItem ? (
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 space-y-8">
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 space-y-8 animate-scale-in">
             {/* Upper selector & stage tabs */}
             <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pb-6 border-b border-gray-100">
               {/* Product Info */}
@@ -326,10 +352,27 @@ export default function MeasurementsPage() {
                   <Tag className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-gray-900 uppercase">{selectedItem.name}</h2>
-                  <p className="text-sm font-bold text-gray-400 mt-0.5">
-                    TALLA SELECCIONADA: {selectedSize} | OP: {selectedItem.op || 'Sin OP'}
-                  </p>
+                  <h2 className="text-2xl font-black text-gray-900 uppercase">{selectedItem.name}</h2>
+                  <div className="flex items-center gap-4 mt-2">
+                    {/* Size Select placed next to model details */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TALLA:</span>
+                      <select
+                        className="bg-gray-100 px-3 py-1.5 rounded-xl font-bold text-sm outline-none border-none focus:ring-2 focus:ring-indigo-500 transition"
+                        value={selectedSize}
+                        onChange={(e) => setSelectedSize(e.target.value)}
+                      >
+                        {['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52'].map(sz => (
+                          <option key={sz} value={sz}>{sz}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {selectedItem.op && (
+                      <span className="text-sm font-bold text-gray-400">
+                        OP Principal: {selectedItem.op}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -348,21 +391,30 @@ export default function MeasurementsPage() {
             </div>
 
             {/* Custom Column / Color adder */}
-            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
-              <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Añadir Variante/Color:</span>
-              <input
-                type="text"
-                placeholder="Ej: Camello, Azul M."
-                value={customColor}
-                onChange={(e) => setCustomColor(e.target.value)}
-                className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm"
-              />
-              <button
-                onClick={addColumn}
-                className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+            <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+              <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Añadir Variante:</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="OP (Ej: OP-02)"
+                  value={customOp}
+                  onChange={(e) => setCustomOp(e.target.value)}
+                  className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-36"
+                />
+                <input
+                  type="text"
+                  placeholder="Color (Ej: Camello)"
+                  value={customColor}
+                  onChange={(e) => setCustomColor(e.target.value)}
+                  className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-44"
+                />
+                <button
+                  onClick={addColumn}
+                  className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Matrix table container */}
@@ -370,20 +422,31 @@ export default function MeasurementsPage() {
               <table className={`w-full text-left border-collapse border-b-4 ${getStageBorderClass()}`}>
                 <thead>
                   <tr className="bg-gray-900 text-white">
-                    <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[140px]">Medida</th>
+                    {/* Double-row mapping header */}
+                    <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[140px] bg-gray-950">
+                      OP / COLOR
+                    </th>
                     {columns.map(col => (
-                      <th key={col} className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 relative group min-w-[140px]">
-                        <div className="flex items-center justify-center gap-2">
-                          <span>{col}</span>
-                          {col !== 'PRELAVADO' && (
-                            <button
-                              onClick={() => removeColumn(col)}
-                              className="text-red-400 hover:text-red-600 transition"
-                              title="Remover columna"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                      <th key={col.id} className="p-2 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 relative group min-w-[140px]">
+                        <div className="flex flex-col items-center justify-center min-h-[44px]">
+                          {/* OP on first row */}
+                          <span className="text-[9px] text-gray-400 font-bold block leading-none mb-1">
+                            {col.op ? col.op : '--'}
+                          </span>
+                          
+                          {/* Color and delete action on second row */}
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="text-xs truncate max-w-[110px]">{col.color}</span>
+                            {col.id !== 'PRELAVADO' && (
+                              <button
+                                onClick={() => removeColumn(col.id)}
+                                className="text-red-400 hover:text-red-600 transition"
+                                title="Remover columna"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </th>
                     ))}
@@ -396,12 +459,12 @@ export default function MeasurementsPage() {
                         {label}
                       </td>
                       {columns.map(col => (
-                        <td key={col} className="p-2 border border-gray-100">
+                        <td key={col.id} className="p-2 border border-gray-100">
                           <input
                             type="text"
                             placeholder='16 3/4"'
-                            value={matrix[col]?.[key] || ''}
-                            onChange={(e) => handleCellChange(col, key, e.target.value)}
+                            value={matrix[col.id]?.[key] || ''}
+                            onChange={(e) => handleCellChange(col.id, key, e.target.value)}
                             className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                           />
                         </td>
