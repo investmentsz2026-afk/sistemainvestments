@@ -115,7 +115,7 @@ export default function InvoicePage() {
             setGreData(prev => ({
                 ...prev,
                 punto_de_llegada_direccion: resp.data.client?.address || '',
-                punto_de_llegada_ubigeo: '150101'
+                punto_de_llegada_ubigeo: resp.data.client?.ubigeo || '150101'
             }));
         } catch (error) {
             console.error('Error fetching order:', error);

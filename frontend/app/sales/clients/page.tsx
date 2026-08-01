@@ -62,6 +62,7 @@ export default function ClientsPage() {
         phone: '',
         address: '',
         address2: '',
+        ubigeo: '',
         zone: ''
     });
 
@@ -88,7 +89,7 @@ export default function ClientsPage() {
             await api.post('/sales/clients', newClient);
             setShowAddModal(false);
             fetchClients();
-            setNewClient({ documentType: 'RUC', documentNumber: '', name: '', email: '', phone: '', address: '', address2: '', zone: '' });
+            setNewClient({ documentType: 'RUC', documentNumber: '', name: '', email: '', phone: '', address: '', address2: '', ubigeo: '', zone: '' });
             toast.success('Cliente registrado correctamente');
         } catch (error) {
             console.error('Error adding client:', error);
@@ -529,6 +530,17 @@ export default function ClientsPage() {
                                             onChange={(e) => setNewClient({ ...newClient, address2: e.target.value })}
                                         />
                                     </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ubigeo (6 dígitos)</label>
+                                        <input 
+                                            type="text"
+                                            maxLength={6}
+                                            placeholder="Ej: 150101"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={newClient.ubigeo}
+                                            onChange={(e) => setNewClient({ ...newClient, ubigeo: e.target.value.replace(/\D/g, '') })}
+                                        />
+                                    </div>
                                 </div>
 
                                 {(authUser?.role === 'ADMIN' || authUser?.role === 'COMERCIAL') && (
@@ -603,7 +615,7 @@ export default function ClientsPage() {
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-gray-50/50">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
                                     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                                         <div className="w-12 h-12 text-blue-500 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
                                             <Mail className="w-5 h-5" />
@@ -624,6 +636,13 @@ export default function ClientsPage() {
                                         </div>
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dirección</p>
                                         <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.address || 'No registrado'}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                                        <div className="w-12 h-12 text-teal-500 bg-teal-50 rounded-2xl flex items-center justify-center mb-4">
+                                            <MapPin className="w-5 h-5" />
+                                        </div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ubigeo</p>
+                                        <p className="text-sm font-bold text-gray-900 mt-1 truncate">{editingClient.ubigeo || 'No registrado'}</p>
                                     </div>
                                     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                                         <div className="w-12 h-12 text-violet-500 bg-violet-50 rounded-2xl flex items-center justify-center mb-4">
@@ -817,6 +836,17 @@ export default function ClientsPage() {
                                             className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
                                             value={editingClient.address2 || ''}
                                             onChange={(e) => setEditingClient({ ...editingClient, address2: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ubigeo (6 dígitos)</label>
+                                        <input 
+                                            type="text"
+                                            maxLength={6}
+                                            placeholder="Ej: 150101"
+                                            className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                                            value={editingClient.ubigeo || ''}
+                                            onChange={(e) => setEditingClient({ ...editingClient, ubigeo: e.target.value.replace(/\D/g, '') })}
                                         />
                                     </div>
                                 </div>

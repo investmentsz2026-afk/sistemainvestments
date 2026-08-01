@@ -125,6 +125,15 @@ export default function SalesPage() {
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
 
+    const calcPendingToCollect = (sale: any) => {
+        const totalPaid = (sale.payments || [])
+            .filter((p: any) => p.status === 'APROBADO')
+            .reduce((acc: number, p: any) => acc + p.amount, 0);
+        return Math.max(0, sale.totalAmount - totalPaid);
+    };
+
+    const totalPendingToCollect = filteredSales.reduce((acc, s) => acc + calcPendingToCollect(s), 0);
+
     // Dynamic cost: always uses the CURRENT product purchasePrice, not the stored cost
     const calcDynamicCost = (sale: any) => {
         return (sale.items || []).reduce((acc: number, item: any) => {
@@ -313,6 +322,9 @@ export default function SalesPage() {
                         <div>
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos Totales</p>
                             <h3 className="text-3xl font-black text-gray-900">S/ {totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                            <p className="text-xs font-bold text-amber-600 mt-1 uppercase tracking-wider">
+                                Falta cobrar: S/ {totalPendingToCollect.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
                         </div>
                     </div>
                     {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (

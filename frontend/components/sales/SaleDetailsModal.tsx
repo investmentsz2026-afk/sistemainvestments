@@ -117,7 +117,7 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
             setGreData(prev => ({
                 ...prev,
                 punto_de_llegada_direccion: resp.data.deliveryAddress || resp.data.client?.address || '',
-                punto_de_llegada_ubigeo: '150101',
+                punto_de_llegada_ubigeo: resp.data.client?.ubigeo || '150101',
                 peso_bruto_total: totalWeight.toFixed(2)
             }));
         } catch (error) {

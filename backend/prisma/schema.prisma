@@ -287,6 +287,7 @@ model Client {
   createdById    String?         @map("created_by_id")
   zone           String?
   address2       String?
+  ubigeo         String?         @map("ubigeo")
   createdBy      User?           @relation("ClientCreator", fields: [createdById], references: [id])
   letraGroups    LetraGroup[]
   orders         Order[]
