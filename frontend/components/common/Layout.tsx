@@ -35,7 +35,8 @@ import {
   RefreshCw,
   FileSignature,
   Scale,
-  Landmark
+  Landmark,
+  Ruler
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -127,7 +128,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'UDP' ? [
       { name: 'Calidad', href: '/quality', icon: ShieldCheck },
-      { name: 'Auditoría', href: '/audit', icon: FileSearch }
+      { name: 'Auditoría', href: '/audit', icon: FileSearch },
+      { name: 'Medidas por OP', href: '/samples/measurements', icon: Ruler }
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' ? [
       { name: 'Predicciones', href: '/commercial/predictions', icon: TrendingUp }

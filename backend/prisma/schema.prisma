@@ -65,6 +65,7 @@ model Product {
   purchaseItems    PurchaseItem[]
   sampleUsage      SampleMaterial[]
   imageUrl         String?           @map("image_url")
+  measurements     ProductMeasurement[]
 
   @@map("products")
 }
@@ -487,6 +488,7 @@ model ProductSample {
   commercial            User?            @relation("SampleReviewer", fields: [commercialId], references: [id])
   udp                   User             @relation("SampleCreator", fields: [udpId], references: [id])
   materials             SampleMaterial[]
+  measurements          ProductMeasurement[]
 
   @@map("product_samples")
 }
@@ -642,4 +644,32 @@ model LetraGroupItem {
   group        LetraGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@map("letra_group_items")
+}
+
+model ProductMeasurement {
+  id             String        @id @default(cuid())
+  productId      String?       @map("product_id")
+  sampleId       String?       @map("sample_id")
+  op             String?       @map("op")
+  size           String
+  color          String?       // color or variant column name
+  stage          String        // 'OFICIAL', 'ANTES_LAVAR', 'DESPUES_LAVAR'
+  
+  cintura        String?
+  cadera         String?
+  muslo          String?
+  rodilla        String?
+  botaPie        String?       @map("bota_pie")
+  tiroDel        String?       @map("tiro_del")
+  tiroPos        String?       @map("tiro_pos")
+  largoTotal     String?       @map("largo_total")
+  
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sample         ProductSample? @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sampleId, op, size, color, stage])
+  @@map("product_measurements")
 }
