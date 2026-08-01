@@ -23,7 +23,8 @@ import {
   Printer,
   Download,
   History,
-  X
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -45,6 +46,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [reference, setReference] = useState('');
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [variantForBarcode, setVariantForBarcode] = useState<any>(null);
+  const [showImageZoom, setShowImageZoom] = useState(false);
 
   const fetchProductDetail = async () => {
     try {
@@ -338,7 +340,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       </div>
 
       {/* Información adicional */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Información adicional</h2>
           <dl className="space-y-3">
@@ -369,6 +371,34 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </div>
             )}
           </dl>
+        </div>
+
+        {/* Imagen del Producto */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col">
+          <h2 className="font-semibold text-gray-900 mb-4">Imagen del Producto</h2>
+          <div className="flex-1 flex items-center justify-center">
+            {product.imageUrl ? (
+              <button 
+                onClick={() => setShowImageZoom(true)}
+                className="w-full relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 hover:opacity-90 transition group shadow-sm flex items-center justify-center"
+              >
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-sm">
+                  Click para agrandar
+                </div>
+              </button>
+            ) : (
+              <div className="w-full h-full min-h-[200px] rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center text-gray-400 p-6">
+                <ImageIcon className="w-12 h-12 mb-2 text-gray-300" />
+                <p className="text-sm font-semibold">Sin imagen</p>
+                <p className="text-xs text-center mt-1">Edita el producto para subir una imagen</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -608,6 +638,26 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           product={product}
           selectedVariant={variantForBarcode}
         />
+      )}
+
+      {/* Modal Zoom de Imagen */}
+      {showImageZoom && product.imageUrl && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[150] p-4 backdrop-blur-md" onClick={() => setShowImageZoom(false)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowImageZoom(false)}
+              className="absolute -top-12 right-0 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition shadow-lg border border-white/10"
+              title="Cerrar"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl animate-scale-in"
+            />
+          </div>
+        </div>
       )}
     </Layout>
   );

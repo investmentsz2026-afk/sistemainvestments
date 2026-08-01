@@ -48,6 +48,7 @@ export class ProductsService {
         minStock: createProductDto.minStock || 5,
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
+        imageUrl: createProductDto.imageUrl,
       } as any,
     });
 

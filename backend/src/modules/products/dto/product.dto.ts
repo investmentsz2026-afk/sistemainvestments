@@ -82,6 +82,10 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => CreateVariantDto)
   variants?: CreateVariantDto[];
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
 }
 
 export class UpdateProductDto {
@@ -151,6 +155,10 @@ export class UpdateProductDto {
   @IsOptional()
   @Type(() => UpdateVariantDto)
   variants?: UpdateVariantDto[];
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
 }
 
 export class UpdateVariantDto {

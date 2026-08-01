@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductBarcode } from './Barcode';
-import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight, Barcode, ClipboardCheck, X } from 'lucide-react';
+import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight, Barcode, ClipboardCheck, X, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
+import api from '../../lib/axios';
 
 const getProductSchema = (isEditing: boolean) => z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -24,6 +25,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
   colors: z.array(z.string()).optional(),
   purchaseItemId: z.string().optional(),
   opVariants: z.record(z.array(z.string())).optional(),
+  imageUrl: z.string().optional(),
   importedStockQuantities: z.record(z.record(z.number())).optional(),
   variants: z.array(z.object({
     id: z.string().optional(),
@@ -128,6 +130,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       minStock: 5,
       sizes: [],
       colors: [],
+      imageUrl: '',
     },
   });
 
@@ -180,6 +183,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
 
   const [colorInput, setColorInput] = React.useState('');
+  const [isUploading, setIsUploading] = React.useState(false);
+  const watchImageUrl = watch('imageUrl');
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setIsUploading(true);
+    try {
+      const resp = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setValue('imageUrl', resp.data.url);
+      toast.success('Imagen subida correctamente');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al subir la imagen');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const [showOpConfigModal, setShowOpConfigModal] = React.useState(false);
   const [localOpVariants, setLocalOpVariants] = React.useState<Record<string, string[]>>({});
   const [localImportedStockQuantities, setLocalImportedStockQuantities] = React.useState<Record<string, Record<string, number>>>({});
@@ -526,6 +554,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 className={`${inputBase} ${inputNormal} resize-none`}
                 placeholder="Descripción detallada del producto (opcional)"
               />
+            </div>
+
+            {/* Imagen del Producto */}
+            <div className="md:col-span-2 space-y-2">
+              <label className={labelClass}>
+                <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                Imagen del Producto
+              </label>
+              <div className="flex items-center gap-5">
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg"
+                  id="product-image-upload"
+                  className="hidden"
+                  onChange={handleUploadImage}
+                />
+                <label
+                  htmlFor="product-image-upload"
+                  className="px-6 py-3 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition rounded-xl font-bold cursor-pointer text-sm flex items-center gap-2 border border-indigo-100 shadow-sm"
+                >
+                  {isUploading ? 'Subiendo...' : 'Seleccionar Imagen'}
+                </label>
+                {watchImageUrl && (
+                  <div className="relative w-16 h-16 bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                    <img src={watchImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setValue('imageUrl', '')}
+                      className="absolute top-0.5 right-0.5 p-1 bg-red-500 text-white rounded-md hover:bg-red-600 transition shadow"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* SKU Base (solo lectura en edición) */}

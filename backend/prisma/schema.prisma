@@ -64,6 +64,7 @@ model Product {
   productionOrders ProductionOrder[]
   purchaseItems    PurchaseItem[]
   sampleUsage      SampleMaterial[]
+  imageUrl         String?           @map("image_url")
 
   @@map("products")
 }
