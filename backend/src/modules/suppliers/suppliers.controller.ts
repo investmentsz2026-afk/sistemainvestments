@@ -12,7 +12,7 @@ export class SuppliersController {
     constructor(private readonly suppliersService: SuppliersService) { }
 
     @Post()
-    @Roles('ADMIN')
+    @Roles('ADMIN', 'LOGISTICA')
     async create(@Body() createSupplierDto: CreateSupplierDto) {
         const supplier = await this.suppliersService.create(createSupplierDto);
         return {
@@ -43,7 +43,7 @@ export class SuppliersController {
     }
 
     @Patch(':id')
-    @Roles('ADMIN')
+    @Roles('ADMIN', 'LOGISTICA')
     async update(@Param('id') id: string, @Body() updateSupplierDto: UpdateSupplierDto) {
         const supplier = await this.suppliersService.update(id, updateSupplierDto);
         return {
@@ -54,7 +54,7 @@ export class SuppliersController {
     }
 
     @Delete(':id')
-    @Roles('ADMIN')
+    @Roles('ADMIN', 'LOGISTICA')
     async remove(@Param('id') id: string) {
         await this.suppliersService.remove(id);
         return {

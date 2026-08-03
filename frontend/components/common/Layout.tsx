@@ -146,8 +146,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Clientes', href: '/sales/clients', icon: Users },
       { name: 'Agencias', href: '/commercial/agencies', icon: Building2 }
     ] : []),
-    ...(user?.role === 'ADMIN' ? [
+    ...(user?.role === 'ADMIN' || user?.role === 'LOGISTICA' ? [
       { name: 'Proveedores', href: '/suppliers', icon: Building2 },
+    ] : []),
+    ...(user?.role === 'ADMIN' ? [
       { name: 'Usuarios', href: '/users', icon: User },
       { name: 'RRHH', href: '/admin/hr', icon: Users }
     ] : []),
