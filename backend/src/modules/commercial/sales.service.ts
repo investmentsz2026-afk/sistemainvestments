@@ -972,6 +972,17 @@ export class SalesService {
         }
       }
 
+      let baseDate = new Date();
+      if (customFechaEmision) {
+        const dateParts = customFechaEmision.split('-');
+        if (dateParts.length === 3) {
+          baseDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+        }
+      }
+      const dueDate = new Date(baseDate);
+      dueDate.setDate(baseDate.getDate() + 30); // Por defecto crédito a 30 días
+      const fechaPagoCuota = getFormattedDate(dueDate);
+
       const payload = {
         operacion: "generar_comprobante",
         tipo_de_comprobante: sale.invoiceNumber.startsWith('F') ? 1 : 2,
@@ -991,7 +1002,7 @@ export class SalesService {
           venta_al_credito: [
             {
               cuota: 1,
-              fecha_de_pago: fechaEmision,
+              fecha_de_pago: fechaPagoCuota,
               importe: parseFloat(sale.totalAmount.toFixed(2))
             }
           ]
