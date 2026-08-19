@@ -988,7 +988,7 @@ export class SalesService {
         condiciones_de_pago: (sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? 'CRÉDITO' : 'CONTADO',
         medio_de_pago: sale.paymentMethod || 'CONTADO',
         ...((sale.paymentMethod === 'CREDITO' || sale.paymentMethod === 'LETRAS') ? {
-          cuotas: [
+          venta_al_credito: [
             {
               cuota: 1,
               fecha_de_pago: fechaEmision,
