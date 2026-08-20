@@ -21,7 +21,8 @@ import {
     DollarSign,
     Printer,
     FileSignature,
-    Percent
+    Percent,
+    Edit
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -55,6 +56,12 @@ export default function LetraGroupsPage() {
 
     // Action execution states
     const [processingGroupId, setProcessingGroupId] = useState<string | null>(null);
+
+    // Modal state for editing Letras
+    const [selectedGroupForEdit, setSelectedGroupForEdit] = useState<any | null>(null);
+    const [editNotes, setEditNotes] = useState('');
+    const [editLetrasList, setEditLetrasList] = useState<any[]>([]);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     const isCommercialOrAdmin = user?.role === 'ADMIN' || user?.role === 'COMERCIAL';
 
@@ -304,6 +311,82 @@ export default function LetraGroupsPage() {
             toast.error(error.response?.data?.message || 'Error al ajustar saldo');
         } finally {
             setIsAdjusting(false);
+        }
+    };
+
+    const handleOpenEditModal = (group: any) => {
+        setSelectedGroupForEdit(group);
+        setEditNotes(group.notes || '');
+        setEditLetrasList((group.letras || []).map((l: any) => ({
+            id: l.id,
+            number: l.number,
+            dueDate: l.dueDate ? l.dueDate.split('T')[0] : '',
+            amount: l.amount.toString(),
+            uniqueNumber: l.uniqueNumber || '',
+            observation: l.observation || ''
+        })).sort((a: any, b: any) => a.number - b.number));
+    };
+
+    const handleEditLetraFieldChange = (idx: number, field: string, value: any) => {
+        const copy = [...editLetrasList];
+        copy[idx][field] = value;
+        setEditLetrasList(copy);
+    };
+
+    const handleAddEditLetra = () => {
+        const nextNum = editLetrasList.length + 1;
+        const d = new Date();
+        d.setDate(d.getDate() + (nextNum * 30));
+        const defaultDate = d.toISOString().split('T')[0];
+
+        setEditLetrasList([
+            ...editLetrasList,
+            { number: nextNum, dueDate: defaultDate, amount: '', uniqueNumber: '', observation: '' }
+        ]);
+    };
+
+    const handleRemoveEditLetra = (idx: number) => {
+        const filtered = editLetrasList.filter((_, i) => i !== idx);
+        // Re-number
+        const renumbered = filtered.map((l, i) => ({ ...l, number: i + 1 }));
+        setEditLetrasList(renumbered);
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        const sumOfLetras = editLetrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
+        if (sumOfLetras <= 0) {
+            toast.error('La suma de las letras debe ser mayor a cero.');
+            return;
+        }
+
+        const invalidLetras = editLetrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
+        if (invalidLetras) {
+            toast.error('Todas las letras deben tener una fecha de vencimiento e importe válido.');
+            return;
+        }
+
+        const totalSalesAmount = selectedGroupForEdit.totalSalesAmount;
+        if (Math.abs(sumOfLetras - totalSalesAmount) > 0.05) {
+            const confirmUpdate = window.confirm(`¡Atención! La suma de las letras (S/. ${sumOfLetras.toFixed(2)}) no coincide exactamente con el total de las facturas (S/. ${totalSalesAmount.toFixed(2)}). Se generará un saldo pendiente de S/. ${(totalSalesAmount - sumOfLetras).toFixed(2)}. ¿Desea continuar?`);
+            if (!confirmUpdate) return;
+        }
+
+        setIsSavingEdit(true);
+        try {
+            await api.put(`/sales/letra-groups/${selectedGroupForEdit.id}`, {
+                notes: editNotes,
+                letras: editLetrasList
+            });
+            toast.success('Cronograma de letras actualizado correctamente');
+            setSelectedGroupForEdit(null);
+            fetchInitialData();
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Error al actualizar letras');
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
@@ -665,6 +748,13 @@ export default function LetraGroupsPage() {
                                                         {g.status === 'PENDIENTE' && isCommercialOrAdmin && (
                                                             <>
                                                                 <button
+                                                                    onClick={() => handleOpenEditModal(g)}
+                                                                    className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition active:scale-95 flex items-center gap-1 shadow-sm"
+                                                                >
+                                                                    <Edit className="w-3.5 h-3.5" />
+                                                                    Editar
+                                                                </button>
+                                                                <button
                                                                     onClick={() => handleApprove(g.id)}
                                                                     disabled={processingGroupId === g.id}
                                                                     className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition active:scale-95 flex items-center gap-1 shadow-sm"
@@ -808,6 +898,157 @@ export default function LetraGroupsPage() {
                                 >
                                     {isAdjusting && <Loader2 className="w-4 h-4 animate-spin" />}
                                     Aplicar Ajuste
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: Edit Letras */}
+            {selectedGroupForEdit && (
+                <div className="fixed inset-0 bg-slate-950/60 z-50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-4xl p-8 shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                                    <FileSignature className="w-5 h-5 text-indigo-600" />
+                                    Editar Cronograma de Letras
+                                </h2>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                                    Cliente: {selectedGroupForEdit.client?.name} | Total Facturas: S/. {selectedGroupForEdit.totalSalesAmount.toFixed(2)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="space-y-6 text-xs font-bold text-slate-700">
+                            {/* Letras rows list */}
+                            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2 divide-y divide-slate-100">
+                                {editLetrasList.map((letra, idx) => (
+                                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end pt-4 first:pt-0">
+                                        <div className="sm:col-span-1 text-center font-black text-indigo-600 uppercase text-[10px] pb-3">
+                                            Cuota {letra.number}
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-[8px] uppercase text-slate-400 mb-1">Monto (S/.)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={letra.amount}
+                                                onChange={(e) => handleEditLetraFieldChange(idx, 'amount', e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 outline-none text-xs"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-3">
+                                            <label className="block text-[8px] uppercase text-slate-400 mb-1">Fecha Vencimiento</label>
+                                            <input
+                                                type="date"
+                                                value={letra.dueDate}
+                                                onChange={(e) => handleEditLetraFieldChange(idx, 'dueDate', e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 outline-none text-xs"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-[8px] uppercase text-slate-400 mb-1">Número Único / Nro Letra</label>
+                                            <input
+                                                type="text"
+                                                value={letra.uniqueNumber}
+                                                placeholder="Ej: 10482"
+                                                onChange={(e) => handleEditLetraFieldChange(idx, 'uniqueNumber', e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 outline-none text-xs"
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-3">
+                                            <label className="block text-[8px] uppercase text-slate-400 mb-1">Observación</label>
+                                            <input
+                                                type="text"
+                                                value={letra.observation}
+                                                placeholder="Ej: Firma pendiente"
+                                                onChange={(e) => handleEditLetraFieldChange(idx, 'observation', e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 outline-none text-xs"
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-1 pb-1 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveEditLetra(idx)}
+                                                className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition active:scale-95"
+                                                title="Eliminar cuota"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Add Letra action */}
+                            <div className="flex justify-start">
+                                <button
+                                    type="button"
+                                    onClick={handleAddEditLetra}
+                                    className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 font-black text-xs uppercase"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Agregar Cuota / Letra
+                                </button>
+                            </div>
+
+                            {/* Sum calculations */}
+                            <div className="bg-slate-50 rounded-3xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-center text-xs">
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Suma Programada de Letras</p>
+                                    <p className="text-2xl font-black text-indigo-600 mt-1">
+                                        S/. {editLetrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0).toFixed(2)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Facturas a Canjear</p>
+                                    <p className="text-2xl font-black text-slate-900 mt-1">
+                                        S/. {selectedGroupForEdit.totalSalesAmount.toFixed(2)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Diferencia</p>
+                                    <p className={`text-2xl font-black mt-1 ${
+                                        (selectedGroupForEdit.totalSalesAmount - editLetrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)) === 0
+                                            ? 'text-emerald-600'
+                                            : 'text-rose-600'
+                                    }`}>
+                                        S/. {(selectedGroupForEdit.totalSalesAmount - editLetrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toFixed(2)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                                <label className="block text-[8px] uppercase text-slate-400 mb-1">Notas / Observaciones del Lote</label>
+                                <textarea
+                                    value={editNotes}
+                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    placeholder="Agrega notas adicionales sobre este refinanciamiento..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-800 outline-none text-xs h-20 resize-none"
+                                />
+                            </div>
+
+                            {/* Form submit buttons */}
+                            <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedGroupForEdit(null)}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-black px-6 py-3 rounded-xl text-xs active:scale-95 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingEdit}
+                                    className="bg-slate-900 hover:bg-slate-850 text-white font-black px-7 py-3 rounded-xl text-xs active:scale-95 transition-all flex items-center gap-2 shadow-md uppercase tracking-wider"
+                                >
+                                    {isSavingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Guardar Cambios
                                 </button>
                             </div>
                         </form>

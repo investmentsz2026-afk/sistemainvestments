@@ -23,7 +23,8 @@ import {
     Clock,
     RotateCw,
     Printer,
-    Edit2
+    Edit2,
+    FileSignature
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -804,6 +805,22 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                             <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Saldo cubierto por abonos pendientes</p>
                                             <p className="text-[9px] text-amber-600 font-bold leading-normal mt-1">
                                                 El saldo pendiente de esta venta está completamente cubierto por abonos pendientes de aprobación. Debe esperar a que el área comercial apruebe o rechace dichos abonos para poder realizar nuevos registros.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {sale?.letraGroupId && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-indigo-50 border border-indigo-200 rounded-[1.5rem] p-4 flex items-start gap-3"
+                                    >
+                                        <FileSignature className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Venta Refinanciada con Letras</p>
+                                            <p className="text-[9px] text-indigo-700 font-bold leading-normal mt-1">
+                                                Esta venta fue cancelada/pagada mediante un canje de letras. El cronograma y los pagos correspondientes se gestionan directamente desde el módulo de Letras.
                                             </p>
                                         </div>
                                     </motion.div>

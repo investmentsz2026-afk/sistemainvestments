@@ -2438,4 +2438,62 @@ export class SalesService {
       }
     });
   }
+
+  async updateLetraGroup(groupId: string, data: any) {
+    const group = await this.prisma.letraGroup.findUnique({
+      where: { id: groupId },
+      include: { letras: true },
+    });
+    if (!group) {
+      throw new NotFoundException('Grupo de letras no encontrado');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Calculate totals if letras list is updated
+      let totalLetrasAmount = group.totalLetrasAmount;
+      let pendingBalance = group.pendingBalance;
+      if (data.letras && Array.isArray(data.letras)) {
+        totalLetrasAmount = data.letras.reduce((sum: number, l: any) => sum + parseFloat(l.amount || 0), 0);
+        pendingBalance = Math.max(0, group.totalSalesAmount - totalLetrasAmount);
+      }
+
+      // 2. Update LetraGroup fields
+      const updatedGroup = await tx.letraGroup.update({
+        where: { id: groupId },
+        data: {
+          notes: data.notes !== undefined ? data.notes : group.notes,
+          totalLetrasAmount,
+          pendingBalance,
+        },
+      });
+
+      // 3. Update letras list if provided
+      if (data.letras && Array.isArray(data.letras)) {
+        // Delete old items
+        await tx.letraGroupItem.deleteMany({
+          where: { groupId },
+        });
+
+        // Insert updated ones
+        await tx.letraGroupItem.createMany({
+          data: data.letras.map((l: any) => ({
+            groupId,
+            number: l.number,
+            dueDate: new Date(l.dueDate),
+            amount: parseFloat(l.amount),
+            uniqueNumber: l.uniqueNumber || null,
+            observation: l.observation || null,
+            status: l.status || 'PENDIENTE',
+            paymentNotes: l.paymentNotes || null,
+            voucherUrl: l.voucherUrl || null,
+          })),
+        });
+      }
+
+      return tx.letraGroup.findUnique({
+        where: { id: groupId },
+        include: { letras: true, client: true, sales: true },
+      });
+    });
+  }
 }

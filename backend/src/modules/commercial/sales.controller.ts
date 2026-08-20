@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req, Delete, Put } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -93,6 +93,11 @@ export class SalesController {
   @Post('letra-groups/:id/adjust')
   adjustLetraGroupBalance(@Param('id') id: string, @Body() data: any) {
     return this.salesService.adjustLetraGroupBalance(id, data);
+  }
+
+  @Put('letra-groups/:id')
+  updateLetraGroup(@Param('id') id: string, @Body() data: any) {
+    return this.salesService.updateLetraGroup(id, data);
   }
 
   @Get('letras')
