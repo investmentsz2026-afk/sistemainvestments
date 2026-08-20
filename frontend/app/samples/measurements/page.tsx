@@ -39,6 +39,7 @@ export default function MeasurementsPage() {
   
   const [selectedSize, setSelectedSize] = useState('32');
   const [activeStage, setActiveStage] = useState('OFICIAL');
+  const [botaPieUnit, setBotaPieUnit] = useState<'cm' | 'in'>('cm');
   
   // Columns/Colors listed in the table (no prelavado column as input anymore)
   const [columns, setColumns] = useState<ColumnType[]>([]);
@@ -498,24 +499,41 @@ export default function MeasurementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MEASUREMENT_KEYS.map(({ key, label }) => (
-                    <tr key={key} className="hover:bg-gray-50/50 transition">
-                      <td className="p-4 font-black text-gray-500 text-xs border border-gray-100 bg-gray-50/40 text-center uppercase tracking-wider">
-                        {label}
-                      </td>
-                      {columns.map(col => (
-                        <td key={col.id} className="p-2 border border-gray-100">
-                          <input
-                            type="text"
-                            placeholder='16 3/4"'
-                            value={matrix[col.id]?.[key] || ''}
-                            onChange={(e) => handleCellChange(col.id, key, e.target.value)}
-                            className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                          />
+                  {MEASUREMENT_KEYS.map(({ key, label }) => {
+                    const isBotaPie = key === 'botaPie';
+                    return (
+                      <tr key={key} className="hover:bg-gray-50/50 transition">
+                        <td className="p-4 border border-gray-100 bg-gray-50/40 text-center uppercase tracking-wider min-w-[150px]">
+                          {isBotaPie ? (
+                            <div className="flex flex-col items-center gap-1.5 justify-center">
+                              <span className="font-black text-gray-500 text-xs">{label}</span>
+                              <select
+                                value={botaPieUnit}
+                                onChange={(e) => setBotaPieUnit(e.target.value as 'cm' | 'in')}
+                                className="text-[10px] font-black bg-white border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                              >
+                                <option value="cm">cm</option>
+                                <option value="in">pulg (")</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <span className="font-black text-gray-500 text-xs">{label}</span>
+                          )}
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        {columns.map(col => (
+                          <td key={col.id} className="p-2 border border-gray-100">
+                            <input
+                              type="text"
+                              placeholder={isBotaPie ? (botaPieUnit === 'cm' ? '18.1 cm' : '7 1/8"') : '16 3/4"'}
+                              value={matrix[col.id]?.[key] || ''}
+                              onChange={(e) => handleCellChange(col.id, key, e.target.value)}
+                              className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
