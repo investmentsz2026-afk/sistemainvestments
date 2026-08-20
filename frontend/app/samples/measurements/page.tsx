@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import api from '../../../lib/axios';
 import { Ruler, Search, Save, Plus, Trash2, Tag, Info } from 'lucide-react';
@@ -46,6 +46,10 @@ export default function MeasurementsPage() {
   const [customOp, setCustomOp] = useState('');
   const [customColor, setCustomColor] = useState('');
   
+  // Registered measurements list for pre-filled models table
+  const [registeredMeasurements, setRegisteredMeasurements] = useState<any[]>([]);
+  const [searchRegisteredText, setSearchRegisteredText] = useState('');
+
   // Matrix data structure: { [columnId]: { [measurementKey]: value } }
   const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -59,14 +63,21 @@ export default function MeasurementsPage() {
     try {
       setSelectedItem(null);
       setSearchQuery('');
+      setSearchRegisteredText('');
+      
+      const [itemsResp, measurementsResp] = await Promise.all([
+        inventoryType === 'MUESTRAS' ? api.get('/samples') : api.get('/products'),
+        api.get('/products-measurements')
+      ]);
+
       if (inventoryType === 'MUESTRAS') {
-        const resp = await api.get('/samples');
-        setSamples(resp.data || []);
+        setSamples(itemsResp.data || []);
       } else {
-        const resp = await api.get('/products');
-        const filtered = (resp.data || []).filter((p: any) => p.inventoryType === inventoryType);
+        const filtered = (itemsResp.data || []).filter((p: any) => p.inventoryType === inventoryType);
         setProducts(filtered);
       }
+
+      setRegisteredMeasurements(measurementsResp.data || []);
     } catch (err) {
       console.error(err);
       toast.error('Error al cargar items');
@@ -285,6 +296,68 @@ export default function MeasurementsPage() {
       });
     }
   });
+
+  const registeredItems = useMemo(() => {
+    const uniqueIds = new Set<string>();
+    const list: any[] = [];
+    
+    registeredMeasurements.forEach((m: any) => {
+      if (inventoryType === 'MUESTRAS') {
+        if (m.sampleId && !uniqueIds.has(m.sampleId)) {
+          uniqueIds.add(m.sampleId);
+          const sample = samples.find(s => s.id === m.sampleId);
+          if (sample) {
+            list.push({ ...sample, type: 'MUESTRA' });
+          }
+        }
+      } else {
+        if (m.productId && !uniqueIds.has(m.productId)) {
+          uniqueIds.add(m.productId);
+          const prod = products.find(p => p.id === m.productId);
+          if (prod) {
+            list.push({ ...prod, type: 'PRODUCTO' });
+          }
+        }
+      }
+    });
+
+    const grouped: any[] = [];
+    const seenNames = new Set<string>();
+
+    list.forEach((item: any) => {
+      const nameKey = (item.name || '').trim().toLowerCase();
+      if (!seenNames.has(nameKey)) {
+        seenNames.add(nameKey);
+        
+        const itemsList = inventoryType === 'MUESTRAS' ? samples : products;
+        const siblings = itemsList.filter((x: any) => (x.name || '').trim().toLowerCase() === nameKey);
+        const allVariants = siblings.flatMap((x: any) => x.variants || []);
+        const allSizes = Array.from(new Set(siblings.flatMap((x: any) => x.sizes || [])));
+        const allColors = Array.from(new Set(siblings.flatMap((x: any) => x.colors || [])));
+
+        grouped.push({
+          ...item,
+          variants: allVariants,
+          sizes: allSizes,
+          colors: allColors,
+          siblingIds: siblings.map((x: any) => x.id)
+        });
+      }
+    });
+
+    return grouped;
+  }, [registeredMeasurements, products, samples, inventoryType]);
+
+  const filteredRegistered = useMemo(() => {
+    const term = searchRegisteredText.toLowerCase();
+    return registeredItems.filter((item: any) => {
+      return (
+        (item.name || '').toLowerCase().includes(term) ||
+        (item.sku || '').toLowerCase().includes(term) ||
+        (item.op || '').toLowerCase().includes(term)
+      );
+    });
+  }, [registeredItems, searchRegisteredText]);
 
   const getStageColorClass = (stageId: string) => {
     const current = STAGES.find(s => s.id === stageId);
@@ -550,10 +623,79 @@ export default function MeasurementsPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-12 text-center text-gray-400 flex flex-col items-center justify-center">
-            <Ruler className="w-16 h-16 text-gray-200 mb-4" />
-            <h3 className="text-lg font-black text-gray-700 uppercase">Ningún modelo seleccionado</h3>
-            <p className="text-sm mt-1 max-w-md">Escribe el nombre del modelo o SKU en la barra superior para comenzar a registrar las medidas.</p>
+          <div className="space-y-6">
+            {registeredItems.length > 0 ? (
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-50 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 uppercase">Modelos Registrados</h3>
+                    <p className="text-xs font-bold text-gray-400 mt-0.5">
+                      Listado de prendas que ya cuentan con control de medidas registrado.
+                    </p>
+                  </div>
+                  {/* Local Search input for registered models */}
+                  <div className="relative w-full md:w-80">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Buscar en lista..."
+                      value={searchRegisteredText}
+                      onChange={(e) => setSearchRegisteredText(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl font-bold text-sm outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-wider">
+                        <th className="p-4 border border-gray-800">Modelo / Nombre</th>
+                        <th className="p-4 border border-gray-800">SKU</th>
+                        <th className="p-4 border border-gray-800">OPs / Variantes</th>
+                        <th className="p-4 border border-gray-800 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-bold text-gray-700 text-sm">
+                      {filteredRegistered.length > 0 ? (
+                        filteredRegistered.map((item: any) => (
+                          <tr key={item.id} className="hover:bg-gray-50/50 transition">
+                            <td className="p-4 uppercase text-gray-900 font-black">{item.name}</td>
+                            <td className="p-4 uppercase text-gray-500">{item.sku || 'Sin SKU'}</td>
+                            <td className="p-4 max-w-xs truncate text-gray-500 uppercase">
+                              {inventoryType === 'MUESTRAS' 
+                                ? (item.op || 'Sin OP') 
+                                : Array.from(new Set((item.variants || []).map((v: any) => v.op).filter(Boolean))).join(', ') || 'Sin OP'
+                              }
+                            </td>
+                            <td className="p-4 text-right">
+                              <button
+                                onClick={() => setSelectedItem(item)}
+                                className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase transition active:scale-95 shadow-md shadow-gray-200"
+                              >
+                                Ver Detalles / Editar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                            No se encontraron modelos con ese término de búsqueda.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-12 text-center text-gray-400 flex flex-col items-center justify-center">
+                <Ruler className="w-16 h-16 text-gray-200 mb-4" />
+                <h3 className="text-lg font-black text-gray-700 uppercase">Ningún modelo seleccionado</h3>
+                <p className="text-sm mt-1 max-w-md">Escribe el nombre del modelo o SKU en la barra superior para comenzar a registrar las medidas.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
