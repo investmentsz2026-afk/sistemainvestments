@@ -29,6 +29,77 @@ const STAGES = [
   { id: 'DESPUES_LAVAR', label: 'Después de Lavar', color: 'emerald' },
 ];
 
+function parseInches(text: string): number | null {
+  const clean = text.replace(/"/g, '').trim();
+  if (!clean) return null;
+
+  // Pattern 1: "7 1/8" or "7-1/8"
+  const fractionParts = clean.split(/[\s-]+/);
+  if (fractionParts.length === 2) {
+    const whole = parseFloat(fractionParts[0]);
+    const fraction = fractionParts[1];
+    const slashIndex = fraction.indexOf('/');
+    if (slashIndex > 0) {
+      const num = parseFloat(fraction.substring(0, slashIndex));
+      const den = parseFloat(fraction.substring(slashIndex + 1));
+      if (!isNaN(whole) && !isNaN(num) && !isNaN(den) && den !== 0) {
+        return whole + (num / den);
+      }
+    }
+  }
+
+  // Pattern 2: "1/8"
+  const slashIndex = clean.indexOf('/');
+  if (slashIndex > 0 && fractionParts.length === 1) {
+    const num = parseFloat(clean.substring(0, slashIndex));
+    const den = parseFloat(clean.substring(slashIndex + 1));
+    if (!isNaN(num) && !isNaN(den) && den !== 0) {
+      return num / den;
+    }
+  }
+
+  // Pattern 3: "7.125" or "7"
+  const num = parseFloat(clean);
+  if (!isNaN(num)) {
+    return num;
+  }
+
+  return null;
+}
+
+function parseCm(text: string): number | null {
+  const clean = text.replace(/cm/gi, '').replace(/,/g, '.').trim();
+  const num = parseFloat(clean);
+  return isNaN(num) ? null : num;
+}
+
+function decToFractionInches(inches: number): string {
+  const whole = Math.floor(inches);
+  const remainder = inches - whole;
+  
+  // Round to nearest 1/8
+  const eighths = Math.round(remainder * 8);
+  if (eighths === 0) {
+    return `${whole}"`;
+  }
+  if (eighths === 8) {
+    return `${whole + 1}"`;
+  }
+  
+  // Simplify fraction
+  let num = eighths;
+  let den = 8;
+  if (num % 4 === 0) {
+    num /= 4;
+    den /= 4;
+  } else if (num % 2 === 0) {
+    num /= 2;
+    den /= 2;
+  }
+  
+  return whole > 0 ? `${whole} ${num}/${den}"` : `${num}/${den}"`;
+}
+
 export default function MeasurementsPage() {
   const [inventoryType, setInventoryType] = useState('TERMINADOS'); // TERMINADOS, SEGUNDA, TALLAS ESPECIALES, MUESTRAS
   const [products, setProducts] = useState<any[]>([]);
@@ -582,7 +653,39 @@ export default function MeasurementsPage() {
                               <span className="font-black text-gray-500 text-xs">{label}</span>
                               <select
                                 value={botaPieUnit}
-                                onChange={(e) => setBotaPieUnit(e.target.value as 'cm' | 'in')}
+                                onChange={(e) => {
+                                  const newUnit = e.target.value as 'cm' | 'in';
+                                  setBotaPieUnit(newUnit);
+                                  
+                                  setMatrix(prev => {
+                                    const copy = { ...prev };
+                                    columns.forEach(col => {
+                                      const val = copy[col.id]?.botaPie;
+                                      if (val) {
+                                        if (newUnit === 'cm') {
+                                          const inches = parseInches(val);
+                                          if (inches !== null) {
+                                            const cm = inches * 2.54;
+                                            copy[col.id] = {
+                                              ...(copy[col.id] || {}),
+                                              botaPie: `${parseFloat(cm.toFixed(1))} cm`
+                                            };
+                                          }
+                                        } else {
+                                          const cm = parseCm(val);
+                                          if (cm !== null) {
+                                            const inches = cm / 2.54;
+                                            copy[col.id] = {
+                                              ...(copy[col.id] || {}),
+                                              botaPie: decToFractionInches(inches)
+                                            };
+                                          }
+                                        }
+                                      }
+                                    });
+                                    return copy;
+                                  });
+                                }}
                                 className="text-[10px] font-black bg-white border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
                               >
                                 <option value="cm">cm</option>
