@@ -9,6 +9,14 @@ import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, H
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
 
+const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
+
+const getImageUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${SERVER_URL}${url}`;
+};
+
 const getProductSchema = (isEditing: boolean) => z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   category: z.string().min(1, 'La categoría es requerida'),
@@ -578,7 +586,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 </label>
                 {watchImageUrl && (
                   <div className="relative w-16 h-16 bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-                    <img src={watchImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    <img src={getImageUrl(watchImageUrl)} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setValue('imageUrl', '')}

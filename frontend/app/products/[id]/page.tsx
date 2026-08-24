@@ -9,6 +9,14 @@ import { Layout } from '../../../components/common/Layout';
 import api from '../../../lib/axios';
 import toast from 'react-hot-toast';
 import { ProductBarcode } from '../../../components/products/Barcode';
+
+const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
+
+const getImageUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  return `${SERVER_URL}${url}`;
+};
 import { 
   ArrowLeft,
   Edit,
@@ -383,7 +391,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 className="w-full relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 hover:opacity-90 transition group shadow-sm flex items-center justify-center"
               >
                 <img 
-                  src={product.imageUrl} 
+                  src={getImageUrl(product.imageUrl)} 
                   alt={product.name} 
                   className="w-full h-full object-cover"
                 />
@@ -652,7 +660,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <X className="w-6 h-6" />
             </button>
             <img
-              src={product.imageUrl}
+              src={getImageUrl(product.imageUrl)}
               alt={product.name}
               className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl animate-scale-in"
             />
