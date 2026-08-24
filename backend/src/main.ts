@@ -27,7 +27,7 @@ async function bootstrap() {
   );
 
   // ✅ Archivos estáticos
-  app.useStaticAssets(join(__dirname, '..', 'public'));
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   // ✅ Prefijo global API
   app.setGlobalPrefix('api');
