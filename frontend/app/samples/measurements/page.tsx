@@ -134,6 +134,42 @@ function formatBotaPieCell(value: string): string {
   return formatSingleBotaPieValue(cleanVal);
 }
 
+function parseBotaPieParts(value: string) {
+  if (!value) return { cm: '', inch: '' };
+  
+  if (value.includes('(') && value.includes(')')) {
+    const parts = value.split('(');
+    const first = parts[0].trim();
+    const second = parts[1].replace(')', '').trim();
+    
+    if (first.toLowerCase().includes('cm')) {
+      return {
+        cm: first.replace(/cm/gi, '').trim(),
+        inch: second.replace(/"/g, '').trim()
+      };
+    } else {
+      return {
+        cm: second.replace(/cm/gi, '').trim(),
+        inch: first.replace(/"/g, '').trim()
+      };
+    }
+  }
+  
+  if (value.toLowerCase().includes('cm')) {
+    return { cm: value.replace(/cm/gi, '').trim(), inch: '' };
+  }
+  if (value.includes('"') || value.includes('/')) {
+    return { cm: '', inch: value.replace(/"/g, '').trim() };
+  }
+  
+  const num = parseFloat(value);
+  if (!isNaN(num)) {
+    return { cm: value.trim(), inch: '' };
+  }
+  
+  return { cm: '', inch: '' };
+}
+
 export default function MeasurementsPage() {
   const [inventoryType, setInventoryType] = useState('TERMINADOS'); // TERMINADOS, SEGUNDA, TALLAS ESPECIALES, MUESTRAS
   const [products, setProducts] = useState<any[]>([]);
@@ -253,7 +289,10 @@ export default function MeasurementsPage() {
       
       if (activeStage === 'OFICIAL') {
         // Only 1 column
-        const officialMeasure = stageMeasurements.find((m: any) => !m.color || m.color === '');
+        let officialMeasure = stageMeasurements.find((m: any) => !m.color || m.color === '');
+        if (!officialMeasure && stageMeasurements.length > 0) {
+          officialMeasure = stageMeasurements[0];
+        }
         newMatrix['OFFICIAL_COLUMN'] = {};
         if (officialMeasure) {
           MEASUREMENT_KEYS.forEach(({ key }) => {
@@ -717,23 +756,81 @@ export default function MeasurementsPage() {
                         <td className="p-4 border border-gray-100 bg-gray-50 text-center uppercase tracking-wider min-w-[150px] sticky left-0 z-10 border-r-2 border-r-gray-200">
                           <span className="font-black text-gray-500 text-xs">{label}</span>
                         </td>
-                        {columns.map(col => (
-                          <td key={col.id} className="p-2 border border-gray-100">
-                            <input
-                              type="text"
-                              placeholder={isBotaPie ? '18.1 cm (7 1/8")' : '16 3/4"'}
-                              value={matrix[col.id]?.[key] || ''}
-                              onChange={(e) => handleCellChange(col.id, key, e.target.value)}
-                              onBlur={(e) => {
-                                if (isBotaPie) {
-                                  const formatted = formatBotaPieCell(e.target.value);
-                                  handleCellChange(col.id, key, formatted);
-                                }
-                              }}
-                              className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-                            />
-                          </td>
-                        ))}
+                        {columns.map(col => {
+                          if (isBotaPie) {
+                            const { cm, inch } = parseBotaPieParts(matrix[col.id]?.[key] || '');
+                            return (
+                              <td key={col.id} className="p-2 border border-gray-100 min-w-[200px]">
+                                <div className="flex items-center gap-1.5">
+                                  {/* CM Input */}
+                                  <div className="flex-1 relative">
+                                    <input
+                                      type="text"
+                                      placeholder="cm"
+                                      value={cm}
+                                      onChange={(e) => {
+                                        const inputVal = e.target.value;
+                                        if (!inputVal) {
+                                          handleCellChange(col.id, key, '');
+                                          return;
+                                        }
+                                        const parsedCm = parseCm(inputVal);
+                                        if (parsedCm !== null) {
+                                          const calculatedInches = parsedCm / 2.54;
+                                          const fraction = decToFractionInches(calculatedInches);
+                                          handleCellChange(col.id, key, `${inputVal} cm (${fraction})`);
+                                        } else {
+                                          handleCellChange(col.id, key, `${inputVal} cm`);
+                                        }
+                                      }}
+                                      className="w-full pl-2 pr-6 py-2 bg-white border border-gray-200 rounded-xl font-bold text-center text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 font-bold uppercase pointer-events-none">cm</span>
+                                  </div>
+                                  
+                                  {/* INCH Input */}
+                                  <div className="flex-1 relative">
+                                    <input
+                                      type="text"
+                                      placeholder="pulg"
+                                      value={inch}
+                                      onChange={(e) => {
+                                        const inputVal = e.target.value;
+                                        if (!inputVal) {
+                                          handleCellChange(col.id, key, '');
+                                          return;
+                                        }
+                                        const parsedIn = parseInches(inputVal);
+                                        if (parsedIn !== null) {
+                                          const cmVal = parsedIn * 2.54;
+                                          const formattedCm = `${parseFloat(cmVal.toFixed(1)).toString().replace('.', ',')} cm`;
+                                          const cleanIn = inputVal.includes('"') ? inputVal : `${inputVal}"`;
+                                          handleCellChange(col.id, key, `${cleanIn} (${formattedCm})`);
+                                        } else {
+                                          handleCellChange(col.id, key, inputVal.includes('"') ? inputVal : `${inputVal}"`);
+                                        }
+                                      }}
+                                      className="w-full pl-2 pr-6 py-2 bg-white border border-gray-200 rounded-xl font-bold text-center text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                                    />
+                                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 font-bold uppercase pointer-events-none">pulg</span>
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          }
+                          
+                          return (
+                            <td key={col.id} className="p-2 border border-gray-100">
+                              <input
+                                type="text"
+                                placeholder="16 3/4&quot;"
+                                value={matrix[col.id]?.[key] || ''}
+                                onChange={(e) => handleCellChange(col.id, key, e.target.value)}
+                                className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                              />
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}
