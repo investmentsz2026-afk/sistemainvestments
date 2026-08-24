@@ -615,7 +615,7 @@ export default function MeasurementsPage() {
                 <thead>
                   <tr className="bg-gray-900 text-white">
                     {/* Double-row mapping header */}
-                    <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[140px] bg-gray-950">
+                    <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[140px] bg-gray-950 sticky left-0 z-20 border-r-2 border-r-gray-800">
                       OP / COLOR
                     </th>
                     {columns.map(col => (
@@ -647,7 +647,7 @@ export default function MeasurementsPage() {
                     const isBotaPie = key === 'botaPie';
                     return (
                       <tr key={key} className="hover:bg-gray-50/50 transition">
-                        <td className="p-4 border border-gray-100 bg-gray-50/40 text-center uppercase tracking-wider min-w-[150px]">
+                        <td className="p-4 border border-gray-100 bg-gray-50 text-center uppercase tracking-wider min-w-[150px] sticky left-0 z-10 border-r-2 border-r-gray-200">
                           {isBotaPie ? (
                             <div className="flex flex-col items-center gap-1.5 justify-center">
                               <span className="font-black text-gray-500 text-xs">{label}</span>
