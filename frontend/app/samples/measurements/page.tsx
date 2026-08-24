@@ -167,26 +167,34 @@ export default function MeasurementsPage() {
 
     const baseCols: ColumnType[] = [];
     
-    if (inventoryType === 'MUESTRAS') {
-      if (selectedItem.productionColor) {
-        baseCols.push({
-          id: `${selectedItem.op || ''}|${selectedItem.productionColor}`,
-          op: selectedItem.op || '',
-          color: selectedItem.productionColor
-        });
-      }
+    if (activeStage === 'OFICIAL') {
+      baseCols.push({
+        id: 'OFFICIAL_COLUMN',
+        op: '',
+        color: ''
+      });
     } else {
-      const variants = selectedItem.variants || [];
-      variants.forEach((v: any) => {
-        const id = `${v.op || ''}|${v.color}`;
-        if (!baseCols.some(c => c.id === id)) {
+      if (inventoryType === 'MUESTRAS') {
+        if (selectedItem.productionColor) {
           baseCols.push({
-            id,
-            op: v.op || '',
-            color: v.color
+            id: `${selectedItem.op || ''}|${selectedItem.productionColor}`,
+            op: selectedItem.op || '',
+            color: selectedItem.productionColor
           });
         }
-      });
+      } else {
+        const variants = selectedItem.variants || [];
+        variants.forEach((v: any) => {
+          const id = `${v.op || ''}|${v.color}`;
+          if (!baseCols.some(c => c.id === id)) {
+            baseCols.push({
+              id,
+              op: v.op || '',
+              color: v.color
+            });
+          }
+        });
+      }
     }
 
     setColumns(baseCols);
@@ -210,32 +218,47 @@ export default function MeasurementsPage() {
 
       const newMatrix: Record<string, Record<string, string>> = {};
       
-      // Prefill columns list from measurements if they have custom values
-      setColumns(prev => {
-        const existingCols = stageMeasurements
-          .filter((m: any) => m.color)
-          .map((m: any) => ({
-            id: `${m.op || ''}|${m.color}`,
-            op: m.op || '',
-            color: m.color
-          }));
-        
-        const map = new Map<string, ColumnType>();
-        prev.forEach(c => map.set(c.id, c));
-        existingCols.forEach(c => map.set(c.id, c));
-        
-        return Array.from(map.values());
-      });
-
-      stageMeasurements.forEach((m: any) => {
-        if (!m.color) return;
-        const colId = `${m.op || ''}|${m.color}`;
-        if (!newMatrix[colId]) newMatrix[colId] = {};
-        
-        MEASUREMENT_KEYS.forEach(({ key }) => {
-          newMatrix[colId][key] = m[key] || '';
+      if (activeStage === 'OFICIAL') {
+        // Only 1 column
+        const officialMeasure = stageMeasurements.find((m: any) => !m.color || m.color === '');
+        newMatrix['OFFICIAL_COLUMN'] = {};
+        if (officialMeasure) {
+          MEASUREMENT_KEYS.forEach(({ key }) => {
+            newMatrix['OFFICIAL_COLUMN'][key] = officialMeasure[key] || '';
+          });
+        } else {
+          MEASUREMENT_KEYS.forEach(({ key }) => {
+            newMatrix['OFFICIAL_COLUMN'][key] = '';
+          });
+        }
+      } else {
+        // Prefill columns list from measurements if they have custom values
+        setColumns(prev => {
+          const existingCols = stageMeasurements
+            .filter((m: any) => m.color)
+            .map((m: any) => ({
+              id: `${m.op || ''}|${m.color}`,
+              op: m.op || '',
+              color: m.color
+            }));
+          
+          const map = new Map<string, ColumnType>();
+          prev.forEach(c => map.set(c.id, c));
+          existingCols.forEach(c => map.set(c.id, c));
+          
+          return Array.from(map.values());
         });
-      });
+
+        stageMeasurements.forEach((m: any) => {
+          if (!m.color) return;
+          const colId = `${m.op || ''}|${m.color}`;
+          if (!newMatrix[colId]) newMatrix[colId] = {};
+          
+          MEASUREMENT_KEYS.forEach(({ key }) => {
+            newMatrix[colId][key] = m[key] || '';
+          });
+        });
+      }
       
       setMatrix(newMatrix);
     } catch (err) {
@@ -291,8 +314,8 @@ export default function MeasurementsPage() {
         const measurements = matrix[col.id] || {};
         const payload: any = {
           size: selectedSize,
-          color: col.color,
-          op: col.op || null,
+          color: activeStage === 'OFICIAL' ? null : (col.color || null),
+          op: activeStage === 'OFICIAL' ? null : (col.op || null),
           stage: activeStage,
           cintura: measurements.cintura || null,
           cadera: measurements.cadera || null,
@@ -309,7 +332,7 @@ export default function MeasurementsPage() {
         } else {
           // Route to specific sibling product containing this variant if applicable
           let targetProductId = selectedItem.id;
-          if (selectedItem.siblingIds) {
+          if (activeStage !== 'OFICIAL' && selectedItem.siblingIds) {
             const matchingSibling = products.find((p: any) => 
               selectedItem.siblingIds.includes(p.id) && 
               (p.variants || []).some((v: any) => (v.op || '') === col.op && v.color === col.color)
@@ -583,31 +606,33 @@ export default function MeasurementsPage() {
             </div>
 
             {/* Custom Column / Color adder */}
-            <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-4 rounded-2xl">
-              <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Añadir Variante:</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="OP (Ej: OP-02)"
-                  value={customOp}
-                  onChange={(e) => setCustomOp(e.target.value)}
-                  className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-36"
-                />
-                <input
-                  type="text"
-                  placeholder="Color (Ej: Camello)"
-                  value={customColor}
-                  onChange={(e) => setCustomColor(e.target.value)}
-                  className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-44"
-                />
-                <button
-                  onClick={addColumn}
-                  className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+            {activeStage !== 'OFICIAL' && (
+              <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Añadir Variante:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="OP (Ej: OP-02)"
+                    value={customOp}
+                    onChange={(e) => setCustomOp(e.target.value)}
+                    className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-36"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Color (Ej: Camello)"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-44"
+                  />
+                  <button
+                    onClick={addColumn}
+                    className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Matrix table container */}
             <div className="overflow-x-auto rounded-3xl border border-gray-100 shadow-inner">
@@ -618,28 +643,37 @@ export default function MeasurementsPage() {
                     <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[140px] bg-gray-950 sticky left-0 z-20 border-r-2 border-r-gray-800">
                       OP / COLOR
                     </th>
-                    {columns.map(col => (
-                      <th key={col.id} className="p-2 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 relative group min-w-[140px]">
-                        <div className="flex flex-col items-center justify-center min-h-[44px]">
-                          {/* OP on first row */}
-                          <span className="text-[9px] text-gray-400 font-bold block leading-none mb-1">
-                            {col.op ? col.op : 'Sin OP'}
-                          </span>
-                          
-                          {/* Color and delete action on second row */}
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className="text-xs truncate max-w-[110px]">{col.color}</span>
-                            <button
-                              onClick={() => removeColumn(col.id)}
-                              className="text-red-400 hover:text-red-600 transition"
-                              title="Remover columna"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </th>
-                    ))}
+                    {columns.map(col => {
+                      const isOfficial = activeStage === 'OFICIAL';
+                      return (
+                        <th key={col.id} className="p-2 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 relative group min-w-[140px]">
+                          {isOfficial ? (
+                            <div className="flex items-center justify-center min-h-[44px] text-xs font-black text-indigo-400">
+                              MEDIDA OFICIAL
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center min-h-[44px]">
+                              {/* OP on first row */}
+                              <span className="text-[9px] text-gray-400 font-bold block leading-none mb-1">
+                                {col.op ? col.op : 'Sin OP'}
+                              </span>
+                              
+                              {/* Color and delete action on second row */}
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="text-xs truncate max-w-[110px]">{col.color}</span>
+                                <button
+                                  onClick={() => removeColumn(col.id)}
+                                  className="text-red-400 hover:text-red-600 transition"
+                                  title="Remover columna"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
