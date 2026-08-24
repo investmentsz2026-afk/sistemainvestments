@@ -96,8 +96,42 @@ function decToFractionInches(inches: number): string {
     num /= 2;
     den /= 2;
   }
-  
   return whole > 0 ? `${whole} ${num}/${den}"` : `${num}/${den}"`;
+}
+
+function formatSingleBotaPieValue(val: string): string {
+  // If it has " or has a fraction (contains /), it's in inches
+  if (val.includes('"') || val.includes('/')) {
+    const inches = parseInches(val);
+    if (inches !== null) {
+      const cm = inches * 2.54;
+      const cleanInches = val.includes('"') ? val : `${val}"`;
+      return `${cleanInches} (${parseFloat(cm.toFixed(1)).toString().replace('.', ',')} cm)`;
+    }
+  }
+
+  // Otherwise, check if it's a valid cm
+  const cm = parseCm(val);
+  if (cm !== null) {
+    const inches = cm / 2.54;
+    const fraction = decToFractionInches(inches);
+    const cleanCm = val.toLowerCase().includes('cm') ? val : `${val} cm`;
+    return `${cleanCm} (${fraction})`;
+  }
+
+  return val;
+}
+
+function formatBotaPieCell(value: string): string {
+  const cleanVal = value.trim();
+  if (!cleanVal) return '';
+
+  if (cleanVal.includes('(') && cleanVal.includes(')')) {
+    const firstPart = cleanVal.split('(')[0].trim();
+    return formatSingleBotaPieValue(firstPart);
+  }
+
+  return formatSingleBotaPieValue(cleanVal);
 }
 
 export default function MeasurementsPage() {
@@ -110,7 +144,6 @@ export default function MeasurementsPage() {
   
   const [selectedSize, setSelectedSize] = useState('32');
   const [activeStage, setActiveStage] = useState('OFICIAL');
-  const [botaPieUnit, setBotaPieUnit] = useState<'cm' | 'in'>('cm');
   
   // Columns/Colors listed in the table (no prelavado column as input anymore)
   const [columns, setColumns] = useState<ColumnType[]>([]);
@@ -682,61 +715,21 @@ export default function MeasurementsPage() {
                     return (
                       <tr key={key} className="hover:bg-gray-50/50 transition">
                         <td className="p-4 border border-gray-100 bg-gray-50 text-center uppercase tracking-wider min-w-[150px] sticky left-0 z-10 border-r-2 border-r-gray-200">
-                          {isBotaPie ? (
-                            <div className="flex flex-col items-center gap-1.5 justify-center">
-                              <span className="font-black text-gray-500 text-xs">{label}</span>
-                              <select
-                                value={botaPieUnit}
-                                onChange={(e) => {
-                                  const newUnit = e.target.value as 'cm' | 'in';
-                                  setBotaPieUnit(newUnit);
-                                  
-                                  setMatrix(prev => {
-                                    const copy = { ...prev };
-                                    columns.forEach(col => {
-                                      const val = copy[col.id]?.botaPie;
-                                      if (val) {
-                                        if (newUnit === 'cm') {
-                                          const inches = parseInches(val);
-                                          if (inches !== null) {
-                                            const cm = inches * 2.54;
-                                            copy[col.id] = {
-                                              ...(copy[col.id] || {}),
-                                              botaPie: `${parseFloat(cm.toFixed(1))} cm`
-                                            };
-                                          }
-                                        } else {
-                                          const cm = parseCm(val);
-                                          if (cm !== null) {
-                                            const inches = cm / 2.54;
-                                            copy[col.id] = {
-                                              ...(copy[col.id] || {}),
-                                              botaPie: decToFractionInches(inches)
-                                            };
-                                          }
-                                        }
-                                      }
-                                    });
-                                    return copy;
-                                  });
-                                }}
-                                className="text-[10px] font-black bg-white border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
-                              >
-                                <option value="cm">cm</option>
-                                <option value="in">pulg (")</option>
-                              </select>
-                            </div>
-                          ) : (
-                            <span className="font-black text-gray-500 text-xs">{label}</span>
-                          )}
+                          <span className="font-black text-gray-500 text-xs">{label}</span>
                         </td>
                         {columns.map(col => (
                           <td key={col.id} className="p-2 border border-gray-100">
                             <input
                               type="text"
-                              placeholder={isBotaPie ? (botaPieUnit === 'cm' ? '18.1 cm' : '7 1/8"') : '16 3/4"'}
+                              placeholder={isBotaPie ? '18.1 cm (7 1/8")' : '16 3/4"'}
                               value={matrix[col.id]?.[key] || ''}
                               onChange={(e) => handleCellChange(col.id, key, e.target.value)}
+                              onBlur={(e) => {
+                                if (isBotaPie) {
+                                  const formatted = formatBotaPieCell(e.target.value);
+                                  handleCellChange(col.id, key, formatted);
+                                }
+                              }}
                               className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                             />
                           </td>
