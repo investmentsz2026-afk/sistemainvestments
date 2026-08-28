@@ -101,6 +101,10 @@ export class SamplesService {
 
     const existingSample = await this.findOne(id);
 
+    if (existingSample.adminOpApprovalStatus === 'APROBADO') {
+      throw new BadRequestException('Esta OP ya ha sido aprobada por el Administrador y no puede ser modificada.');
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       // 1. Update status and observations
       const updatedSample = await (tx as any).productSample.update({
@@ -116,6 +120,7 @@ export class SamplesService {
           productionSizeData: status === 'APROBADO' ? (productionSizeData || null) : null,
           commercialId,
           approvedAt: status === 'APROBADO' ? new Date() : null,
+          adminOpApprovalStatus: status === 'APROBADO' ? 'PENDIENTE' : existingSample.adminOpApprovalStatus,
         },
       });
 
@@ -168,11 +173,10 @@ export class SamplesService {
       }
 
       if (status === 'APROBADO') {
-        const adminRole = await tx.role.findUnique({ where: { name: 'ADMIN' } });
         await tx.notification.create({
           data: {
-            title: 'Muestra Aprobada (Nueva OP)',
-            message: `Comercial ha aprobado la muestra ${existingSample.name} y creado la OP: ${op}. Pendiente de revisión para enviar a UDP (Auditoría).`,
+            title: existingSample.status === 'APROBADO' ? 'OP Actualizada por Comercial' : 'Muestra Aprobada (Nueva OP)',
+            message: `Comercial ha ${existingSample.status === 'APROBADO' ? 'actualizado los datos de la OP' : 'aprobado la muestra'} ${existingSample.name} (OP: ${op}). Pendiente de aprobación de Admin.`,
             type: 'SAMPLE_APPROVED',
             referenceId: id,
             targetRole: 'ADMIN',

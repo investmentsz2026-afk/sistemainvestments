@@ -204,8 +204,8 @@ export default function SamplesPage() {
                                     href={`/samples/${sample.id}`}
                                     className="mt-8 w-full py-4 bg-gray-50 text-gray-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                                 >
-                                    {user?.role === 'COMERCIAL' && sample.status === 'PENDIENTE' ? (
-                                        <>Revisar Muestra <ArrowRight className="w-4 h-4" /></>
+                                    {user?.role === 'COMERCIAL' && (sample.status === 'PENDIENTE' || (sample.status === 'APROBADO' && sample.adminOpApprovalStatus !== 'APROBADO')) ? (
+                                        <>{sample.status === 'PENDIENTE' ? 'Revisar Muestra' : 'Editar / Ver OP'} <ArrowRight className="w-4 h-4" /></>
                                     ) : (
                                         <>Ver Detalles <Eye className="w-4 h-4" /></>
                                     )}

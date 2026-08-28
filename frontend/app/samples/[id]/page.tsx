@@ -52,6 +52,11 @@ export default function SampleDetailPage() {
     const [showSalesPriceModal, setShowSalesPriceModal] = useState(false);
     const [salesPrices, setSalesPrices] = useState<{ [size: string]: { price: number, secondPrice: number } }>({});
     const [generatedBarcode, setGeneratedBarcode] = useState('');
+    const [isCommercialEditing, setIsCommercialEditing] = useState(false);
+
+    // Permission helpers for Commercial editing
+    const canCommercialEdit = (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && sample?.adminOpApprovalStatus !== 'APROBADO';
+    const isCommercialMode = sample?.status === 'PENDIENTE' || isCommercialEditing;
 
     // Edit State (UDP)
     const [isEditing, setIsEditing] = useState(false);
@@ -438,11 +443,12 @@ export default function SampleDetailPage() {
                 productionSizeData: reviewStatus === 'APROBADO' ? enrichedProductionDetail : undefined,
                 materials: reviewStatus === 'APROBADO' ? activeBom : []
             });
-            toast.success('OP enviada a admin para su aprobacion');
-            router.push('/samples');
-        } catch (error) {
+            toast.success(sample?.status === 'APROBADO' ? 'OP actualizada con éxito. Enviada a Admin para aprobación.' : 'OP guardada y enviada a Admin para su aprobación.');
+            setIsCommercialEditing(false);
+            fetchData();
+        } catch (error: any) {
             console.error('Error saving review:', error);
-            toast.error('Error al guardar la revisión');
+            toast.error(error.response?.data?.message || 'Error al guardar la revisión');
         } finally {
             setIsSaving(false);
         }
@@ -567,8 +573,9 @@ export default function SampleDetailPage() {
                 const sizeReq = sample.udpRequirements.sizes.find((s: any) => s.size === pd.size);
                 if (sizeReq) {
                     sizeReq.items.forEach((item: any) => {
-                        if (!materialMap.has(item.productId)) {
-                            materialMap.set(item.productId, {
+                        const key = item.productId || item.name;
+                        if (!materialMap.has(key)) {
+                            materialMap.set(key, {
                                 productId: item.productId,
                                 name: item.name,
                                 sku: item.sku,
@@ -576,8 +583,22 @@ export default function SampleDetailPage() {
                                 totalQuantity: 0,
                             });
                         }
-                        const m = materialMap.get(item.productId);
+                        const m = materialMap.get(key);
                         m.totalQuantity += (pd.quantity || 0) * (item.consumption || 0);
+                    });
+                }
+            });
+
+            // Include extra manually added materials from bom state that are not in sizeReq!
+            bom.forEach(b => {
+                const key = b.productId || b.name;
+                if (!materialMap.has(key)) {
+                    materialMap.set(key, {
+                        productId: b.productId,
+                        name: b.name,
+                        sku: b.sku,
+                        unitPrice: b.unitPrice || b.price || 0,
+                        totalQuantity: (b.quantityPerUnit || 1) * (parseFloat(prodQuantity) || targetQuantity || 1),
                     });
                 }
             });
@@ -588,7 +609,7 @@ export default function SampleDetailPage() {
             }));
         }
         return bom;
-    }, [sample, productionDetail, bom, targetQuantity]);
+    }, [sample, productionDetail, bom, targetQuantity, prodQuantity]);
 
     const sizeCosts = useMemo(() => {
         if (!sample?.udpRequirements?.sizes) return [];
@@ -604,15 +625,20 @@ export default function SampleDetailPage() {
     const displayedMaterials = useMemo(() => {
         if (!sample?.udpRequirements?.sizes || !bomViewSize) return activeBom;
         const sizeReq = sample.udpRequirements.sizes.find((s: any) => s.size === bomViewSize);
-        if (!sizeReq) return activeBom;
-        return sizeReq.items.map((item: any) => ({
+        
+        const sizeItems = sizeReq ? sizeReq.items.map((item: any) => ({
             productId: item.productId,
             name: item.name,
             sku: item.sku,
             unitPrice: item.price || 0,
             quantityPerUnit: item.consumption || 0
-        }));
-    }, [bomViewSize, sample, activeBom]);
+        })) : [];
+
+        // Include any additional manual items added to bom
+        const extraItems = bom.filter(b => !sizeItems.some((si: any) => (si.productId && si.productId === b.productId) || si.name === b.name));
+
+        return [...sizeItems, ...extraItems];
+    }, [bomViewSize, sample, activeBom, bom]);
 
     // Default selection
     useEffect(() => {
@@ -937,24 +963,57 @@ export default function SampleDetailPage() {
                     <div className="lg:col-span-5 space-y-8">
                         {/* REVIEW SECTION */}
                         <div className={`${cardClass} border-indigo-100 shadow-indigo-100/30`}>
-                            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-8 flex items-center justify-between">
-                                <span>Control Comercial</span>
-                                <ClipboardList className="w-6 h-6 text-indigo-600" />
+                            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-8 flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <span>Control Comercial</span>
+                                    {sample.adminOpApprovalStatus === 'APROBADO' && (
+                                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Aprobada por Admin (Bloqueada)
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {canCommercialEdit && sample.status === 'APROBADO' && !isCommercialEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsCommercialEditing(true);
+                                                setReviewStatus('APROBADO');
+                                            }}
+                                            className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
+                                        >
+                                            <Edit className="w-3.5 h-3.5" /> Editar OP / Revisión
+                                        </button>
+                                    )}
+                                    {isCommercialEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsCommercialEditing(false);
+                                                fetchData();
+                                            }}
+                                            className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-black uppercase transition"
+                                        >
+                                            Cancelar Edición
+                                        </button>
+                                    )}
+                                    <ClipboardList className="w-6 h-6 text-indigo-600" />
+                                </div>
                             </h2>
 
-                            {user?.role === 'COMERCIAL' && sample.status === 'PENDIENTE' && sample.udpRequirements && (
+                            {user?.role === 'COMERCIAL' && sample.udpRequirements && (
                                 <button 
                                     onClick={() => {
-                                        setReqModalMode('VIEW');
+                                        setReqModalMode(canCommercialEdit && isCommercialMode ? 'EDIT' : 'VIEW');
                                         setShowRequirementsModal(true);
                                     }}
                                     className="w-full mb-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-black transition shadow-xl shadow-indigo-100 flex items-center justify-center gap-3"
                                 >
-                                    <FileText className="w-5 h-5" /> Ver Ficha Técnica (Requerimientos UDP)
+                                    <FileText className="w-5 h-5" /> {canCommercialEdit && isCommercialMode ? 'Editar Ficha Técnica (Requerimientos UDP)' : 'Ver Ficha Técnica (Requerimientos UDP)'}
                                 </button>
                             )}
 
-                            {user?.role === 'COMERCIAL' && sample.status === 'PENDIENTE' ? (
+                            {canCommercialEdit && isCommercialMode ? (
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-2 gap-4">
                                         <button
@@ -1074,6 +1133,7 @@ export default function SampleDetailPage() {
                                                                 </div>
                                                                 <div className="col-span-2 flex justify-end">
                                                                     <button 
+                                                                        type="button"
                                                                         onClick={() => {
                                                                             const newList = productionDetail.filter((_, i) => i !== idx);
                                                                             setProductionDetail(newList);
@@ -1211,30 +1271,103 @@ export default function SampleDetailPage() {
                                     animate={{ opacity: 1, height: 'auto' }}
                                     className={cardClass}
                                 >
-                                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-8 flex items-center gap-3">
-                                        <Calculator className="w-6 h-6 text-emerald-600" /> Requerimientos (BOM)
+                                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Calculator className="w-6 h-6 text-emerald-600" />
+                                            <span>Requerimientos (BOM)</span>
+                                        </div>
+                                        {canCommercialEdit && isCommercialMode && sample.udpRequirements && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setReqModalMode('EDIT');
+                                                    setShowRequirementsModal(true);
+                                                }}
+                                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase transition flex items-center gap-1.5"
+                                            >
+                                                <Edit className="w-3.5 h-3.5" /> Ficha Técnica
+                                            </button>
+                                        )}
                                     </h2>
 
-                                    {/* SEARCH FOR RAW MATERIALS - ONLY IF NO UDP REQUIREMENTS */}
-                                    {sample.status === 'PENDIENTE' && !sample.udpRequirements && (
-                                        <div className="relative mb-8">
-                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                                            <input
-                                                type="text" placeholder="Añadir tela, botones, cierres..."
-                                                className="w-full bg-gray-50 border-none rounded-2xl pl-10 pr-4 py-3 text-sm font-bold outline-none"
-                                                onFocus={() => { }} // Could show a dropdown
-                                            />
-                                            {/* Simplified material selection mock-up or real logic */}
-                                            <div className="mt-4 flex flex-wrap gap-2">
-                                                {products.filter(p => ['Materiales', 'Avios', 'AVIOS', 'MATERIALES'].some(t => [p.category, p.inventoryType].includes(t))).slice(0, 5).map(p => (
+                                    {/* INVENTORY SEARCH FOR COMMERCIAL WHEN IN EDIT MODE */}
+                                    {canCommercialEdit && isCommercialMode && (
+                                        <div className="bg-gray-900 p-6 rounded-[2rem] text-white space-y-4 mb-8 shadow-xl shadow-gray-900/10">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                                    <Search className="w-3.5 h-3.5" /> Agregar Insumo/Material del Inventario
+                                                </h4>
+                                                <span className="text-[9px] text-gray-400 font-bold">Avíos, Materiales, Telas</span>
+                                            </div>
+
+                                            {/* Type filter chips */}
+                                            <div className="flex flex-wrap gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedType('')}
+                                                    className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
+                                                        selectedType === '' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    TODOS
+                                                </button>
+                                                {inventoryTypes.map(type => (
                                                     <button
-                                                        key={p.id}
-                                                        onClick={() => addMaterial(p)}
-                                                        className="px-3 py-1.5 bg-gray-100 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-colors"
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => setSelectedType(type)}
+                                                        className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
+                                                            selectedType === type ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                        }`}
                                                     >
-                                                        + {p.name}
+                                                        {type.replace('_', ' ')}
                                                     </button>
                                                 ))}
+                                            </div>
+
+                                            {/* Search input */}
+                                            <div className="relative">
+                                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar por nombre o SKU..."
+                                                    className="w-full bg-white/10 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 font-bold text-xs text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                                                    value={reqSearch}
+                                                    onChange={e => setReqSearch(e.target.value)}
+                                                />
+                                            </div>
+
+                                            {/* Quick Results */}
+                                            <div className="max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                                                {filteredReqProducts.map(p => {
+                                                    const alreadyInBom = bom.some(b => b.productId === p.id);
+                                                    return (
+                                                        <div key={p.id} className="flex items-center justify-between p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-xs">
+                                                            <div className="truncate pr-2">
+                                                                <span className="font-black text-white block truncate">{p.name}</span>
+                                                                <span className="text-[9px] text-gray-400 font-mono">SKU: {p.sku} | Costo: S/ {p.purchasePrice || 0}</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                disabled={alreadyInBom}
+                                                                onClick={() => {
+                                                                    addMaterial(p);
+                                                                    toast.success(`${p.name} añadido a la BOM`);
+                                                                }}
+                                                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition shrink-0 ${
+                                                                    alreadyInBom
+                                                                    ? 'bg-white/10 text-gray-500 cursor-not-allowed'
+                                                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                                                                }`}
+                                                            >
+                                                                {alreadyInBom ? 'Añadido' : '+ Añadir'}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {filteredReqProducts.length === 0 && (
+                                                    <p className="text-[10px] text-gray-400 text-center py-2 italic">No se encontraron productos en el inventario</p>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -1261,7 +1394,7 @@ export default function SampleDetailPage() {
 
                                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                         {displayedMaterials.map(item => (
-                                            <div key={item.productId} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl group">
+                                            <div key={item.productId || item.name} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl group">
                                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-300">
                                                     <Package className="w-5 h-5" />
                                                 </div>
@@ -1275,7 +1408,7 @@ export default function SampleDetailPage() {
                                                                 className="w-full bg-white border-none rounded-lg px-3 py-1 text-xs font-black mt-1"
                                                                 value={item.quantityPerUnit.toFixed(4)}
                                                                 onChange={e => updateBomQuantity(item.productId, parseFloat(e.target.value) || 0)}
-                                                                disabled={sample.status === 'APROBADO' || !!sample.udpRequirements}
+                                                                disabled={!canCommercialEdit || !isCommercialMode}
                                                             />
                                                         </div>
                                                         <div>
@@ -1284,10 +1417,12 @@ export default function SampleDetailPage() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {sample.status === 'PENDIENTE' && !sample.udpRequirements && (
+                                                {canCommercialEdit && isCommercialMode && (
                                                     <button
+                                                        type="button"
                                                         onClick={() => removeMaterial(item.productId)}
                                                         className="p-2 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
+                                                        title="Eliminar de BOM"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -1326,7 +1461,7 @@ export default function SampleDetailPage() {
                                                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Desglose de Materiales Necesarios</h4>
                                                 <div className="space-y-2">
                                                     {bom.map(item => (
-                                                        <div key={item.productId} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl text-xs font-bold">
+                                                        <div key={item.productId || item.name} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl text-xs font-bold">
                                                             <span className="text-gray-900">{item.name}</span>
                                                             <div className="text-right">
                                                                 <span className="text-indigo-600 font-black text-xs uppercase italic">{ ( (item.quantityPerUnit || 0) * (targetQuantity || 0) ).toFixed(2) } Unidades/Metros</span>
@@ -1343,9 +1478,9 @@ export default function SampleDetailPage() {
                         )}
 
                         {/* FINAL ACTION BUTTONS FOR COMMERCIAL - ENABLED ONLY IF MATERIALS ARE READY */}
-                        {user?.role === 'COMERCIAL' && sample.status === 'PENDIENTE' && (
+                        {canCommercialEdit && isCommercialMode && (
                             <div className="space-y-4">
-                                {sample.materialReceiptStatus && sample.materialReceiptStatus !== 'DESARROLLO_COMPLETADO' ? (
+                                {sample.materialReceiptStatus && sample.materialReceiptStatus !== 'DESARROLLO_COMPLETADO' && sample.status === 'PENDIENTE' ? (
                                     <div className="p-6 bg-amber-50 rounded-3xl border border-amber-200 flex items-center gap-4 text-amber-700">
                                         <Clock className="w-6 h-6 flex-shrink-0" />
                                         <p className="text-xs font-bold uppercase tracking-tight">
@@ -1362,7 +1497,7 @@ export default function SampleDetailPage() {
                                             <>Procesando...</>
                                         ) : (
                                             <>
-                                                <Save className="w-6 h-6" /> Guardar Veredicto Final
+                                                <Save className="w-6 h-6" /> {sample.status === 'APROBADO' ? 'Guardar Cambios y Notificar a Admin' : 'Guardar Veredicto Final'}
                                             </>
                                         )}
                                     </button>
