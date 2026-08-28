@@ -55,7 +55,8 @@ export default function SampleDetailPage() {
     const [isCommercialEditing, setIsCommercialEditing] = useState(false);
 
     // Permission helpers for Commercial editing
-    const canCommercialEdit = (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && sample?.adminOpApprovalStatus !== 'APROBADO';
+    const userRole = (user?.role || '').toString().trim().toUpperCase();
+    const canCommercialEdit = (userRole === 'COMERCIAL' || userRole === 'ADMIN' || !userRole) && sample?.adminOpApprovalStatus !== 'APROBADO';
     const isCommercialMode = sample?.status === 'PENDIENTE' || isCommercialEditing;
 
     // Edit State (UDP)
@@ -721,10 +722,34 @@ export default function SampleDetailPage() {
                                 </button>
                             </div>
                         )}
-                        {user?.role === 'COMERCIAL' && sample.status === 'PENDIENTE' && (
+                        {userRole === 'COMERCIAL' && sample.status === 'PENDIENTE' && (
                             <div className="hidden md:flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-bold text-sm">
                                 <AlertTriangle className="w-5 h-5" /> Revisión Requerida
                             </div>
+                        )}
+                        {canCommercialEdit && sample.status === 'APROBADO' && !isCommercialEditing && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCommercialEditing(true);
+                                    setReviewStatus('APROBADO');
+                                }}
+                                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-xl hover:bg-black transition active:scale-95"
+                            >
+                                <Edit className="w-4 h-4" /> Editar OP / Revisión
+                            </button>
+                        )}
+                        {isCommercialEditing && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCommercialEditing(false);
+                                    fetchData();
+                                }}
+                                className="flex items-center gap-2 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-rose-100 transition"
+                            >
+                                <XCircle className="w-4 h-4" /> Cancelar Edición
+                            </button>
                         )}
                     </div>
                 </div>
@@ -1258,6 +1283,19 @@ export default function SampleDetailPage() {
                                                 )}
                                             </div>
                                         </div>
+                                    )}
+
+                                    {canCommercialEdit && sample.status === 'APROBADO' && !isCommercialEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsCommercialEditing(true);
+                                                setReviewStatus('APROBADO');
+                                            }}
+                                            className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-black transition active:scale-95 shadow-indigo-200"
+                                        >
+                                            <Edit className="w-5 h-5" /> Editar OP y Datos de Fabricación
+                                        </button>
                                     )}
                                 </div>
                             )}
