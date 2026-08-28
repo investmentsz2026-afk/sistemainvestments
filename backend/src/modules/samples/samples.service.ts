@@ -125,15 +125,43 @@ export class SamplesService {
         await (tx as any).sampleMaterial.deleteMany({ where: { sampleId: id } });
 
         for (const mat of materials) {
-          const product = await tx.product.findUnique({ where: { id: mat.productId } });
-          if (!product) throw new BadRequestException(`Material/Insumo no encontrado: ${mat.productId}`);
+          const productIdVal = mat.productId || null;
+
+          if (!productIdVal) {
+            // Save as custom material if no product ID
+            await (tx as any).sampleMaterial.create({
+              data: {
+                sampleId: id,
+                productId: null,
+                customMaterial: mat.name || mat.customMaterial || 'Material Personalizado',
+                quantity: mat.totalQuantity || mat.quantity || mat.quantityPerUnit || 1,
+                unitPriceAtTime: mat.unitPrice || mat.price || 0,
+              },
+            });
+            continue;
+          }
+
+          const product = await tx.product.findUnique({ where: { id: productIdVal } });
+          if (!product) {
+            // Save as custom material if product not found in database
+            await (tx as any).sampleMaterial.create({
+              data: {
+                sampleId: id,
+                productId: null,
+                customMaterial: mat.name || mat.customMaterial || `Insumo Especial (${productIdVal})`,
+                quantity: mat.totalQuantity || mat.quantity || mat.quantityPerUnit || 1,
+                unitPriceAtTime: mat.unitPrice || mat.price || 0,
+              },
+            });
+            continue;
+          }
 
           await (tx as any).sampleMaterial.create({
             data: {
               sampleId: id,
-              productId: mat.productId,
-              quantity: mat.quantity || 1,
-              unitPriceAtTime: product.purchasePrice,
+              productId: productIdVal,
+              quantity: mat.totalQuantity || mat.quantity || mat.quantityPerUnit || 1,
+              unitPriceAtTime: product.purchasePrice || mat.unitPrice || mat.price || 0,
             },
           });
         }
