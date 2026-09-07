@@ -534,6 +534,90 @@ export class ProductsService {
     };
   }
 
+  async getFirstQualityOps() {
+    const productsWithOp = await this.prisma.product.findMany({
+      where: {
+        isActive: true,
+        op: { not: null },
+      },
+      include: {
+        variants: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const opMap = new Map<string, any>();
+
+    for (const p of productsWithOp) {
+      if (!p.op) continue;
+      const opKey = p.op.trim();
+      if (!opMap.has(opKey)) {
+        const totalStock = p.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+        opMap.set(opKey, {
+          op: opKey,
+          productId: p.id,
+          productName: p.name,
+          category: p.category,
+          inventoryType: p.inventoryType,
+          purchasePrice: p.purchasePrice,
+          sellingPrice: p.sellingPrice,
+          realPrice: p.realPrice,
+          totalStock,
+          variantsCount: p.variants.length,
+          imageUrl: p.imageUrl,
+          createdAt: p.createdAt,
+        });
+      }
+    }
+
+    return Array.from(opMap.values());
+  }
+
+  async linkOpToProduct(id: string, op: string, syncPrices: boolean = true) {
+    const product = await this.findOne(id);
+    const cleanOp = op.trim();
+
+    // Buscar si existe un producto de referencia con esta OP
+    const refProduct = await this.prisma.product.findFirst({
+      where: {
+        op: cleanOp,
+        isActive: true,
+      },
+      include: { variants: true },
+    });
+
+    const updateData: any = {
+      op: cleanOp,
+    };
+
+    if (refProduct && syncPrices) {
+      updateData.purchasePrice = refProduct.purchasePrice;
+      if (refProduct.realPrice !== undefined && refProduct.realPrice !== null) {
+        updateData.realPrice = refProduct.realPrice;
+      }
+    }
+
+    // Actualizar producto
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: updateData,
+      include: { variants: true },
+    });
+
+    // Actualizar variantSku de todas las variantes del producto para que incluyan la OP
+    if (updatedProduct.variants && updatedProduct.variants.length > 0) {
+      for (const variant of updatedProduct.variants) {
+        const newVariantSku = await this.generateUniqueSkuForOp(cleanOp);
+        await this.prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { variantSku: newVariantSku },
+        });
+      }
+    }
+
+    return this.findOne(id);
+  }
+
   private async generateUniqueSkuForOp(opNumber: string): Promise<string> {
     const cleanOp = opNumber.replace(/\D/g, ''); // Solo dígitos
     const opLen = cleanOp.length;

@@ -37,7 +37,10 @@ import {
   ChevronsRight,
   Boxes,
   Image as ImageIcon,
-  Maximize2
+  Maximize2,
+  Link2,
+  TrendingUp,
+  Coins
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -46,6 +49,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ImageZoomModal } from '../../components/common/ImageZoomModal';
+import { LinkOpModal } from '../../components/products/LinkOpModal';
 import { getImageUrl } from '../../lib/imageUrl';
 
 export default function InventoryPage() {
@@ -65,6 +69,7 @@ export default function InventoryPage() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [zoomProduct, setZoomProduct] = useState<any>(null);
+  const [linkOpProduct, setLinkOpProduct] = useState<any>(null);
 
   // Estados para controlar visualización de variantes
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
@@ -212,6 +217,10 @@ export default function InventoryPage() {
   const totalValue = filteredProducts.reduce((acc, p) =>
     acc + p.variants.reduce((sum, v) => sum + (v.stock * p.purchasePrice), 0), 0
   );
+  const totalSalesValue = filteredProducts.reduce((acc, p) =>
+    acc + p.variants.reduce((sum, v) => sum + (v.stock * (p.sellingPrice || 0)), 0), 0
+  );
+  const totalRecoveryMargin = totalSalesValue - totalValue;
 
   const inventoryTypes = [
     { id: 'TODOS', label: 'Todos', icon: Package },
@@ -624,63 +633,131 @@ export default function InventoryPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
+      {selectedInventoryType === 'SEGUNDA' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-fade-in">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl shadow-sm border border-amber-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-amber-500 text-white rounded-xl shadow-md shadow-amber-500/20">
+                <RefreshCw className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-black tracking-wider uppercase text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">
+                Prendas de Segunda
+              </span>
             </div>
-            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-              Total
-            </span>
+            <h3 className="text-3xl font-black text-gray-900 mt-2">{totalStock}</h3>
+            <p className="text-xs font-bold text-gray-600 mt-0.5">Unidades dañadas/observadas</p>
+            <p className="text-[11px] text-amber-700 font-semibold mt-2">{totalProducts} modelos en catálogo</p>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">{totalProducts}</h3>
-          <p className="text-gray-600 text-sm">Productos</p>
-          <p className="text-xs text-gray-400 mt-1">{totalVariants} variantes</p>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+          <div className="bg-gradient-to-br from-rose-50 to-red-50/50 rounded-2xl shadow-sm border border-rose-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-rose-500 text-white rounded-xl shadow-md shadow-rose-500/20">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-black tracking-wider uppercase text-rose-800 bg-rose-100 px-2.5 py-1 rounded-full">
+                Costo Invertido (Lotes)
+              </span>
             </div>
-            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-              Stock
-            </span>
+            <h3 className="text-3xl font-black text-rose-700 mt-2">
+              S/ {totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h3>
+            <p className="text-xs font-bold text-gray-600 mt-0.5">Costo de fabricación absorbido</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-2">Sincronizado de lotes de primera</p>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">{totalStock}</h3>
-          <p className="text-gray-600 text-sm">Unidades en stock</p>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-yellow-600" />
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 rounded-2xl shadow-sm border border-emerald-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-600/20">
+                <Coins className="w-6 h-6" />
+              </div>
+              <span className="text-[10px] font-black tracking-wider uppercase text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full">
+                Venta Estimada (Liquidación)
+              </span>
             </div>
-            <span className="text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">
-              Alerta
-            </span>
+            <h3 className="text-3xl font-black text-emerald-700 mt-2">
+              S/ {totalSalesValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h3>
+            <p className="text-xs font-bold text-gray-600 mt-0.5">Ingreso total proyectado</p>
+            <p className="text-[11px] text-emerald-700 font-medium mt-2">A precio de venta de segunda</p>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">{lowStockCount}</h3>
-          <p className="text-gray-600 text-sm">Stock bajo</p>
-          <p className="text-xs text-gray-400 mt-1">{outOfStockCount} agotados</p>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-purple-600" />
+          <div className={`bg-gradient-to-br ${totalRecoveryMargin >= 0 ? 'from-blue-50 to-indigo-50/50 border-blue-200' : 'from-gray-50 to-slate-100 border-gray-200'} rounded-2xl shadow-sm border p-6`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className={`p-3 ${totalRecoveryMargin >= 0 ? 'bg-indigo-600' : 'bg-gray-600'} text-white rounded-xl shadow-md`}>
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <span className={`text-[10px] font-black tracking-wider uppercase px-2.5 py-1 rounded-full ${totalRecoveryMargin >= 0 ? 'text-indigo-800 bg-indigo-100' : 'text-gray-700 bg-gray-200'}`}>
+                {totalRecoveryMargin >= 0 ? 'Margen Positivo' : 'Recuperación Parcial'}
+              </span>
             </div>
-            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-              Valor
-            </span>
+            <h3 className={`text-3xl font-black mt-2 ${totalRecoveryMargin >= 0 ? 'text-indigo-700' : 'text-gray-800'}`}>
+              S/ {totalRecoveryMargin.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h3>
+            <p className="text-xs font-bold text-gray-600 mt-0.5">Diferencia Venta - Costo</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-2">
+              {totalRecoveryMargin >= 0 ? 'Margen proyectado de venta' : 'Pérdida absorbida de material'}
+            </p>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">
-            S/ {totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </h3>
-          <p className="text-gray-600 text-sm">Valor del inventario</p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Package className="w-6 h-6 text-blue-600" />
+              </div>
+              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                Total
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900">{totalProducts}</h3>
+            <p className="text-gray-600 text-sm">Productos</p>
+            <p className="text-xs text-gray-400 mt-1">{totalVariants} variantes</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                Stock
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900">{totalStock}</h3>
+            <p className="text-gray-600 text-sm">Unidades en stock</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+              </div>
+              <span className="text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded-full">
+                Alerta
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900">{lowStockCount}</h3>
+            <p className="text-gray-600 text-sm">Stock bajo</p>
+            <p className="text-xs text-gray-400 mt-1">{outOfStockCount} agotados</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <DollarSign className="w-6 h-6 text-purple-600" />
+              </div>
+              <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                Valor
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900">
+              S/ {totalValue.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </h3>
+            <p className="text-gray-600 text-sm">Valor del inventario</p>
+          </div>
+        </div>
+      )}
 
       {/* Barra de herramientas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
@@ -1006,9 +1083,29 @@ export default function InventoryPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <code className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                            {product.op || '--'}
-                          </code>
+                          {product.inventoryType === 'SEGUNDA' ? (
+                            <button
+                              type="button"
+                              onClick={() => setLinkOpProduct(product)}
+                              className={`group/op text-xs font-black px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                product.op
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-400 shadow-sm'
+                                  : 'bg-amber-50 border-dashed border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400'
+                              }`}
+                              title={
+                                product.op
+                                  ? `OP ${product.op} (Click para cambiar o verificar lote de origen)`
+                                  : 'Prenda de Segunda sin OP - Click para conectar a OP de Primera'
+                              }
+                            >
+                              <Link2 className="w-3.5 h-3.5 text-indigo-500 group-hover/op:rotate-45 transition-transform" />
+                              <span>{product.op ? `OP ${product.op}` : '+ Conectar OP'}</span>
+                            </button>
+                          ) : (
+                            <code className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                              {product.op || '--'}
+                            </code>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <code className="text-xs bg-gray-100 px-2 py-1 rounded">
@@ -1439,6 +1536,16 @@ export default function InventoryPage() {
           title={zoomProduct.name}
           category={zoomProduct.category}
           sku={zoomProduct.sku}
+        />
+      )}
+
+      {/* Modal Vincular OP para Productos de Segunda */}
+      {linkOpProduct && (
+        <LinkOpModal
+          isOpen={!!linkOpProduct}
+          onClose={() => setLinkOpProduct(null)}
+          product={linkOpProduct}
+          onSuccess={() => window.location.reload()}
         />
       )}
     </Layout>

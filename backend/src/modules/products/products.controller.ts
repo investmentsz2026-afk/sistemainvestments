@@ -58,6 +58,19 @@ export class ProductsController {
     return this.productsService.findByVariantSku(variantSku);
   }
 
+  @Get('first-quality-ops')
+  getFirstQualityOps() {
+    return this.productsService.getFirstQualityOps();
+  }
+
+  @Post(':id/link-op')
+  linkOp(
+    @Param('id') id: string,
+    @Body() body: { op: string; syncPrices?: boolean },
+  ) {
+    return this.productsService.linkOpToProduct(id, body.op, body.syncPrices !== false);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);

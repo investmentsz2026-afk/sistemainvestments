@@ -32,12 +32,14 @@ import {
   Download,
   History,
   X,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Link2
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarcodeModal } from '../../../components/products/BarcodeModal';
+import { LinkOpModal } from '../../../components/products/LinkOpModal';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -55,6 +57,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [variantForBarcode, setVariantForBarcode] = useState<any>(null);
   const [showImageZoom, setShowImageZoom] = useState(false);
+  const [showLinkOpModal, setShowLinkOpModal] = useState(false);
 
   const fetchProductDetail = async () => {
     try {
@@ -174,6 +177,46 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lote de Origen para Productos de Segunda */}
+      {product.inventoryType === 'SEGUNDA' && (
+        <div className="mb-6 p-5 bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-blue-500/10 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md shadow-amber-500/20">
+              <Link2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                  Prenda de Segunda
+                </span>
+                {product.op ? (
+                  <span className="text-xs font-black font-mono px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Lote de Origen: OP {product.op}
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Sin OP de primera vinculada
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {product.op
+                  ? `Esta prenda proviene del lote de primera calidad OP ${product.op}. Los costos y SKUs de variantes están sincronizados con la producción.`
+                  : 'Conecta este producto a su OP de primera calidad para sincronizar su costo unitario de producción y trazabilidad de lote.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLinkOpModal(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/20 transition flex-shrink-0 cursor-pointer"
+          >
+            <Link2 className="w-4 h-4" />
+            {product.op ? 'Cambiar OP de Origen' : 'Conectar a OP de Primera'}
+          </button>
         </div>
       )}
 
@@ -666,6 +709,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             />
           </div>
         </div>
+      )}
+      {/* Modal Vincular OP */}
+      {showLinkOpModal && (
+        <LinkOpModal
+          isOpen={showLinkOpModal}
+          onClose={() => setShowLinkOpModal(false)}
+          product={product}
+          onSuccess={() => fetchProductDetail()}
+        />
       )}
     </Layout>
   );
