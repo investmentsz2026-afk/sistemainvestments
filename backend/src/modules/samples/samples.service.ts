@@ -121,6 +121,7 @@ export class SamplesService {
           commercialId,
           approvedAt: status === 'APROBADO' ? new Date() : null,
           adminOpApprovalStatus: status === 'APROBADO' ? 'PENDIENTE' : existingSample.adminOpApprovalStatus,
+          materialReceiptStatus: status === 'APROBADO' ? 'DESARROLLO_COMPLETADO' : existingSample.materialReceiptStatus,
         },
       });
 

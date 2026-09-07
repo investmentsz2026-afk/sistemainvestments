@@ -882,8 +882,8 @@ export default function SampleDetailPage() {
                                         </button>
                                     )}
 
-                                    {user?.role === 'UDP' && sample.materialReceiptStatus === 'RECIBIDO_UDP' && (
-                                        <div className="flex flex-col gap-4">
+                                    {user?.role === 'UDP' && sample.status === 'PENDIENTE' && (
+                                        <div className="flex flex-col gap-4 mt-4">
                                             <button 
                                                 onClick={() => {
                                                     setReqModalMode('EDIT');
@@ -891,15 +891,17 @@ export default function SampleDetailPage() {
                                                 }}
                                                 className="w-full py-4 bg-white border-2 border-indigo-600 text-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-50 transition shadow-lg shadow-indigo-100"
                                             >
-                                                <ClipboardList className="w-5 h-5 inline mr-2" /> Llenar requerimientos
+                                                <ClipboardList className="w-5 h-5 inline mr-2" /> Llenar requerimientos / Ficha Técnica
                                             </button>
-                                            <button 
-                                                onClick={handleUDPCompleteDevelopment}
-                                                disabled={isSaving}
-                                                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition shadow-xl shadow-indigo-200"
-                                            >
-                                                <Send className="w-5 h-5 inline mr-2" /> Ya hice la muestra y enviar a comercial
-                                            </button>
+                                            {sample.materialReceiptStatus !== 'DESARROLLO_COMPLETADO' && (
+                                                <button 
+                                                    onClick={handleUDPCompleteDevelopment}
+                                                    disabled={isSaving}
+                                                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition shadow-xl shadow-indigo-200"
+                                                >
+                                                    <Send className="w-5 h-5 inline mr-2" /> Ya hice la muestra y enviar a comercial
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1515,31 +1517,22 @@ export default function SampleDetailPage() {
                             </AnimatePresence>
                         )}
 
-                        {/* FINAL ACTION BUTTONS FOR COMMERCIAL - ENABLED ONLY IF MATERIALS ARE READY */}
+                        {/* FINAL ACTION BUTTONS FOR COMMERCIAL */}
                         {canCommercialEdit && isCommercialMode && (
                             <div className="space-y-4">
-                                {sample.materialReceiptStatus && sample.materialReceiptStatus !== 'DESARROLLO_COMPLETADO' && sample.status === 'PENDIENTE' ? (
-                                    <div className="p-6 bg-amber-50 rounded-3xl border border-amber-200 flex items-center gap-4 text-amber-700">
-                                        <Clock className="w-6 h-6 flex-shrink-0" />
-                                        <p className="text-xs font-bold uppercase tracking-tight">
-                                            La revisión comercial está bloqueada hasta que el desarrollo sea completado por UDP.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={handleSaveReview}
-                                        disabled={isSaving || !reviewStatus}
-                                        className="w-full py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50"
-                                    >
-                                        {isSaving ? (
-                                            <>Procesando...</>
-                                        ) : (
-                                            <>
-                                                <Save className="w-6 h-6" /> {sample.status === 'APROBADO' ? 'Guardar Cambios y Notificar a Admin' : 'Guardar Veredicto Final'}
-                                            </>
-                                        )}
-                                    </button>
-                                )}
+                                <button
+                                    onClick={handleSaveReview}
+                                    disabled={isSaving || !reviewStatus}
+                                    className="w-full py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isSaving ? (
+                                        <>Procesando...</>
+                                    ) : (
+                                        <>
+                                            <Save className="w-6 h-6" /> {sample.status === 'APROBADO' ? 'Guardar Cambios y Notificar a Admin' : 'Guardar Veredicto Final'}
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         )}
 
