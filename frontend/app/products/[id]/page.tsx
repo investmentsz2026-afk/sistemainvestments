@@ -33,7 +33,9 @@ import {
   History,
   X,
   Image as ImageIcon,
-  Link2
+  Link2,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -289,8 +291,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   Este producto no tiene variantes registradas (SKUs pendientes).
                 </p>
                 <p className="text-xs text-gray-500 mb-4">
-                  Las variantes se generarán automáticamente al registrar su Orden de Producción (OP).
+                  {product.op
+                    ? 'Este producto tiene una OP asignada. Puedes generar automáticamente todas las variantes con sus SKUs correspondientes.'
+                    : 'Las variantes se generarán automáticamente al registrar o conectar su Orden de Producción (OP).'}
                 </p>
+
+                {product.op && (
+                  <div className="mb-6 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await api.post(`/products/${product.id}/link-op`, { op: product.op, syncPrices: true });
+                          toast.success('Variantes y SKUs generados exitosamente');
+                          fetchProductDetail();
+                        } catch (err: any) {
+                          toast.error(err.response?.data?.message || 'Error al generar variantes');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-500/25 transition cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" /> Generar Variantes y SKUs de OP {product.op}
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-6 justify-center text-xs">
                   <div className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 shadow-sm text-left min-w-[150px]">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Tallas del Producto</span>

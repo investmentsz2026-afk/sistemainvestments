@@ -586,33 +586,136 @@ export class ProductsService {
       include: { variants: true },
     });
 
+    // Determinar tallas y colores a usar
+    const sizesToUse = (product.sizes && product.sizes.length > 0)
+      ? product.sizes
+      : (refProduct?.sizes || []);
+
+    const colorsToUse = (product.colors && product.colors.length > 0)
+      ? product.colors
+      : (refProduct?.colors || []);
+
     const updateData: any = {
       op: cleanOp,
+      sizes: sizesToUse,
+      colors: colorsToUse,
     };
 
-    if (refProduct && syncPrices) {
-      updateData.purchasePrice = refProduct.purchasePrice;
-      if (refProduct.realPrice !== undefined && refProduct.realPrice !== null) {
-        updateData.realPrice = refProduct.realPrice;
+    if (refProduct) {
+      if (syncPrices) {
+        updateData.purchasePrice = refProduct.purchasePrice;
+        if (refProduct.realPrice !== undefined && refProduct.realPrice !== null) {
+          updateData.realPrice = refProduct.realPrice;
+        }
+      }
+      if (!product.entalle && refProduct.entalle) {
+        updateData.entalle = refProduct.entalle;
+      }
+      if (!product.imageUrl && refProduct.imageUrl) {
+        updateData.imageUrl = refProduct.imageUrl;
       }
     }
 
     // Actualizar producto
-    const updatedProduct = await this.prisma.product.update({
+    await this.prisma.product.update({
       where: { id },
       data: updateData,
-      include: { variants: true },
     });
 
-    // Actualizar variantSku de todas las variantes del producto para que incluyan la OP
-    if (updatedProduct.variants && updatedProduct.variants.length > 0) {
-      for (const variant of updatedProduct.variants) {
-        const newVariantSku = await this.generateUniqueSkuForOp(cleanOp);
-        await this.prisma.productVariant.update({
-          where: { id: variant.id },
-          data: { variantSku: newVariantSku },
-        });
+    // Armar la lista consolidada de variantes que debe tener el producto
+    const desiredVariantsMap = new Map<string, { size: string; color: string }>();
+
+    // 1. Tomar variantes existentes en refProduct si las hay
+    if (refProduct?.variants && refProduct.variants.length > 0) {
+      for (const v of refProduct.variants) {
+        const s = (v.size || 'Única').trim();
+        const c = (v.color || 'Sin Color').trim();
+        const key = `${s.toUpperCase()}_${c.toUpperCase()}`;
+        desiredVariantsMap.set(key, { size: s, color: c });
       }
+    }
+
+    // 2. Tomar combinaciones de sizesToUse x colorsToUse
+    if (sizesToUse.length > 0 && colorsToUse.length > 0) {
+      for (const s of sizesToUse) {
+        for (const c of colorsToUse) {
+          const sClean = s.trim();
+          const cClean = c.trim();
+          const key = `${sClean.toUpperCase()}_${cClean.toUpperCase()}`;
+          if (!desiredVariantsMap.has(key)) {
+            desiredVariantsMap.set(key, { size: sClean, color: cClean });
+          }
+        }
+      }
+    } else if (sizesToUse.length > 0) {
+      for (const s of sizesToUse) {
+        const sClean = s.trim();
+        const cClean = 'Sin Color';
+        const key = `${sClean.toUpperCase()}_${cClean.toUpperCase()}`;
+        if (!desiredVariantsMap.has(key)) {
+          desiredVariantsMap.set(key, { size: sClean, color: cClean });
+        }
+      }
+    } else if (colorsToUse.length > 0) {
+      for (const c of colorsToUse) {
+        const sClean = 'Única';
+        const cClean = c.trim();
+        const key = `${sClean.toUpperCase()}_${cClean.toUpperCase()}`;
+        if (!desiredVariantsMap.has(key)) {
+          desiredVariantsMap.set(key, { size: sClean, color: cClean });
+        }
+      }
+    }
+
+    // Variantes actuales del producto
+    const existingVariants = await this.prisma.productVariant.findMany({
+      where: { productId: id },
+    });
+
+    const existingKeys = new Set<string>();
+
+    for (const v of existingVariants) {
+      const key = `${(v.size || '').trim().toUpperCase()}_${(v.color || '').trim().toUpperCase()}`;
+      existingKeys.add(key);
+
+      // Actualizar variantSku para que corresponda a la OP
+      const newVariantSku = await this.generateUniqueSkuForOp(cleanOp);
+      await this.prisma.productVariant.update({
+        where: { id: v.id },
+        data: { variantSku: newVariantSku },
+      });
+    }
+
+    // Crear las variantes faltantes
+    for (const [key, item] of desiredVariantsMap.entries()) {
+      if (!existingKeys.has(key)) {
+        const newVariantSku = await this.generateUniqueSkuForOp(cleanOp);
+        await this.prisma.productVariant.create({
+          data: {
+            productId: id,
+            size: item.size,
+            color: item.color,
+            stock: 0,
+            variantSku: newVariantSku,
+          },
+        });
+        existingKeys.add(key);
+      }
+    }
+
+    // Si aún así no hay variantes registradas, crear al menos una variante básica
+    const countAfter = await this.prisma.productVariant.count({ where: { productId: id } });
+    if (countAfter === 0) {
+      const defaultVariantSku = await this.generateUniqueSkuForOp(cleanOp);
+      await this.prisma.productVariant.create({
+        data: {
+          productId: id,
+          size: 'Única',
+          color: 'Sin Color',
+          stock: 0,
+          variantSku: defaultVariantSku,
+        },
+      });
     }
 
     return this.findOne(id);
