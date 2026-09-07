@@ -35,7 +35,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Boxes
+  Boxes,
+  Image as ImageIcon,
+  Maximize2
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -43,6 +45,8 @@ import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ImageZoomModal } from '../../components/common/ImageZoomModal';
+import { getImageUrl } from '../../lib/imageUrl';
 
 export default function InventoryPage() {
   const { products, isLoading } = useProducts();
@@ -60,6 +64,7 @@ export default function InventoryPage() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [showMovementModal, setShowMovementModal] = useState(false);
+  const [zoomProduct, setZoomProduct] = useState<any>(null);
 
   // Estados para controlar visualización de variantes
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
@@ -943,21 +948,60 @@ export default function InventoryPage() {
                       statusText = 'Stock bajo';
                     }
 
+                    const isAvio =
+                      product.inventoryType === 'AVIOS' ||
+                      product.inventoryType?.toLowerCase() === 'avios' ||
+                      product.inventoryType?.toLowerCase() === 'avíos' ||
+                      product.category?.toLowerCase() === 'avios' ||
+                      product.category?.toLowerCase() === 'avíos' ||
+                      product.category?.toLowerCase() === 'avio';
+
                     return (
                       <tr key={product.id} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4 max-w-[250px]">
-                          <div>
-                            <p className="font-medium text-gray-900 truncate" title={product.name}>
-                              {product.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500 truncate max-w-[100px]" title={product.category}>
-                                {product.category}
-                              </span>
-                              <span className="w-1 h-1 bg-gray-300 rounded-full flex-shrink-0"></span>
-                              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded truncate flex-shrink-0">
-                                {inventoryTypes.find(t => t.id === product.inventoryType)?.label || product.inventoryType}
-                              </span>
+                        <td className="px-6 py-4 max-w-[280px]">
+                          <div className="flex items-center gap-3">
+                            {/* Thumbnail solo para Avíos */}
+                            {isAvio && (
+                              product.imageUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setZoomProduct(product)}
+                                  className="relative group/thumb w-11 h-11 flex-shrink-0 rounded-lg overflow-hidden border-2 border-purple-200 hover:border-purple-500 bg-gray-50 shadow-sm transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                                  title="Click para ver imagen ampliada"
+                                >
+                                  <img
+                                    src={getImageUrl(product.imageUrl)}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-110"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Maximize2 className="w-3.5 h-3.5 text-white drop-shadow" />
+                                  </div>
+                                </button>
+                              ) : (
+                                <div
+                                  className="w-11 h-11 flex-shrink-0 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-400"
+                                  title="Avío sin imagen"
+                                >
+                                  <ImageIcon className="w-4 h-4 text-gray-300" />
+                                  <span className="text-[8px] font-medium text-gray-400 mt-0.5">Sin foto</span>
+                                </div>
+                              )
+                            )}
+
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate" title={product.name}>
+                                {product.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-gray-500 truncate max-w-[100px]" title={product.category}>
+                                  {product.category}
+                                </span>
+                                <span className="w-1 h-1 bg-gray-300 rounded-full flex-shrink-0"></span>
+                                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded truncate flex-shrink-0">
+                                  {inventoryTypes.find(t => t.id === product.inventoryType)?.label || product.inventoryType}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1385,6 +1429,18 @@ export default function InventoryPage() {
           </div>
         )
       }
-    </Layout >
+
+      {/* Modal Zoom de Imagen */}
+      {zoomProduct && (
+        <ImageZoomModal
+          isOpen={!!zoomProduct}
+          onClose={() => setZoomProduct(null)}
+          imageUrl={zoomProduct.imageUrl}
+          title={zoomProduct.name}
+          category={zoomProduct.category}
+          sku={zoomProduct.sku}
+        />
+      )}
+    </Layout>
   );
 }

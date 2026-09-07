@@ -23,6 +23,7 @@ export interface Product {
   variants: ProductVariant[];
   sizes?: string[];
   colors?: string[];
+  imageUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

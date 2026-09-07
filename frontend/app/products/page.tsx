@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Layout } from '../../components/common/Layout';
 import { ProductCard } from '../../components/products/ProductCard';
 import { BarcodeModal } from '../../components/products/BarcodeModal';
+import { ImageZoomModal } from '../../components/common/ImageZoomModal';
 import { useProducts } from '../../hooks/useProducts';
 import { Plus, Search, Package, Barcode, AlertTriangle, CheckCircle, RefreshCw, Clock, Boxes, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +17,7 @@ export default function ProductsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any>(null);
   const [selectedInventoryType, setSelectedInventoryType] = useState('TODOS');
+  const [zoomProduct, setZoomProduct] = useState<any>(null);
   const { products, isLoading, deleteProduct, isDeleting } = useProducts();
 
   const productTabs = [
@@ -122,6 +124,7 @@ export default function ProductsPage() {
               key={product.id}
               product={product}
               onViewBarcodes={() => handleViewBarcodes(product)}
+              onZoomImage={(p) => setZoomProduct(p)}
               onEdit={() => {
                 window.location.href = `/products/${product.id}/edit`;
               }}
@@ -149,6 +152,18 @@ export default function ProductsPage() {
             Agregar Primer Producto
           </Link>
         </div>
+      )}
+
+      {/* Modal Zoom de Imagen */}
+      {zoomProduct && (
+        <ImageZoomModal
+          isOpen={!!zoomProduct}
+          onClose={() => setZoomProduct(null)}
+          imageUrl={zoomProduct.imageUrl}
+          title={zoomProduct.name}
+          category={zoomProduct.category}
+          sku={zoomProduct.sku}
+        />
       )}
 
       {/* Modal de Códigos de Barras */}

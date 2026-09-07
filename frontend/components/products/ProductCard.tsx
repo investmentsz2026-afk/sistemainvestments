@@ -1,22 +1,34 @@
 // frontend/components/products/ProductCard.tsx
-import { Edit, Trash2, Eye, AlertTriangle, Package, Barcode } from 'lucide-react';
+import React from 'react';
+import { Edit, Trash2, Eye, AlertTriangle, Barcode, Image as ImageIcon, Maximize2 } from 'lucide-react';
 import Link from 'next/link';
+import { getImageUrl } from '../../lib/imageUrl';
 
 interface ProductCardProps {
   product: any;
   onViewBarcodes: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onZoomImage?: (product: any) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onViewBarcodes,
   onEdit,
-  onDelete
+  onDelete,
+  onZoomImage,
 }) => {
   const totalStock = product.variants.reduce((sum: number, v: any) => sum + v.stock, 0);
   const hasLowStock = product.variants.some((v: any) => v.stock <= product.minStock);
+
+  const isAvio =
+    product.inventoryType === 'AVIOS' ||
+    product.inventoryType?.toLowerCase() === 'avios' ||
+    product.inventoryType?.toLowerCase() === 'avíos' ||
+    product.category?.toLowerCase() === 'avios' ||
+    product.category?.toLowerCase() === 'avíos' ||
+    product.category?.toLowerCase() === 'avio';
 
   const getInventoryTypeBadge = (type: string) => {
     switch (type) {
@@ -41,21 +53,53 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition group">
       <div className="p-5">
         {/* Header con acciones */}
-        <div className="flex items-start justify-between mb-3 gap-4">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 truncate" title={product.name}>
-              {product.name}
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate max-w-[100px]">
-                {product.category}
-              </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold truncate ${badge.className}`}>
-                {badge.label}
-              </span>
-              <span className="text-xs text-gray-400 truncate">SKU: {product.sku}</span>
+        <div className="flex items-start justify-between mb-3 gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Thumbnail solo para Avíos */}
+            {isAvio && (
+              product.imageUrl ? (
+                <button
+                  type="button"
+                  onClick={() => onZoomImage?.(product)}
+                  className="relative group/thumb w-14 h-14 flex-shrink-0 rounded-xl overflow-hidden border-2 border-purple-200 hover:border-purple-500 bg-gray-50 shadow-sm transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                  title="Click para ver imagen ampliada"
+                >
+                  <img
+                    src={getImageUrl(product.imageUrl)}
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                    <Maximize2 className="w-4 h-4 text-white drop-shadow" />
+                  </div>
+                </button>
+              ) : (
+                <div
+                  className="w-14 h-14 flex-shrink-0 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-400"
+                  title="Avío sin imagen"
+                >
+                  <ImageIcon className="w-5 h-5 text-gray-300" />
+                  <span className="text-[9px] font-medium text-gray-400">Sin foto</span>
+                </div>
+              )
+            )}
+
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-gray-900 truncate" title={product.name}>
+                {product.name}
+              </h3>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate max-w-[100px]">
+                  {product.category}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold truncate ${badge.className}`}>
+                  {badge.label}
+                </span>
+                <span className="text-xs text-gray-400 truncate">SKU: {product.sku}</span>
+              </div>
             </div>
           </div>
+
           <div className="flex gap-1 flex-shrink-0">
             <button
               onClick={onViewBarcodes}
@@ -92,10 +136,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="bg-gray-50 rounded-lg p-2">
             <p className="text-xs text-gray-500">Stock Total</p>
-            <p className={`text-lg font-bold ${totalStock === 0 ? 'text-red-600' :
-              hasLowStock ? 'text-yellow-600' :
-                'text-green-600'
-              }`}>
+            <p
+              className={`text-lg font-bold ${
+                totalStock === 0 ? 'text-red-600' : hasLowStock ? 'text-yellow-600' : 'text-green-600'
+              }`}
+            >
               {totalStock}
             </p>
           </div>
@@ -121,11 +166,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="space-y-1.5">
             {product.variants.slice(0, 3).map((variant: any) => (
               <div key={variant.id} className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 truncate flex-1 min-w-0 mr-2" title={`${variant.size} / ${variant.color}`}>
+                <span
+                  className="text-gray-600 truncate flex-1 min-w-0 mr-2"
+                  title={`${variant.size} / ${variant.color}`}
+                >
                   {variant.size} / {variant.color}
                 </span>
-                <span className={`font-medium flex-shrink-0 ${variant.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'
-                  }`}>
+                <span
+                  className={`font-medium flex-shrink-0 ${
+                    variant.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'
+                  }`}
+                >
                   {variant.stock} uni.
                 </span>
               </div>
