@@ -617,21 +617,22 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 {selectedVariant.size} / {selectedVariant.color}
               </p>
               <p className="text-sm text-gray-600 mt-1">
-                Stock actual: <span className="font-medium">{selectedVariant.stock}</span>
+                Stock actual: <span className="font-bold text-gray-900">{selectedVariant.stock} {product.unit || 'uds'}</span>
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad
+                  Cantidad {product.unit ? `(${product.unit})` : '(Unidades)'}
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  step="any"
+                  min="0.01"
                   max={movementType === 'EXIT' ? selectedVariant.stock : undefined}
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
+                  onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>

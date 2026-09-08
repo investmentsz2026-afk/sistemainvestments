@@ -132,6 +132,7 @@ export default function NewProductPage() {
       name: item.name,
       category: item.category,
       inventoryType: invType,
+      unit: item.unit || (invType === 'MATERIALES' ? 'METROS' : 'UND'),
       description: item.description || `Importado de Factura: ${purchase.invoiceNumber || 'Sin Nro.'}`,
       purchasePrice: item.price,
       sellingPrice: item.price * 1.3,

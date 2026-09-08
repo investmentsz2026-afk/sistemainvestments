@@ -44,6 +44,8 @@ interface ScannedItem {
   size: string;
   color: string;
   stock: number;
+  unit?: string;
+  inventoryType?: string;
   quantity: number;
   price: number;
   timestamp: Date;
@@ -57,6 +59,7 @@ interface QuantityInputProps {
 
 const QuantityInput: React.FC<QuantityInputProps> = ({ item, updateItemQuantity, movementType }) => {
   const [localVal, setLocalVal] = useState(item.quantity.toString());
+  const isDecimalAllowed = ['METROS', 'KILOS', 'YARDAS'].includes(item.unit?.toUpperCase() || '');
 
   useEffect(() => {
     setLocalVal(item.quantity.toString());
@@ -64,15 +67,15 @@ const QuantityInput: React.FC<QuantityInputProps> = ({ item, updateItemQuantity,
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    if (val === '' || /^\d+$/.test(val)) {
+    if (val === '' || (isDecimalAllowed ? /^\d*\.?\d*$/.test(val) : /^\d+$/.test(val))) {
       setLocalVal(val);
-      if (val !== '') {
-        const num = parseInt(val, 10);
+      if (val !== '' && !isNaN(parseFloat(val))) {
+        const num = parseFloat(val);
         if (num > 0) {
           if (movementType === 'EXIT' && num > item.stock) {
             updateItemQuantity(item.variantSku, item.stock);
             setLocalVal(item.stock.toString());
-            toast.error(`Stock insuficiente. Stock actual: ${item.stock}`);
+            toast.error(`Stock insuficiente. Stock actual: ${item.stock} ${item.unit || 'uds'}`);
           } else {
             updateItemQuantity(item.variantSku, num);
           }
@@ -82,22 +85,26 @@ const QuantityInput: React.FC<QuantityInputProps> = ({ item, updateItemQuantity,
   };
 
   const handleBlur = () => {
-    if (localVal === '' || parseInt(localVal, 10) < 1) {
+    if (localVal === '' || parseFloat(localVal) <= 0 || isNaN(parseFloat(localVal))) {
       updateItemQuantity(item.variantSku, 1);
       setLocalVal('1');
     }
   };
 
+  const unitLabel = item.unit === 'METROS' ? 'm' : item.unit === 'KILOS' ? 'kg' : item.unit === 'YARDAS' ? 'yd' : item.unit === 'CONOS' ? 'conos' : item.unit === 'ROLLOS' ? 'rollos' : 'uds';
+
   return (
-    <input
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      value={localVal}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      className="w-16 text-center font-medium border border-gray-300 rounded py-0.5 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
-    />
+    <div className="inline-flex items-center gap-1.5">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={localVal}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        className="w-20 text-center font-bold border border-gray-300 rounded-lg py-1 px-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white shadow-inner"
+      />
+      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{unitLabel}</span>
+    </div>
   );
 };
 
@@ -332,6 +339,8 @@ export default function ScanPage() {
           size: variant.size,
           color: variant.color,
           stock: variant.stock,
+          unit: variant.product.unit || 'UND',
+          inventoryType: variant.product.inventoryType,
           quantity: 1,
           price: variant.product.purchasePrice, // Mostrar costo de producción en vez del precio de venta
           timestamp: new Date()

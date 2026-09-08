@@ -41,6 +41,7 @@ export class ProductsService {
         inventoryType: createProductDto.inventoryType || 'TERMINADOS',
         description: createProductDto.description,
         op: createProductDto.op,
+        unit: createProductDto.unit || 'UND',
         entalle: createProductDto.entalle,
         purchasePrice: createProductDto.purchasePrice,
         sellingPrice: createProductDto.sellingPrice,

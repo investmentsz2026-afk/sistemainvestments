@@ -55,6 +55,7 @@ model Product {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   inventoryType    String            @default("TERMINADOS") @map("inventory_type")
   op               String?
+  unit             String?           @default("UND") @map("unit")
   colors           String[]          @default([])
   sizes            String[]          @default([])
   entalle          String?

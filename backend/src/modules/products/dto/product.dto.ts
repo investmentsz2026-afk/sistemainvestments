@@ -44,6 +44,10 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  unit?: string;
+
+  @IsString()
+  @IsOptional()
   entalle?: string;
 
   @IsNumber()
@@ -112,6 +116,10 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   op?: string;
+
+  @IsString()
+  @IsOptional()
+  unit?: string;
 
   @IsString()
   @IsOptional()

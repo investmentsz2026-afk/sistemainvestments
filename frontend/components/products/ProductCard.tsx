@@ -38,16 +38,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         return { label: 'Segunda', className: 'bg-amber-50 text-amber-700 border-amber-100' };
       case 'PROCESO':
         return { label: 'En Proceso', className: 'bg-indigo-50 text-indigo-700 border-indigo-100' };
+      case 'TALLAS ESPECIALES':
+        return { label: 'Plus Size', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' };
       case 'AVIOS':
         return { label: 'Avíos', className: 'bg-purple-50 text-purple-700 border-purple-100' };
       case 'MATERIALES':
         return { label: 'Materiales', className: 'bg-blue-50 text-blue-700 border-blue-100' };
+      case 'MAQUINARIA':
+        return { label: 'Maquinaria', className: 'bg-cyan-50 text-cyan-700 border-cyan-100' };
+      case 'OTROS':
+        return { label: 'Otros', className: 'bg-slate-50 text-slate-700 border-slate-100' };
       default:
         return { label: type, className: 'bg-gray-50 text-gray-700 border-gray-100' };
     }
   };
 
   const badge = getInventoryTypeBadge(product.inventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(product.inventoryType);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition group">
@@ -141,12 +148,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 totalStock === 0 ? 'text-red-600' : hasLowStock ? 'text-yellow-600' : 'text-green-600'
               }`}
             >
-              {totalStock}
+              {totalStock} <span className="text-xs font-normal text-gray-500">{product.unit || 'uds'}</span>
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
-            <p className="text-xs text-gray-500">Precio Venta</p>
-            <p className="text-lg font-bold text-gray-900">S/ {product.sellingPrice}</p>
+            <p className="text-xs text-gray-500">{isMaterialOrMachinery ? 'Costo Unit.' : 'Precio Venta'}</p>
+            <p className="text-lg font-bold text-gray-900">
+              S/ {(isMaterialOrMachinery ? product.purchasePrice : (product.sellingPrice || product.purchasePrice || 0)).toFixed(2)}
+            </p>
           </div>
         </div>
 

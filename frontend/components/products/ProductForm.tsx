@@ -17,10 +17,106 @@ const getImageUrl = (url: string) => {
   return `${SERVER_URL}${url}`;
 };
 
+export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string; label: string }>> = {
+  TERMINADOS: [
+    { value: 'Jeans', label: '👖 Jeans' },
+    { value: 'Pantalón', label: '👔 Pantalón' },
+    { value: 'Chaquetas', label: '🧥 Chaquetas / Casacas' },
+    { value: 'Camisas', label: '👕 Camisas' },
+    { value: 'Camisetas', label: '🎽 Camisetas / Polos' },
+    { value: 'Poleras', label: '🧥 Poleras / Chompas' },
+    { value: 'Vestidos', label: '👗 Vestidos' },
+    { value: 'Faldas', label: '🩳 Faldas' },
+    { value: 'Bermudas', label: '🩳 Bermudas / Shorts' },
+    { value: 'Deportivo', label: '🏃 Ropa Deportiva' },
+    { value: 'Formal', label: '🤵 Ropa Formal' },
+  ],
+  PROCESO: [
+    { value: 'Jeans en Proceso', label: '👖 Jeans en Proceso' },
+    { value: 'Pantalón en Proceso', label: '👔 Pantalón en Proceso' },
+    { value: 'Chaquetas en Proceso', label: '🧥 Chaquetas en Proceso' },
+    { value: 'Camisas en Proceso', label: '👕 Camisas en Proceso' },
+    { value: 'Polos en Proceso', label: '🎽 Polos en Proceso' },
+    { value: 'Corte', label: '✂️ Lotes de Corte' },
+    { value: 'Costura', label: '🧵 En Costura / Armado' },
+    { value: 'Lavandería', label: '🧼 En Lavandería / Teñido' },
+    { value: 'Acabados', label: '🏷️ En Acabados' },
+  ],
+  SEGUNDA: [
+    { value: 'Jeans', label: '👖 Jeans (2da Calidad)' },
+    { value: 'Pantalón', label: '👔 Pantalón (2da Calidad)' },
+    { value: 'Chaquetas', label: '🧥 Chaquetas (2da Calidad)' },
+    { value: 'Camisas', label: '👕 Camisas (2da Calidad)' },
+    { value: 'Camisetas', label: '🎽 Camisetas / Polos (2da Calidad)' },
+    { value: 'Poleras', label: '🧥 Poleras (2da Calidad)' },
+    { value: 'Bermudas', label: '🩳 Bermudas (2da Calidad)' },
+    { value: 'Prendas con Falla', label: '⚠️ Prendas con Falla / Observadas' },
+    { value: 'Saldos de Producción', label: '📦 Saldos de Producción' },
+  ],
+  'TALLAS ESPECIALES': [
+    { value: 'Jeans Plus Size', label: '👖 Jeans Plus Size (48-52)' },
+    { value: 'Pantalón Plus Size', label: '👔 Pantalón Plus Size' },
+    { value: 'Chaquetas Plus Size', label: '🧥 Chaquetas Plus Size' },
+    { value: 'Camisas Plus Size', label: '👕 Camisas Plus Size' },
+    { value: 'Bermudas Plus Size', label: '🩳 Bermudas Plus Size' },
+  ],
+  MAQUINARIA: [
+    { value: 'Accesorios de Costura', label: '⚙️ Accesorios de Costura / Guiadores' },
+    { value: 'Máquinas de Coser', label: '🧵 Máquinas de Coser (Recta, Remalle, Recubridora)' },
+    { value: 'Cortadoras y Cuchillas', label: '✂️ Cortadoras y Cuchillas' },
+    { value: 'Planchadoras y Calderos', label: '💨 Planchadoras y Calderos a Vapor' },
+    { value: 'Motores y Repuestos', label: '⚡ Motores, Fajas y Repuestos' },
+    { value: 'Herramientas y Mantenimiento', label: '🛠️ Herramientas y Mantenimiento' },
+    { value: 'Equipos de Acabado', label: '🏷️ Equipos de Acabado y Ojaladoras' },
+    { value: 'Otras Maquinarias', label: '📦 Otras Maquinarias e Instalaciones' },
+  ],
+  MATERIALES: [
+    { value: 'Telas y Rollos', label: '🧵 Telas y Rollos (Denim, Drill, Algodón, etc.)' },
+    { value: 'Hilos e Hilazas', label: '🧶 Hilos, Hilazas y Conos' },
+    { value: 'Forros y Entretelas', label: '🧥 Forros, Entretelas y Pellón' },
+    { value: 'Cierres por Mayor', label: '🧷 Cierres por Mayor e Insumos' },
+    { value: 'Insumos Químicos', label: '🧪 Químicos, Tintes y Lavandería' },
+    { value: 'Empaque y Cajas', label: '📦 Cajas, Plásticos y Cinta de Embalaje' },
+    { value: 'Otros Materiales', label: '🧱 Otros Materiales de Producción' },
+  ],
+  AVIOS: [
+    { value: 'Botones y Broches', label: '🔘 Botones, Broches y Remaches' },
+    { value: 'Remaches y Placas', label: '🏷️ Remaches Metálicos y Placas' },
+    { value: 'Cierres y Deslizadores', label: '🧷 Cierres, Cremalleras y Deslizadores' },
+    { value: 'Etiquetas', label: '🏷️ Etiquetas (Tejidas, Cuero, Estampadas, Cuidado)' },
+    { value: 'Hangtags y Tags', label: '🔖 Hangtags, Tags Colgantes y Pasadores' },
+    { value: 'Bolsas y Fundas', label: '🛍️ Bolsas de Prenda, Fundas y Empaque' },
+    { value: 'Elásticos y Cintas', label: '🩳 Elásticos, Cintas y Vivos' },
+    { value: 'Hilos Especiales', label: '🧵 Hilos Especiales y de Bordado' },
+    { value: 'Telas para Avíos', label: '🧵 Telas y Retazos para Avíos' },
+    { value: 'Otros Avíos', label: '🧷 Otros Avíos de Confección' },
+  ],
+  OTROS: [
+    { value: 'Limpieza y Mantenimiento', label: '🧹 Limpieza y Mantenimiento' },
+    { value: 'Útiles de Oficina', label: '📎 Útiles de Oficina y Papelería' },
+    { value: 'Embalaje y Despacho', label: '📦 Embalaje y Despacho' },
+    { value: 'Servicios', label: '🛠️ Servicios y Terceros' },
+    { value: 'Varios', label: '📋 Varios y Misceláneos' },
+  ],
+};
+
+export const UNITS_OF_MEASURE = [
+  { value: 'UND', label: 'Unidades (und)', symbol: 'und' },
+  { value: 'METROS', label: 'Metros (m)', symbol: 'm' },
+  { value: 'ROLLOS', label: 'Rollos (rollo)', symbol: 'rollo' },
+  { value: 'CONOS', label: 'Conos (cono)', symbol: 'cono' },
+  { value: 'KILOS', label: 'Kilos (kg)', symbol: 'kg' },
+  { value: 'YARDAS', label: 'Yardas (yd)', symbol: 'yd' },
+  { value: 'MILLAR', label: 'Millar (mil)', symbol: 'mil' },
+  { value: 'DOCENA', label: 'Docenas (doc)', symbol: 'doc' },
+  { value: 'PAQUETES', label: 'Paquetes (pqt)', symbol: 'pqt' },
+];
+
 const getProductSchema = (isEditing: boolean) => z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   category: z.string().min(1, 'La categoría es requerida'),
   inventoryType: z.string().min(1, 'El tipo de inventario es requerido'),
+  unit: z.string().optional().default('UND'),
   description: z.string().optional(),
   sku: z.string().optional(),
   op: z.string().optional(),
@@ -128,6 +224,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       name: '',
       category: '',
       inventoryType: 'TERMINADOS',
+      unit: 'UND',
       description: '',
       sku: '',
       op: '',
@@ -456,53 +553,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               )}
             </div>
 
-            {/* Categoría */}
-            <div>
-              <label className={labelClass}>
-                <Layers className="w-3.5 h-3.5" />
-                Categoría <span className="text-red-400">*</span>
-              </label>
-              <select
-                {...register('category')}
-                className={`${inputBase} cursor-pointer appearance-none ${errors.category ? inputError : inputNormal}`}
-              >
-                <option value="">Seleccionar categoría</option>
-                <option value="Jeans">👖 Jeans</option>
-                <option value="Pantalón">👔 Pantalón</option>
-                <option value="Camisas">👕 Camisas</option>
-                <option value="Camisetas">🎽 Camisetas</option>
-                <option value="Chaquetas">🧥 Chaquetas</option>
-                <option value="Vestidos">👗 Vestidos</option>
-                <option value="Faldas">🩳 Faldas</option>
-                <option value="Bermudas">🩳 Bermudas</option>
-                <option value="Deportivo">🏃 Deportivo</option>
-                <option value="Formal">🤵 Formal</option>
-              </select>
-              {errors.category && (
-                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {errors.category.message}
-                </p>
-              )}
-            </div>
-
             {/* Tipo de Inventario */}
             <div>
               <label className={labelClass}>
-                <Package className="w-3.5 h-3.5" />
+                <Package className="w-3.5 h-3.5 text-blue-600" />
                 Tipo de Inventario <span className="text-red-400">*</span>
               </label>
               <select
                 {...register('inventoryType')}
-                className={`${inputBase} cursor-pointer appearance-none ${errors.inventoryType ? inputError : inputNormal}`}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  setValue('inventoryType', newType);
+                  // Establecer primera categoría por defecto para el tipo seleccionado si la actual no pertenece
+                  const nextCats = CATEGORIES_BY_INVENTORY_TYPE[newType] || [];
+                  if (nextCats.length > 0 && !nextCats.some(c => c.value === watch('category'))) {
+                    setValue('category', nextCats[0].value);
+                  }
+                  // Sugerir unidad por defecto
+                  if (newType === 'MATERIALES') {
+                    setValue('unit', 'METROS');
+                  } else if (newType === 'AVIOS') {
+                    setValue('unit', 'UND');
+                  } else {
+                    setValue('unit', 'UND');
+                  }
+                }}
+                className={`${inputBase} cursor-pointer appearance-none font-bold ${errors.inventoryType ? inputError : inputNormal}`}
               >
-                <option value="TERMINADOS">📦 Productos Terminados</option>
+                <option value="TERMINADOS">📦 Productos Terminados (1ra Calidad)</option>
                 <option value="PROCESO">⏳ Productos en Proceso</option>
                 <option value="SEGUNDA">♻️ Productos de Segunda</option>
-                <option value="TALLAS ESPECIALES">🌟 Tallas Especiales</option>
-                <option value="MATERIALES">🧱 Materiales</option>
-                <option value="MAQUINARIA">⚙️ Maquinaria</option>
-                <option value="AVIOS">🧷 Avíos</option>
-                <option value="OTROS">📋 Otros</option>
+                <option value="TALLAS ESPECIALES">🌟 Tallas Especiales (Plus Size)</option>
+                <option value="AVIOS">🧷 Avíos de Confección</option>
+                <option value="MATERIALES">🧱 Materiales y Telas</option>
+                <option value="MAQUINARIA">⚙️ Maquinarias y Equipos</option>
+                <option value="OTROS">📋 Otros / Suministros</option>
               </select>
               {errors.inventoryType && (
                 <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
@@ -511,14 +596,72 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               )}
             </div>
 
+            {/* Categoría Dinámica según Tipo de Inventario */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  Categoría ({watchInventoryType}) <span className="text-red-400">*</span>
+                </label>
+              </div>
+              <select
+                {...register('category')}
+                className={`${inputBase} cursor-pointer appearance-none ${errors.category ? inputError : inputNormal}`}
+              >
+                <option value="">-- Seleccionar categoría --</option>
+                {(CATEGORIES_BY_INVENTORY_TYPE[watchInventoryType] || CATEGORIES_BY_INVENTORY_TYPE.TERMINADOS).map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+                {/* Opción personalizada si el producto ya tiene otra categoría guardada */}
+                {watch('category') && 
+                  !(CATEGORIES_BY_INVENTORY_TYPE[watchInventoryType] || []).some(c => c.value === watch('category')) && (
+                    <option value={watch('category')}>
+                      🏷️ {watch('category')} (Personalizada)
+                    </option>
+                  )}
+              </select>
+              {errors.category && (
+                <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {errors.category.message}
+                </p>
+              )}
+            </div>
+
+            {/* Unidad de Medida */}
+            <div>
+              <label className={labelClass}>
+                <Ruler className="w-3.5 h-3.5 text-blue-500" />
+                Unidad de Medida <span className="text-red-400">*</span>
+              </label>
+              <select
+                {...register('unit')}
+                className={`${inputBase} cursor-pointer appearance-none font-semibold ${errors.unit ? inputError : inputNormal}`}
+              >
+                {UNITS_OF_MEASURE.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                {['MATERIALES', 'AVIOS'].includes(watchInventoryType)
+                  ? 'Determina cómo se registrará el stock y entradas por código de barras (ej. Metros o Unidades).'
+                  : 'Unidad de conteo de inventario (por defecto Unidades).'}
+              </p>
+            </div>
+
             {/* Stock Mínimo */}
             <div>
               <label className={labelClass}>
-                <Hash className="w-3.5 h-3.5" />
+                <Hash className="w-3.5 h-3.5 text-amber-500" />
                 Stock Mínimo
               </label>
               <input
                 type="number"
+                step="any"
                 {...register('minStock', { valueAsNumber: true })}
                 className={`${inputBase} ${inputNormal}`}
                 placeholder="5"
@@ -531,7 +674,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
             {/* Campo Entalle */}
             {['TERMINADOS', 'PROCESO', 'SEGUNDA', 'TALLAS ESPECIALES'].includes(watchInventoryType) && (
-              <div>
+              <div className="md:col-span-2">
                 <label className={labelClass}>
                   <Hash className="w-3.5 h-3.5 text-indigo-500" />
                   Entalle (Código Interno)
