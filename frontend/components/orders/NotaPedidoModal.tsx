@@ -18,7 +18,8 @@ import {
     Package,
     CheckCircle,
     Printer,
-    RefreshCw
+    RefreshCw,
+    MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -68,6 +69,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
     const [isSaving, setIsSaving] = useState(false);
     const [duplicateError, setDuplicateError] = useState(false);
     const [isAnnulling, setIsAnnulling] = useState(false);
+    const [showCommentsModal, setShowCommentsModal] = useState(false);
 
     // Filtered Products Search State
     const { products } = useProducts();
@@ -1352,7 +1354,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                         <div className="space-y-1.5 relative">
                                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5 font-sans">
                                                 <Truck className="w-3 h-3 text-indigo-500" /> Agencia
@@ -1443,7 +1445,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                             <input
                                                 type="text"
                                                 disabled={readOnly}
-                                                className="w-full px-4 py-3 bg-amber-50/50 border border-amber-200 rounded-xl outline-none font-black text-amber-700 text-xs shadow-inner uppercase placeholder:text-amber-300"
+                                                className="w-full px-4 py-3 bg-amber-50/50 border border-amber-200 rounded-xl outline-none font-black text-amber-700 text-xs shadow-inner uppercase placeholder:text-amber-400"
                                                 value={formData.orderNumber}
                                                 onChange={(e) => setFormData({ ...formData, orderNumber: e.target.value })}
                                                 placeholder="AUTOGENERADO"
@@ -1453,12 +1455,12 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                                 </div>
                             </div>
 
-                            {/* Right Column: Observations */}
-                            <div className="xl:col-span-1 bg-white p-5 rounded-2xl border-2 border-slate-900 shadow-md flex flex-col">
+                            {/* Desktop Observations */}
+                            <div className="hidden xl:flex xl:col-span-1 bg-white p-5 rounded-2xl border-2 border-slate-900 shadow-md flex-col">
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">Comentarios</label>
                                 <textarea
                                     disabled={readOnly}
-                                    className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 focus:bg-white transition-all outline-none font-medium text-slate-800 text-xs min-h-[100px] shadow-inner"
+                                    className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-600 focus:bg-white transition-all outline-none font-medium text-slate-800 text-xs min-h-[100px] shadow-inner resize-none"
                                     value={formData.observations}
                                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
                                     placeholder="Instrucciones especiales..."
@@ -1466,43 +1468,69 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                             </div>
                         </div>
 
+                        {/* Mobile Observations: Compact Button / Card */}
+                        <div className="xl:hidden flex items-center justify-between p-3.5 bg-white rounded-2xl border-2 border-slate-900 shadow-sm gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={`p-2.5 rounded-xl shrink-0 ${formData.observations ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-slate-100 text-slate-500'}`}>
+                                    <MessageSquare className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Comentarios del Pedido</p>
+                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                        {formData.observations ? formData.observations : 'Sin comentarios agregados'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowCommentsModal(true)}
+                                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition shrink-0 shadow-sm ${
+                                    formData.observations
+                                        ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                                        : 'bg-slate-900 text-white hover:bg-black'
+                                }`}
+                            >
+                                {formData.observations ? 'Editar' : '+ Comentarios'}
+                            </button>
+                        </div>
+
                         {/* Selector de tipo de inventario */}
                         {!readOnly && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || user?.role?.startsWith('VENDEDOR')) && (
-                            <div className="flex justify-end gap-2">
+                            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:justify-end sm:gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setInventoryMode('TERMINADOS')}
-                                    className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                    className={`flex items-center justify-center px-2 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all border text-center ${
                                         inventoryMode === 'TERMINADOS'
                                             ? 'bg-slate-900 text-white border-slate-900 shadow-md'
                                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                                     }`}
                                 >
-                                    Inventario de Primera
+                                    1ra Calidad
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setInventoryMode('SEGUNDA')}
-                                    className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                    className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all border text-center ${
                                         inventoryMode === 'SEGUNDA'
                                             ? 'bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-500/20'
                                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
                                     }`}
                                 >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${inventoryMode === 'SEGUNDA' ? 'animate-spin' : ''}`} />
-                                    Inventario de Segunda
+                                    <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${inventoryMode === 'SEGUNDA' ? 'animate-spin' : ''}`} />
+                                    De Segunda
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setInventoryMode('TALLAS ESPECIALES')}
-                                    className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                                    className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all border text-center ${
                                         inventoryMode === 'TALLAS ESPECIALES'
                                             ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-500/20'
                                             : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
                                     }`}
                                 >
-                                    <Package className="w-3.5 h-3.5" />
-                                    Tallas Especiales
+                                    <Package className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    Tallas Espec.
                                 </button>
                             </div>
                         )}
@@ -1877,11 +1905,11 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                     </form>
 
                     {/* Footer Actions */}
-                    <div className="px-8 py-4 bg-white border-t border-slate-200 flex justify-end items-center gap-4 relative z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+                    <div className="px-4 py-3.5 sm:px-8 sm:py-4 bg-white border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end items-stretch sm:items-center gap-2.5 sm:gap-4 relative z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
                         {readOnly && initialOrder && (initialOrder.status === 'PENDIENTE' || initialOrder.status === 'EN_LOGISTICA') && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN' || initialOrder.sellerId === user?.id) && (
                             <button
                                 type="button" onClick={handleAnnul} disabled={isAnnulling}
-                                className="flex items-center gap-2.5 px-8 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-rose-600/20"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-rose-600 text-white hover:bg-rose-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-rose-600/20"
                             >
                                 {isAnnulling ? 'Anulando...' : 'Anular Pedido'}
                             </button>
@@ -1889,21 +1917,21 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                         {initialOrder && (
                             <button
                                 type="button" onClick={handlePrint}
-                                className="flex items-center gap-2.5 px-8 py-3 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                             >
                                 <Printer className="w-4 h-4" /> Imprimir PDF
                             </button>
                         )}
                         <button
                             type="button" onClick={onClose}
-                            className="px-8 py-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all"
+                            className="w-full sm:w-auto px-6 py-3 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all text-center"
                         >
                             {readOnly ? 'Cerrar Ventana' : 'Cancelar Registro'}
                         </button>
                         {!readOnly && (
                             <button
                                 type="button" onClick={handleSubmit} disabled={isSaving}
-                                className="flex items-center gap-2.5 px-10 py-3.5 bg-slate-900 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:bg-black transition-all active:scale-95 disabled:opacity-50 ring-4 ring-transparent hover:ring-slate-100"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:bg-black transition-all active:scale-95 disabled:opacity-50 ring-4 ring-transparent hover:ring-slate-100"
                             >
                                 {isSaving ? 'Guardando...' : (
                                     <>
@@ -1913,6 +1941,63 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
                             </button>
                         )}
                     </div>
+
+                    {/* Modal de Comentarios en Celular */}
+                    <AnimatePresence>
+                        {showCommentsModal && (
+                            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                                    onClick={() => setShowCommentsModal(false)}
+                                />
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-5 border border-slate-200 z-10 space-y-4"
+                                >
+                                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                <MessageSquare className="w-4 h-4" />
+                                            </div>
+                                            <h3 className="text-sm font-black uppercase text-slate-900">Comentarios del Pedido</h3>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCommentsModal(false)}
+                                            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+
+                                    <textarea
+                                        disabled={readOnly}
+                                        rows={4}
+                                        className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all outline-none font-medium text-slate-800 text-xs shadow-inner resize-none"
+                                        value={formData.observations}
+                                        onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                                        placeholder="Escribe instrucciones especiales para este pedido..."
+                                        autoFocus
+                                    />
+
+                                    <div className="pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCommentsModal(false)}
+                                            className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-black transition shadow-md shadow-slate-900/20 active:scale-95"
+                                        >
+                                            Guardar Comentarios
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Modal Error Duplicado */}
                     <AnimatePresence>
