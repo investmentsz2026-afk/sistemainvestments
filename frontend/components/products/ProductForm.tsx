@@ -475,10 +475,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   };
 
   const handleFormSubmit = (data: ProductFormData) => {
-    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
+    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType);
     if (isMat) {
       data.sizes = ['ESTÁNDAR'];
-      data.colors = ['ÚNICO'];
+      const validColors = (data.colors || []).filter(c => c && c.trim() && c.trim() !== 'ÚNICO');
+      if (validColors.length === 0) {
+        data.colors = ['ÚNICO'];
+        data.variants = [{
+          size: 'ESTÁNDAR',
+          color: 'ÚNICO',
+          stock: 0,
+          initialStock: 0,
+          variantSku: data.sku || undefined,
+        }];
+      } else {
+        data.colors = validColors;
+        const existingVariants = data.variants || [];
+        data.variants = validColors.map(color => {
+          const existing = existingVariants.find((v: any) => v.color === color);
+          return {
+            id: existing?.id,
+            size: 'ESTÁNDAR',
+            color: color,
+            stock: existing?.stock !== undefined ? existing.stock : (existing?.initialStock || 0),
+            initialStock: existing?.initialStock || 0,
+            variantSku: existing?.variantSku || undefined,
+          };
+        });
+      }
     }
 
     if (data.op && data.opVariants) {
@@ -569,13 +593,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   if (nextCats.length > 0 && !nextCats.some(c => c.value === watch('category'))) {
                     setValue('category', nextCats[0].value);
                   }
-                  // Sugerir unidad por defecto
-                  if (newType === 'MATERIALES') {
-                    setValue('unit', 'METROS');
-                  } else if (newType === 'AVIOS') {
-                    setValue('unit', 'UND');
-                  } else {
-                    setValue('unit', 'UND');
+                  // Sugerir unidad por defecto solo si no está definida
+                  const currentUnit = watch('unit');
+                  if (!currentUnit || currentUnit === 'UND') {
+                    if (newType === 'MATERIALES') {
+                      setValue('unit', 'METROS');
+                    } else {
+                      setValue('unit', 'UND');
+                    }
                   }
                 }}
                 className={`${inputBase} cursor-pointer appearance-none font-bold ${errors.inventoryType ? inputError : inputNormal}`}
@@ -1058,6 +1083,75 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Colores / Variantes para Avíos, Materiales, Maquinaria, Otros (Opcional) ── */}
+      {isMaterialOrMachinery && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-amber-50/50 to-orange-50/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Palette className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Colores / Variantes del Producto (Opcional)</h2>
+                <p className="text-[10px] text-gray-400">
+                  Si este material o avío tiene diferentes colores (ej. Azul, Blanco, Negro), agrégalos aquí para generar un SKU por cada color. Si lo dejas vacío, funcionará como producto único con su SKU base.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {/* Tags Container */}
+            {watchColors.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {watchColors.map((color) => (
+                  <span
+                    key={color}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-full text-xs font-bold transition-all"
+                  >
+                    🎨 {color}
+                    <button
+                      type="button"
+                      onClick={() => handleColorRemove(color)}
+                      className="w-4 h-4 rounded-full bg-amber-200 hover:bg-red-500 hover:text-white flex items-center justify-center text-[10px] transition-colors"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={colorInput}
+                onChange={(e) => setColorInput(e.target.value)}
+                onKeyDown={handleColorAdd}
+                className={inputBase}
+                placeholder="Escribe un color (ej. Blanco, Azul Noche, Negro) y presiona Enter o Agregar..."
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const val = colorInput.trim();
+                  if (val && !watchColors.includes(val)) {
+                    setValue('colors', [...watchColors, val]);
+                    setColorInput('');
+                  }
+                }}
+                className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shrink-0 transition"
+              >
+                + Agregar Color
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400">
+              💡 Cada color agregado creará una variante con su propio código de barras para entradas y salidas.
+            </p>
           </div>
         </div>
       )}

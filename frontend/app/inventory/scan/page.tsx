@@ -297,44 +297,77 @@ export default function ScanPage() {
   };
 
   const processBarcode = (barcode: string) => {
-    // Buscar producto por SKU de variante
-    const variant = products?.flatMap(p => 
-      p.variants.map(v => ({
+    const cleanCode = barcode.trim();
+    if (!cleanCode) return;
+
+    // 1. Primero buscar coincidencia directa por variantSku
+    let variant = products?.flatMap(p => 
+      (p.variants || []).map((v: any) => ({
         ...v,
         product: p
       }))
-    ).find(v => v.variantSku === barcode);
+    ).find(v => v.variantSku?.toUpperCase() === cleanCode.toUpperCase());
+
+    // 2. Si no se encontró por variantSku, buscar por SKU Base del Producto
+    if (!variant) {
+      const productByBaseSku = products?.find(p => p.sku?.toUpperCase() === cleanCode.toUpperCase());
+      if (productByBaseSku) {
+        const variants = productByBaseSku.variants || [];
+        const nonUniqueVariants = variants.filter((v: any) => v.color !== 'ÚNICO' || v.size !== 'ESTÁNDAR');
+
+        // Si tiene más de una variante real o varios colores/tallas
+        if (variants.length > 1 || nonUniqueVariants.length > 1) {
+          toast.error(
+            `El producto "${productByBaseSku.name}" tiene ${variants.length} variantes (${variants.map((v: any) => v.color).join(', ')}). Debes escanear el SKU de la variante específica.`,
+            { duration: 5000 }
+          );
+          setBarcodeInput('');
+          return;
+        } else if (variants.length === 1) {
+          // Producto único sin variantes múltiples -> Funciona directamente con su SKU base
+          variant = {
+            ...variants[0],
+            product: productByBaseSku
+          };
+        } else {
+          // Si por alguna razón el producto no tenía variantes en el array local
+          toast.error(`El producto "${productByBaseSku.name}" no tiene variantes de inventario configuradas.`);
+          setBarcodeInput('');
+          return;
+        }
+      }
+    }
 
     if (variant) {
-      const existingItem = scannedItems.find(item => item.variantSku === barcode);
+      const existingItem = scannedItems.find(item => item.variantSku === variant.variantSku || item.id === variant.id);
       
       if (existingItem) {
         // Verificar stock para salidas
         if (movementType === 'EXIT' && existingItem.quantity + 1 > variant.stock) {
-          toast.error(`Stock insuficiente. Stock actual: ${variant.stock}`);
+          toast.error(`Stock insuficiente. Stock actual: ${variant.stock} ${variant.product.unit || 'uds'}`);
           return;
         }
         
         // Si ya existe, aumentar cantidad
         setScannedItems(prev =>
           prev.map(item =>
-            item.variantSku === barcode
+            (item.variantSku === variant.variantSku || item.id === variant.id)
               ? { ...item, quantity: item.quantity + 1 }
               : item
           )
         );
-        toast.success(`+1 ${variant.product.name} (${variant.size}/${variant.color})`);
+        toast.success(`+1 ${variant.product.name} ${variant.color !== 'ÚNICO' ? `(${variant.color})` : ''}`);
       } else {
         // Verificar stock para salidas
         if (movementType === 'EXIT' && variant.stock < 1) {
-          toast.error(`Stock insuficiente. Stock actual: ${variant.stock}`);
+          toast.error(`Stock insuficiente. Stock actual: ${variant.stock} ${variant.product.unit || 'uds'}`);
           return;
         }
         
         // Si es nuevo, agregar a la lista
         const newItem: ScannedItem = {
           id: variant.id,
-          variantSku: variant.variantSku,
+          variantSku: variant.variantSku || variant.product.sku,
           productName: variant.product.name,
           size: variant.size,
           color: variant.color,
@@ -346,7 +379,7 @@ export default function ScanPage() {
           timestamp: new Date()
         };
         setScannedItems(prev => [newItem, ...prev]);
-        toast.success(`${variant.product.name} (${variant.size}/${variant.color}) agregado`);
+        toast.success(`${variant.product.name} ${variant.color !== 'ÚNICO' ? `(${variant.color})` : ''} agregado`);
       }
       
       setBarcodeInput('');
@@ -354,7 +387,7 @@ export default function ScanPage() {
         inputRef.current.focus();
       }
     } else {
-      toast.error(`Producto no encontrado: ${barcode}`);
+      toast.error(`Producto no encontrado: ${cleanCode}`);
     }
   };
 

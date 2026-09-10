@@ -66,10 +66,18 @@ export class ProductsService {
 
     // Si hay variantes, crearlas
     if (createProductDto.variants && createProductDto.variants.length > 0) {
-      const isOnlyVariant = createProductDto.variants.length === 1;
+      const isOnlyVariant = createProductDto.variants.length === 1 && (createProductDto.variants[0].color === 'ÚNICO' || !createProductDto.colors || createProductDto.colors.length <= 1);
       for (const variant of createProductDto.variants) {
         await this.createVariant(userId, product.id, variant, isOnlyVariant);
       }
+    } else {
+      // Si no se proporcionaron variantes, crear la variante base única con el SKU del producto
+      await this.createVariant(userId, product.id, {
+        size: 'ESTÁNDAR',
+        color: 'ÚNICO',
+        variantSku: product.sku,
+        initialStock: 0,
+      }, true);
     }
 
     return this.findOne(product.id);
@@ -102,7 +110,7 @@ export class ProductsService {
     if (!variantSku) {
       if (product.op) {
         variantSku = await this.generateUniqueSkuForOp(product.op);
-      } else if (isOnlyVariant) {
+      } else if (isOnlyVariant || (createVariantDto.color === 'ÚNICO' && createVariantDto.size === 'ESTÁNDAR')) {
         variantSku = product.sku;
       } else {
         variantSku = generateVariantSKU(

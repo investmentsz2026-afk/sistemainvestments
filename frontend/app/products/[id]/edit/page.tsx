@@ -81,6 +81,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           category: product.category,
           sku: product.sku,
           op: product.op || '',
+          unit: product.unit || 'UND',
           entalle: product.entalle || '',
           inventoryType: product.inventoryType,
           description: product.description || '',
@@ -88,9 +89,10 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           sellingPrice: product.sellingPrice,
           realPrice: product.realPrice,
           minStock: product.minStock,
+          imageUrl: product.imageUrl || '',
           sizes: product.sizes || [],
-          colors: product.colors || [],
-          variants: product.variants.map((v: any) => ({
+          colors: (product.colors || []).filter((c: string) => c !== 'ÚNICO'),
+          variants: (product.variants || []).map((v: any) => ({
             id: v.id,
             size: v.size,
             color: v.color,
