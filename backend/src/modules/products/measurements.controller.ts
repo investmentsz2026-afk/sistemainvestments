@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { MeasurementsService } from './measurements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -13,17 +13,24 @@ export class MeasurementsController {
     @Query('sampleId') sampleId?: string,
     @Query('op') op?: string,
     @Query('size') size?: string,
+    @Query('stage') stage?: string,
   ) {
     return this.measurementsService.findMeasurements({
       productId,
       sampleId,
       op,
       size,
+      stage,
     });
   }
 
   @Post()
   async saveMeasurement(@Body() body: any) {
     return this.measurementsService.saveMeasurement(body);
+  }
+
+  @Delete(':id')
+  async deleteMeasurement(@Param('id') id: string) {
+    return this.measurementsService.deleteMeasurement(id);
   }
 }

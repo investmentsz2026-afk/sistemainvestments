@@ -162,12 +162,16 @@ export default function SamplesPage() {
                                         <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200/50 ${
                                             sample.status === 'COMPLETADO_INVENTARIO' ? 'bg-blue-600 text-white' :
                                             sample.processAudits?.some((a: any) => a.status === 'EN_PROCESO') ? 'bg-indigo-600 text-white' :
+                                            (sample.status === 'APROBADO' && (!sample.op || sample.adminOpApprovalStatus === 'SIN_OP')) ? 'bg-emerald-600 text-white' :
+                                            (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'PENDIENTE') ? 'bg-amber-500 text-white' :
+                                            (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'APROBADO') ? 'bg-indigo-600 text-white' :
                                             sample.status === 'APROBADO' ? 'bg-emerald-500 text-white' :
                                             sample.status === 'OBSERVADO' ? 'bg-rose-500 text-white' : 'bg-amber-500 text-white'
                                         }`}>
                                              {sample.status === 'COMPLETADO_INVENTARIO' ? 'INVENTARIADO' : 
                                               (sample.status === 'APROBADO' && sample.processAudits?.some((a: any) => a.status === 'EN_PROCESO')) ? 'EN AUDITORÍA' :
                                               (sample.status === 'APROBADO' && sample.processAudits?.some((a: any) => a.adminStatus === 'APROBADO')) ? 'LISTO PARA INVENTARIO' :
+                                              (sample.status === 'APROBADO' && (!sample.op || sample.adminOpApprovalStatus === 'SIN_OP')) ? 'MUESTRA APROBADA' :
                                               (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'PENDIENTE') ? 'APROBADO - PEND. ADMIN' : 
                                               (sample.status === 'APROBADO' && sample.adminOpApprovalStatus === 'APROBADO') ? 'LISTO PARA AUDITORÍA' : 
                                               sample.status}
@@ -205,7 +209,7 @@ export default function SamplesPage() {
                                     className="mt-8 w-full py-4 bg-gray-50 text-gray-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                                 >
                                     {user?.role === 'COMERCIAL' && (sample.status === 'PENDIENTE' || (sample.status === 'APROBADO' && sample.adminOpApprovalStatus !== 'APROBADO')) ? (
-                                        <>{sample.status === 'PENDIENTE' ? 'Revisar Muestra' : 'Editar / Ver OP'} <ArrowRight className="w-4 h-4" /></>
+                                        <>{sample.status === 'PENDIENTE' ? 'Revisar Muestra' : (!sample.op || sample.adminOpApprovalStatus === 'SIN_OP' ? 'Gestionar / Crear OP' : 'Editar / Ver OP')} <ArrowRight className="w-4 h-4" /></>
                                     ) : (
                                         <>Ver Detalles <Eye className="w-4 h-4" /></>
                                     )}

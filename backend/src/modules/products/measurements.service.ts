@@ -10,16 +10,24 @@ export class MeasurementsService {
     sampleId?: string;
     op?: string;
     size?: string;
+    stage?: string;
   }) {
     const where: any = {};
     if (query.productId) where.productId = query.productId;
     if (query.sampleId) where.sampleId = query.sampleId;
     if (query.op) where.op = query.op;
     if (query.size) where.size = query.size;
+    if (query.stage) where.stage = query.stage;
 
     return this.prisma.productMeasurement.findMany({
       where,
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async deleteMeasurement(id: string) {
+    return this.prisma.productMeasurement.delete({
+      where: { id },
     });
   }
 

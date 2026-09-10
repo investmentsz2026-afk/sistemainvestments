@@ -16,11 +16,14 @@ import {
     ArrowLeft,
     Send,
     FileText,
-    Settings
+    Settings,
+    Upload,
+    Loader2
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { getImageUrl } from '../../../lib/imageUrl';
 
 export default function NewSamplePage() {
     const { user } = useAuth();
@@ -43,19 +46,48 @@ export default function NewSamplePage() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [customMatName, setCustomMatName] = useState('');
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-    const [imageUrl, setImageUrl] = useState('');
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-    const addImage = () => {
-        if (!imageUrl) return;
-        setFormData({ ...formData, images: [...formData.images, imageUrl] });
-        setImageUrl('');
-        toast.success('Imagen añadida');
+        setIsUploadingImage(true);
+        const uploadedUrls: string[] = [];
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', file);
+
+                const resp = await api.post('/uploads', uploadFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                if (resp.data?.url) {
+                    uploadedUrls.push(resp.data.url);
+                }
+            }
+
+            if (uploadedUrls.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, ...uploadedUrls]
+                }));
+                toast.success(uploadedUrls.length === 1 ? 'Foto subida correctamente' : `${uploadedUrls.length} fotos subidas`);
+            }
+        } catch (err) {
+            console.error('Error uploading image:', err);
+            toast.error('Error al subir la(s) foto(s)');
+        } finally {
+            setIsUploadingImage(false);
+            e.target.value = '';
+        }
     };
 
     const removeImage = (index: number) => {
         setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
-        toast.error('Imagen eliminada');
+        toast.error('Foto eliminada');
     };
 
     const handleSearchMaterials = async (q: string) => {
@@ -84,6 +116,8 @@ export default function NewSamplePage() {
         setMaterials([...materials, {
             productId: prod.id,
             name: prod.name,
+            imageUrl: prod.imageUrl,
+            sku: prod.sku,
             quantity: 1,
             unitPriceAtTime: prod.purchasePrice || 0,
             customMaterial: null
@@ -270,24 +304,30 @@ export default function NewSamplePage() {
                                 </div>
 
                                 {searchResults.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto p-2 space-y-1">
+                                    <div className="absolute z-10 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-72 overflow-y-auto p-2 space-y-1">
                                         {searchResults.map(prod => (
                                             <button
                                                 key={prod.id}
                                                 type="button"
                                                 onClick={() => addMaterial(prod)}
-                                                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition text-left group"
+                                                className="w-full flex items-center justify-between p-3.5 hover:bg-gray-50 rounded-xl transition text-left group"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 font-black text-xs">
-                                                        <Box className="w-5 h-5" />
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-12 h-12 bg-indigo-50/70 rounded-xl flex items-center justify-center text-indigo-600 font-black text-xs overflow-hidden border border-gray-100 shrink-0">
+                                                        {prod.imageUrl ? (
+                                                            <img src={getImageUrl(prod.imageUrl)} alt={prod.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <Box className="w-6 h-6 text-indigo-400" />
+                                                        )}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-black text-gray-900 text-sm uppercase">{prod.name}</p>
-                                                        <p className="text-[10px] font-bold text-gray-400 font-mono tracking-tighter uppercase">{prod.sku} • S/ {prod.purchasePrice}</p>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-black text-gray-900 text-sm uppercase truncate">{prod.name}</p>
+                                                        <p className="text-[10px] font-bold text-gray-400 font-mono tracking-tighter uppercase mt-0.5">{prod.sku} • S/ {prod.purchasePrice}</p>
                                                     </div>
                                                 </div>
-                                                <Plus className="w-5 h-5 text-gray-300 group-hover:text-indigo-600 transition" />
+                                                <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-indigo-600 flex items-center justify-center text-gray-400 group-hover:text-white transition shrink-0 ml-3">
+                                                    <Plus className="w-4 h-4" />
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
@@ -331,10 +371,21 @@ export default function NewSamplePage() {
                                                     {materials.map((m, i) => (
                                                         <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/20 transition-colors">
                                                             <td className="px-4 py-2.5">
-                                                                <p className="font-bold text-gray-900 text-[11px] uppercase">{m.name}</p>
-                                                                <p className="text-[8.5px] font-bold text-indigo-500 uppercase tracking-wider mt-0.5">
-                                                                    {m.productId ? 'De Inventario' : 'Manual / Externo'}
-                                                                </p>
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-100 shrink-0">
+                                                                        {m.imageUrl ? (
+                                                                            <img src={getImageUrl(m.imageUrl)} alt={m.name} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <Box className="w-4 h-4 text-gray-400" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="font-bold text-gray-900 text-[11px] uppercase">{m.name}</p>
+                                                                        <p className="text-[8.5px] font-bold text-indigo-500 uppercase tracking-wider mt-0.5">
+                                                                            {m.productId ? 'De Inventario' : 'Manual / Externo'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td className="px-4 py-2.5 text-center">
                                                                 <input 
@@ -379,19 +430,23 @@ export default function NewSamplePage() {
                                 ) : (
                                     materials.map((m, i) => (
                                         <div key={i} className="flex items-center justify-between bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${m.productId ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                    {m.productId ? <Box className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden border border-gray-100 shrink-0 bg-gray-50">
+                                                    {m.imageUrl ? (
+                                                        <img src={getImageUrl(m.imageUrl)} alt={m.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        m.productId ? <Box className="w-6 h-6 text-emerald-600" /> : <Plus className="w-6 h-6 text-amber-600" />
+                                                    )}
                                                 </div>
-                                                <div>
-                                                    <p className="font-black text-gray-900 text-sm uppercase">{m.name}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-black text-gray-900 text-sm uppercase truncate">{m.name}</p>
                                                     <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
                                                         {m.productId ? 'De Inventario' : 'Manual / Externo'}
                                                     </p>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-6">
+                                            <div className="flex items-center gap-6 shrink-0">
                                                 <div className="flex items-center bg-gray-50 rounded-xl p-1 px-3">
                                                     <span className="text-[10px] font-black text-gray-400 uppercase mr-3">Cant</span>
                                                     <input 
@@ -443,43 +498,92 @@ export default function NewSamplePage() {
                             </div>
                         </div>
 
-                        {/* IMAGES */}
-                        <div className="space-y-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fotos y Evidencias</label>
-                            <div className="flex gap-4">
-                                <input 
-                                    type="text" 
-                                    placeholder="Pegar URL de la imagen (o subir archivo en versión final)..."
-                                    className="flex-1 bg-gray-50 border-none rounded-2xl px-6 py-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                                    value={imageUrl}
-                                    onChange={e => setImageUrl(e.target.value)}
-                                />
-                                <button 
-                                    type="button"
-                                    onClick={addImage}
-                                    className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition"
-                                >
-                                    <Plus className="w-6 h-6" />
-                                </button>
+                        {/* IMAGES & EVIDENCES (PHONE / PC UPLOAD) */}
+                        <div className="space-y-4 pt-8 border-t border-gray-100">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fotos y Evidencias</label>
+                                <p className="text-xs text-gray-400 font-bold mt-0.5">
+                                    Sube fotos directamente desde la cámara o galería de tu celular o desde tu PC
+                                </p>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-4 mt-6">
+                            {/* HIDDEN FILE INPUT */}
+                            <input 
+                                type="file" 
+                                id="sample-file-upload"
+                                accept="image/*" 
+                                multiple
+                                className="hidden"
+                                onChange={handleImageUpload}
+                                disabled={isUploadingImage}
+                            />
+
+                            {/* UPLOAD TRIGGER CARD */}
+                            <label 
+                                htmlFor="sample-file-upload"
+                                className={`w-full border-2 border-dashed rounded-3xl p-6 md:p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${
+                                    isUploadingImage 
+                                        ? 'bg-indigo-50/60 border-indigo-300 cursor-wait' 
+                                        : 'bg-gray-50/60 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'
+                                }`}
+                            >
+                                {isUploadingImage ? (
+                                    <>
+                                        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                                        <div className="text-center">
+                                            <p className="text-sm font-black text-indigo-600 uppercase tracking-wider">Subiendo foto(s)...</p>
+                                            <p className="text-[11px] text-gray-400 font-bold mt-1">Por favor espera un momento</p>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:scale-105 transition">
+                                            <Camera className="w-8 h-8" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-sm md:text-base font-black text-gray-900 uppercase tracking-wide">
+                                                📷 Seleccionar / Tomar Foto (Celular o PC)
+                                            </p>
+                                            <p className="text-[11px] text-gray-400 font-bold mt-1">
+                                                JPG, PNG, WEBP (puedes seleccionar una o varias imágenes)
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
+                            </label>
+
+                            {/* GALLERY OF UPLOADED PHOTOS */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4">
                                 {formData.images.map((img, i) => (
-                                    <div key={i} className="aspect-square bg-gray-100 rounded-2xl relative group overflow-hidden border border-gray-100">
-                                        <img src={img} alt="Preview" className="w-full h-full object-cover" />
+                                    <div key={i} className="aspect-square bg-gray-100 rounded-2xl relative group overflow-hidden border border-gray-200 shadow-sm">
+                                        <img src={getImageUrl(img)} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                                         <button 
                                             type="button"
                                             onClick={() => removeImage(i)}
-                                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg"
+                                            className="absolute top-2 right-2 p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl shadow-lg transition active:scale-90"
+                                            title="Eliminar foto"
                                         >
-                                            <X className="w-3 h-3" />
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
+                                        <div className="absolute bottom-2 left-2 px-2.5 py-1 bg-black/60 backdrop-blur-sm rounded-lg text-[9px] font-black text-white uppercase tracking-wider">
+                                            Foto {i + 1}
+                                        </div>
                                     </div>
                                 ))}
-                                {formData.images.length === 0 && (
-                                    <div className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-300">
-                                        <Camera className="w-8 h-8 mb-2" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Añadir Fotos</span>
+
+                                {formData.images.length > 0 && !isUploadingImage && (
+                                    <label 
+                                        htmlFor="sample-file-upload"
+                                        className="aspect-square bg-gray-50 hover:bg-indigo-50 border-2 border-dashed border-gray-200 hover:border-indigo-400 rounded-2xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-indigo-600 cursor-pointer transition"
+                                    >
+                                        <Plus className="w-8 h-8" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Añadir más</span>
+                                    </label>
+                                )}
+
+                                {formData.images.length === 0 && !isUploadingImage && (
+                                    <div className="col-span-full py-8 text-center text-gray-400">
+                                        <p className="text-xs font-bold uppercase tracking-widest">No has subido fotos todavía</p>
                                     </div>
                                 )}
                             </div>

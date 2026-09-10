@@ -23,13 +23,18 @@ import {
     FileText,
     Edit,
     Send,
-    Printer
+    Printer,
+    Ruler
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { ProductBarcode } from '../../../components/products/Barcode';
 import { OPBarcodeModal } from '../../../components/samples/OPBarcodeModal';
+import { SampleBarcodeModal } from '../../../components/samples/SampleBarcodeModal';
+import { SampleMeasurementsModal } from '../../../components/samples/SampleMeasurementsModal';
+import { UDPEditSampleModal } from '../../../components/samples/UDPEditSampleModal';
+import { getImageUrl } from '../../../lib/imageUrl';
 
 export default function SampleDetailPage() {
     const { id } = useParams();
@@ -53,6 +58,10 @@ export default function SampleDetailPage() {
     const [salesPrices, setSalesPrices] = useState<{ [size: string]: { price: number, secondPrice: number } }>({});
     const [generatedBarcode, setGeneratedBarcode] = useState('');
     const [isCommercialEditing, setIsCommercialEditing] = useState(false);
+    const [showSampleStickerModal, setShowSampleStickerModal] = useState(false);
+    const [isCreatingOP, setIsCreatingOP] = useState(false);
+    const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
+    const [showUDPEditModal, setShowUDPEditModal] = useState(false);
 
     // Permission helpers for Commercial editing
     const userRole = (user?.role || '').toString().trim().toUpperCase();
@@ -415,14 +424,41 @@ export default function SampleDetailPage() {
         }
     };
 
-    const handleSaveReview = async () => {
+    const handleSavePrototypeReview = async () => {
         if (!reviewStatus || reviewStatus === 'PENDIENTE') {
-            toast.error('Por favor selecciona un estado de revisión');
+            toast.error('Por favor selecciona si la muestra es Aprobada u Observada.');
             return;
         }
 
-        if (reviewStatus === 'APROBADO' && (!opName.trim() || !prodQuantity.trim())) {
-            toast.error('Para aprobar debes ingresar la OP y la Cantidad de Producción.');
+        setIsSaving(true);
+        try {
+            await api.put(`/samples/${id}/review`, {
+                status: reviewStatus,
+                observations,
+                recommendations,
+            });
+            toast.success(reviewStatus === 'APROBADO' ? '¡Muestra aprobada exitosamente! Se generó su SKU numérico y sticker de muestra.' : 'Muestra registrada como Observada.');
+            setIsCommercialEditing(false);
+            fetchData();
+        } catch (error: any) {
+            console.error('Error saving prototype review:', error);
+            toast.error(error.response?.data?.message || 'Error al guardar la revisión');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSaveOP = async () => {
+        if (!opName || !opName.trim()) {
+            toast.error('Debes ingresar el número de OP (Ej: OP-050).');
+            return;
+        }
+        if (!prodQuantity || parseFloat(prodQuantity) <= 0) {
+            toast.error('Debes ingresar la cantidad de prendas a confeccionar.');
+            return;
+        }
+        if (productionDetail.length === 0) {
+            toast.error('Debes agregar al menos una talla en el desglose de producción.');
             return;
         }
 
@@ -435,21 +471,22 @@ export default function SampleDetailPage() {
         setIsSaving(true);
         try {
             await api.put(`/samples/${id}/review`, {
-                status: reviewStatus,
-                observations,
-                recommendations,
-                op: reviewStatus === 'APROBADO' ? opName : undefined,
-                barcode: reviewStatus === 'APROBADO' ? generatedBarcode : undefined,
-                productionQuantity: reviewStatus === 'APROBADO' ? parseFloat(prodQuantity) : undefined,
-                productionSizeData: reviewStatus === 'APROBADO' ? enrichedProductionDetail : undefined,
-                materials: reviewStatus === 'APROBADO' ? activeBom : []
+                status: 'APROBADO',
+                op: opName.trim().toUpperCase(),
+                productionQuantity: parseFloat(prodQuantity),
+                productionColor: productionDetail[0]?.color || 'Varios',
+                productionSizeData: enrichedProductionDetail,
+                materials: activeBom,
+                observations: observations || sample?.observations,
+                recommendations: recommendations || sample?.recommendations,
             });
-            toast.success(sample?.status === 'APROBADO' ? 'OP actualizada con éxito. Enviada a Admin para aprobación.' : 'OP guardada y enviada a Admin para su aprobación.');
+            toast.success('¡Orden de Producción (OP) creada y enviada a Administración para su aprobación!');
+            setIsCreatingOP(false);
             setIsCommercialEditing(false);
             fetchData();
         } catch (error: any) {
-            console.error('Error saving review:', error);
-            toast.error(error.response?.data?.message || 'Error al guardar la revisión');
+            console.error('Error saving OP:', error);
+            toast.error(error.response?.data?.message || 'Error al guardar la OP');
         } finally {
             setIsSaving(false);
         }
@@ -697,30 +734,25 @@ export default function SampleDetailPage() {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {user?.role === 'UDP' && sample.status === 'PENDIENTE' && !isEditing && (
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* VIEW MEASUREMENTS BUTTON */}
+                        <button
+                            type="button"
+                            onClick={() => setShowMeasurementsModal(true)}
+                            className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-wider text-gray-700 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition active:scale-95"
+                        >
+                            <Ruler className="w-4 h-4 text-indigo-500" /> Ver Medidas
+                        </button>
+
+                        {/* UDP EDIT BUTTON */}
+                        {(user?.role === 'UDP' || user?.role === 'ADMIN') && sample.status !== 'COMPLETADO_INVENTARIO' && (
                             <button
-                                onClick={() => setIsEditing(true)}
-                                className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl font-bold text-gray-600 hover:text-indigo-600 shadow-sm transition"
+                                type="button"
+                                onClick={() => setShowUDPEditModal(true)}
+                                className="flex items-center gap-2 px-5 py-3 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition shadow-sm active:scale-95"
                             >
-                                <Edit className="w-4 h-4" /> Editar Muestra
+                                <Edit className="w-4 h-4" /> Editar Muestra (UDP)
                             </button>
-                        )}
-                        {isEditing && (
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="px-6 py-3 bg-white border border-gray-100 rounded-2xl font-bold text-gray-400 hover:text-gray-900 shadow-sm transition"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSaveEdit}
-                                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-black transition"
-                                >
-                                    <Save className="w-4 h-4" /> Guardar Cambios
-                                </button>
-                            </div>
                         )}
                         {userRole === 'COMERCIAL' && sample.status === 'PENDIENTE' && (
                             <div className="hidden md:flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-bold text-sm">
@@ -974,7 +1006,7 @@ export default function SampleDetailPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 {sample.images && sample.images.length > 0 ? sample.images.map((img: string, i: number) => (
                                     <div key={i} className="aspect-square bg-gray-100 rounded-3xl overflow-hidden shadow-sm">
-                                        <img src={img} alt={`Evidencia ${i}`} className="w-full h-full object-cover" />
+                                        <img src={getImageUrl(img)} alt={`Evidencia ${i}`} className="w-full h-full object-cover" />
                                     </div>
                                 )) : (
                                     <div className="col-span-full py-10 bg-gray-50 rounded-[2rem] border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-gray-300">
@@ -986,574 +1018,613 @@ export default function SampleDetailPage() {
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: COMMERCIAL REVIEW & BOM */}
+                    {/* RIGHT COLUMN: COMMERCIAL REVIEW & OP */}
                     <div className="lg:col-span-5 space-y-8">
-                        {/* REVIEW SECTION */}
-                        <div className={`${cardClass} border-indigo-100 shadow-indigo-100/30`}>
-                            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-8 flex items-center justify-between flex-wrap gap-4">
-                                <div className="flex items-center gap-3">
-                                    <span>Control Comercial</span>
-                                    {sample.adminOpApprovalStatus === 'APROBADO' && (
-                                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
-                                            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Aprobada por Admin (Bloqueada)
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {canCommercialEdit && sample.status === 'APROBADO' && !isCommercialEditing && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsCommercialEditing(true);
-                                                setReviewStatus('APROBADO');
-                                            }}
-                                            className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
-                                        >
-                                            <Edit className="w-3.5 h-3.5" /> Editar OP / Revisión
-                                        </button>
-                                    )}
-                                    {isCommercialEditing && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIsCommercialEditing(false);
-                                                fetchData();
-                                            }}
-                                            className="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-xs font-black uppercase transition"
-                                        >
-                                            Cancelar Edición
-                                        </button>
-                                    )}
+                        {/* CASE 1: SAMPLE IS PENDING REVIEW (COMERCIAL REVIEW STEP) */}
+                        {sample.status === 'PENDIENTE' && (
+                            <div className={`${cardClass} border-indigo-100 shadow-indigo-100/30`}>
+                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center justify-between">
+                                    <span>Evaluación de Prototipo</span>
                                     <ClipboardList className="w-6 h-6 text-indigo-600" />
-                                </div>
-                            </h2>
+                                </h2>
 
-                            {user?.role === 'COMERCIAL' && sample.udpRequirements && (
-                                <button 
-                                    onClick={() => {
-                                        setReqModalMode(canCommercialEdit && isCommercialMode ? 'EDIT' : 'VIEW');
-                                        setShowRequirementsModal(true);
-                                    }}
-                                    className="w-full mb-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-black transition shadow-xl shadow-indigo-100 flex items-center justify-center gap-3"
-                                >
-                                    <FileText className="w-5 h-5" /> {canCommercialEdit && isCommercialMode ? 'Editar Ficha Técnica (Requerimientos UDP)' : 'Ver Ficha Técnica (Requerimientos UDP)'}
-                                </button>
-                            )}
+                                {userRole === 'COMERCIAL' && (
+                                    <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                                        {sample.udpRequirements && (
+                                            <button 
+                                                onClick={() => {
+                                                    setReqModalMode('VIEW');
+                                                    setShowRequirementsModal(true);
+                                                }}
+                                                className="flex-1 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition shadow-sm flex items-center justify-center gap-2"
+                                            >
+                                                <FileText className="w-4 h-4" /> Ver Ficha UDP
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={() => setShowMeasurementsModal(true)}
+                                            className="flex-1 py-3.5 bg-white text-gray-800 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition shadow-sm flex items-center justify-center gap-2"
+                                        >
+                                            <Ruler className="w-4 h-4 text-indigo-500" /> Tabla de Medidas
+                                        </button>
+                                    </div>
+                                )}
 
-                            {canCommercialEdit && isCommercialMode ? (
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-2 gap-4">
                                         <button
+                                            type="button"
                                             onClick={() => setReviewStatus('APROBADO')}
-                                            className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${reviewStatus === 'APROBADO' ? 'bg-emerald-50 border-emerald-500 shadow-lg shadow-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-200'
-                                                }`}
+                                            className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${
+                                                reviewStatus === 'APROBADO' 
+                                                ? 'bg-emerald-50 border-emerald-500 shadow-lg shadow-emerald-100 scale-102' 
+                                                : 'bg-white border-gray-100 hover:border-emerald-200'
+                                            }`}
                                         >
                                             <CheckCircle2 className={`w-8 h-8 ${reviewStatus === 'APROBADO' ? 'text-emerald-600' : 'text-gray-300'}`} />
-                                            <span className="font-black text-[10px] uppercase tracking-widest">Aprobar</span>
+                                            <span className="font-black text-xs uppercase tracking-widest text-gray-900">Aprobar Muestra</span>
+                                            <span className="text-[9px] font-bold text-gray-400 text-center">Registrar prototipo y generar SKU</span>
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => setReviewStatus('OBSERVADO')}
-                                            className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${reviewStatus === 'OBSERVADO' ? 'bg-rose-50 border-rose-500 shadow-lg shadow-rose-100' : 'bg-white border-gray-100 hover:border-rose-200'
-                                                }`}
+                                            className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 ${
+                                                reviewStatus === 'OBSERVADO' 
+                                                ? 'bg-rose-50 border-rose-500 shadow-lg shadow-rose-100 scale-102' 
+                                                : 'bg-white border-gray-100 hover:border-rose-200'
+                                            }`}
                                         >
                                             <XCircle className={`w-8 h-8 ${reviewStatus === 'OBSERVADO' ? 'text-rose-600' : 'text-gray-300'}`} />
-                                            <span className="font-black text-[10px] uppercase tracking-widest">Observar</span>
+                                            <span className="font-black text-xs uppercase tracking-widest text-gray-900">Observar</span>
+                                            <span className="text-[9px] font-bold text-gray-400 text-center">Devolver a UDP para corregir</span>
                                         </button>
                                     </div>
 
                                     <div className="space-y-4">
-                                        {reviewStatus === 'APROBADO' && (
-                                            <div className="p-6 bg-emerald-50/50 rounded-[2rem] border border-emerald-100 space-y-4">
-                                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Datos de Orden de Producción</p>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Orden de Producción (OP) *</label>
-                                                        <input
-                                                            type="text"
-                                                            className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500 transition mt-2 uppercase font-mono"
-                                                            placeholder="Ej: OP-050"
-                                                            value={opName}
-                                                            onChange={e => setOpName(e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cantidad de Prendas a Producir *</label>
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500 transition mt-2"
-                                                            placeholder="Ej: 1000"
-                                                            value={prodQuantity}
-                                                            onChange={e => setProdQuantity(e.target.value)}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {generatedBarcode && (
-                                                    <div className="flex flex-col items-center justify-center p-4 bg-white rounded-3xl border border-emerald-100 shadow-sm animate-in fade-in zoom-in duration-300">
-                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Código de Barras Generado para OP</p>
-                                                        <div className="bg-white p-4 rounded-xl border border-gray-50">
-                                                            <ProductBarcode value={generatedBarcode} width={1.2} height={60} displayValue={true} />
-                                                        </div>
-                                                        <p className="mt-2 font-mono font-bold text-gray-900">{generatedBarcode}</p>
-                                                    </div>
-                                                )}
-
-                                                <div className="pt-2 border-t border-emerald-100/30">
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Desglose de Producción (Talla, Color, Cantidad) *</label>
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => setProductionDetail([...productionDetail, { size: 'S', color: '', quantity: 0 }])}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[10px] font-bold hover:bg-black transition shadow-sm"
-                                                        >
-                                                            <Plus className="w-3.5 h-3.5" /> Agregar Item
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    <div className="space-y-3">
-                                                        {productionDetail.map((item, idx) => (
-                                                            <div key={idx} className="grid grid-cols-12 gap-3 items-end bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                                                                <div className="col-span-3">
-                                                                    <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Talla</label>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        placeholder="S, M, 32..."
-                                                                        className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold uppercase"
-                                                                        value={item.size}
-                                                                        onChange={e => {
-                                                                            const newList = [...productionDetail];
-                                                                            newList[idx].size = e.target.value.toUpperCase();
-                                                                            setProductionDetail(newList);
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-4">
-                                                                    <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Color</label>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        placeholder="Azul, Rojo..."
-                                                                        className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold"
-                                                                        value={item.color}
-                                                                        onChange={e => {
-                                                                            const newList = [...productionDetail];
-                                                                            newList[idx].color = e.target.value;
-                                                                            setProductionDetail(newList);
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-3">
-                                                                    <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Cantidad</label>
-                                                                    <input 
-                                                                        type="number" 
-                                                                        className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold"
-                                                                        value={item.quantity}
-                                                                        onChange={e => {
-                                                                            const val = parseInt(e.target.value) || 0;
-                                                                            const newList = [...productionDetail];
-                                                                            newList[idx].quantity = val;
-                                                                            setProductionDetail(newList);
-                                                                            const total = newList.reduce((a, b) => a + b.quantity, 0);
-                                                                            setProdQuantity(total.toString());
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div className="col-span-2 flex justify-end">
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const newList = productionDetail.filter((_, i) => i !== idx);
-                                                                            setProductionDetail(newList);
-                                                                            const total = newList.reduce((a, b) => a + b.quantity, 0);
-                                                                            setProdQuantity(total.toString());
-                                                                        }}
-                                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                        
-                                                        {productionDetail.length === 0 && (
-                                                            <div className="text-center py-6 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100 italic text-gray-400 text-[10px] font-bold uppercase">
-                                                                No se han añadido ítems de producción
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {productionDetail.length > 0 && (
-                                                        <div className="pt-6 mt-6 border-t border-emerald-100/30">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowSalesPriceModal(true)}
-                                                                className="w-full py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                                                            >
-                                                                <Calculator className="w-5 h-5" /> Configurar Precio de Venta por Talla
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
                                         <div>
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Observaciones Críticas</label>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Observaciones / Comentarios</label>
                                             <textarea
-                                                className="w-full bg-gray-50 border-none rounded-3xl p-6 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 h-32 resize-none"
-                                                placeholder="Escribe aquí los motivos del rechazo u observaciones generales..."
+                                                className="w-full bg-gray-50 border-none rounded-3xl p-5 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 h-28 resize-none"
+                                                placeholder="Comentarios o motivos de observación..."
                                                 value={observations}
                                                 onChange={e => setObservations(e.target.value)}
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recomendaciones de Mejora</label>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recomendaciones para Producción</label>
                                             <textarea
-                                                className="w-full bg-gray-50 border-none rounded-3xl p-6 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 h-32 resize-none"
-                                                placeholder="Sugerencias para que la siguiente muestra sea aprobada..."
+                                                className="w-full bg-gray-50 border-none rounded-3xl p-5 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 h-28 resize-none"
+                                                placeholder="Sugerencias técnicas o comerciales..."
                                                 value={recommendations}
                                                 onChange={e => setRecommendations(e.target.value)}
                                             />
                                         </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    <div className={`p-6 rounded-[2rem] ${sample.status === 'APROBADO' ? 'bg-emerald-50' : 'bg-rose-50'} border border-transparent`}>
-                                        <h4 className={`text-sm font-black uppercase tracking-widest ${sample.status === 'APROBADO' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            Resultado: {sample.status}
-                                        </h4>
-                                        <p className="text-gray-700 font-bold mt-2 text-sm italic">"{sample.observations || 'Sin observaciones registradas.'}"</p>
-                                        {sample.status === 'APROBADO' && sample.op && (
-                                            <>
-                                                <div className="mt-4 pt-4 border-t border-emerald-100/50 grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Orden Prod. (OP)</p>
-                                                        <p className="font-black text-emerald-900 text-lg font-mono">{sample.op}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cantidad a Producir</p>
-                                                        <p className="font-black text-emerald-900 text-lg">{sample.productionQuantity} prendas</p>
-                                                    </div>
-                                                </div>
-                                                {sample.barcode && (
-                                                    <div className="mt-4 flex flex-col items-center bg-white p-4 rounded-3xl border border-emerald-100 shadow-sm relative group/barcode">
-                                                        <ProductBarcode value={sample.barcode} width={1.2} height={50} displayValue={true} />
-                                                        <p className="mt-2 font-mono font-bold text-[10px] text-gray-400 uppercase tracking-widest">{sample.barcode}</p>
-                                                        
-                                                        <button
-                                                            onClick={() => setShowOPPrintModal(true)}
-                                                            className="absolute top-2 right-2 p-2 bg-emerald-50 text-emerald-600 rounded-xl opacity-0 group-hover/barcode:opacity-100 transition-all hover:bg-emerald-600 hover:text-white shadow-sm"
-                                                            title="Opciones de Impresión"
-                                                        >
-                                                            <Printer className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                    {sample.recommendations && (
-                                        <div className="p-6 bg-indigo-50/50 rounded-[2rem]">
-                                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Recomendaciones</h4>
-                                            <p className="text-gray-900 font-bold text-sm">{sample.recommendations}</p>
-                                        </div>
-                                    )}
 
-                                    {sample.status === 'APROBADO' && sample.productionSizeData && (
-                                        <div className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Detalles de Fabricación (OP: {sample.op})
-                                            </h4>
-                                            <div className="space-y-2">
-                                                {Array.isArray(sample.productionSizeData) ? (
-                                                    (sample.productionSizeData as any[]).map((row, i) => (
-                                                        <div key={i} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl text-[11px] font-bold">
-                                                            <div className="flex items-center gap-4">
-                                                                <span className="w-8 text-indigo-600">T: {row.size}</span>
-                                                                <span className="text-gray-500">Color: <span className="text-gray-900 uppercase">{row.color}</span></span>
-                                                            </div>
-                                                            <span className="text-emerald-600">{row.quantity} uds.</span>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    Object.entries(sample.productionSizeData as { [key: string]: number }).map(([size, qty]) => (
-                                                        <div key={size} className="px-4 py-2 bg-white border border-gray-200 rounded-xl flex flex-col items-center min-w-[60px]">
-                                                            <span className="text-[9px] font-black text-gray-400 uppercase">{size}</span>
-                                                            <span className="text-sm font-black text-gray-900">{qty}</span>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {canCommercialEdit && sample.status === 'APROBADO' && !isCommercialEditing && (
+                                    {canCommercialEdit && (
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setIsCommercialEditing(true);
-                                                setReviewStatus('APROBADO');
-                                            }}
-                                            className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-black transition active:scale-95 shadow-indigo-200"
+                                            onClick={handleSavePrototypeReview}
+                                            disabled={isSaving || !reviewStatus}
+                                            className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black text-base flex items-center justify-center gap-3 shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50 cursor-pointer"
                                         >
-                                            <Edit className="w-5 h-5" /> Editar OP y Datos de Fabricación
+                                            {isSaving ? 'Guardando...' : (
+                                                <>
+                                                    <Save className="w-5 h-5" /> {reviewStatus === 'APROBADO' ? 'Aprobar Muestra (Generar Sticker)' : 'Guardar Veredicto'}
+                                                </>
+                                            )}
                                         </button>
                                     )}
                                 </div>
-                            )}
-                        </div>
-
-                        {/* BOM SECTION (MATERIALS & REQUIREMENTS) - ONLY IF APPROVING OR ALREADY APPROVED */}
-                        {(reviewStatus === 'APROBADO' || sample.status === 'APROBADO') && (
-                            <AnimatePresence>
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    className={cardClass}
-                                >
-                                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <Calculator className="w-6 h-6 text-emerald-600" />
-                                            <span>Requerimientos (BOM)</span>
-                                        </div>
-                                        {canCommercialEdit && isCommercialMode && sample.udpRequirements && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setReqModalMode('EDIT');
-                                                    setShowRequirementsModal(true);
-                                                }}
-                                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase transition flex items-center gap-1.5"
-                                            >
-                                                <Edit className="w-3.5 h-3.5" /> Ficha Técnica
-                                            </button>
-                                        )}
-                                    </h2>
-
-                                    {/* INVENTORY SEARCH FOR COMMERCIAL WHEN IN EDIT MODE */}
-                                    {canCommercialEdit && isCommercialMode && (
-                                        <div className="bg-gray-900 p-6 rounded-[2rem] text-white space-y-4 mb-8 shadow-xl shadow-gray-900/10">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                                    <Search className="w-3.5 h-3.5" /> Agregar Insumo/Material del Inventario
-                                                </h4>
-                                                <span className="text-[9px] text-gray-400 font-bold">Avíos, Materiales, Telas</span>
-                                            </div>
-
-                                            {/* Type filter chips */}
-                                            <div className="flex flex-wrap gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedType('')}
-                                                    className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
-                                                        selectedType === '' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                                    }`}
-                                                >
-                                                    TODOS
-                                                </button>
-                                                {inventoryTypes.map(type => (
-                                                    <button
-                                                        key={type}
-                                                        type="button"
-                                                        onClick={() => setSelectedType(type)}
-                                                        className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
-                                                            selectedType === type ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                                                        }`}
-                                                    >
-                                                        {type.replace('_', ' ')}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {/* Search input */}
-                                            <div className="relative">
-                                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Buscar por nombre o SKU..."
-                                                    className="w-full bg-white/10 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 font-bold text-xs text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-indigo-500"
-                                                    value={reqSearch}
-                                                    onChange={e => setReqSearch(e.target.value)}
-                                                />
-                                            </div>
-
-                                            {/* Quick Results */}
-                                            <div className="max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
-                                                {filteredReqProducts.map(p => {
-                                                    const alreadyInBom = bom.some(b => b.productId === p.id);
-                                                    return (
-                                                        <div key={p.id} className="flex items-center justify-between p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-xs">
-                                                            <div className="truncate pr-2">
-                                                                <span className="font-black text-white block truncate">{p.name}</span>
-                                                                <span className="text-[9px] text-gray-400 font-mono">SKU: {p.sku} | Costo: S/ {p.purchasePrice || 0}</span>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                disabled={alreadyInBom}
-                                                                onClick={() => {
-                                                                    addMaterial(p);
-                                                                    toast.success(`${p.name} añadido a la BOM`);
-                                                                }}
-                                                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition shrink-0 ${
-                                                                    alreadyInBom
-                                                                    ? 'bg-white/10 text-gray-500 cursor-not-allowed'
-                                                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
-                                                                }`}
-                                                            >
-                                                                {alreadyInBom ? 'Añadido' : '+ Añadir'}
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                                {filteredReqProducts.length === 0 && (
-                                                    <p className="text-[10px] text-gray-400 text-center py-2 italic">No se encontraron productos en el inventario</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* SIZE COSTS BREAKDOWN (INTERACTIVE) */}
-                                    {sample.udpRequirements && (
-                                        <div className="mb-8 flex flex-wrap gap-4">
-                                            {sizeCosts.map(sc => (
-                                                <button 
-                                                    key={sc.size} 
-                                                    onClick={() => setBomViewSize(sc.size)}
-                                                    className={`flex-1 min-w-[120px] p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-1 ${
-                                                        bomViewSize === sc.size 
-                                                        ? 'bg-indigo-50 border-indigo-500 shadow-xl shadow-indigo-100 scale-105' 
-                                                        : 'bg-white border-gray-50 hover:border-indigo-100 hover:bg-gray-50/50'
-                                                    }`}
-                                                >
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${bomViewSize === sc.size ? 'text-indigo-400' : 'text-gray-400'}`}>Talla {sc.size}</span>
-                                                    <span className={`text-lg font-black mt-1 ${bomViewSize === sc.size ? 'text-indigo-600' : 'text-gray-900'}`}>S/ {sc.cost.toFixed(2)}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {displayedMaterials.map(item => (
-                                            <div key={item.productId || item.name} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl group">
-                                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-300">
-                                                    <Package className="w-5 h-5" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h4 className="text-xs font-black text-gray-900 uppercase truncate">{item.name}</h4>
-                                                    <div className="flex items-center gap-4 mt-2">
-                                                        <div className="flex-1">
-                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Cant. x Unidad</p>
-                                                            <input
-                                                                type="number"
-                                                                className="w-full bg-white border-none rounded-lg px-3 py-1 text-xs font-black mt-1"
-                                                                value={item.quantityPerUnit.toFixed(4)}
-                                                                onChange={e => updateBomQuantity(item.productId, parseFloat(e.target.value) || 0)}
-                                                                disabled={!canCommercialEdit || !isCommercialMode}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">P. Unit</p>
-                                                            <p className="text-xs font-black text-gray-900 mt-2">S/ {item.unitPrice.toFixed(2)}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {canCommercialEdit && isCommercialMode && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeMaterial(item.productId)}
-                                                        className="p-2 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
-                                                        title="Eliminar de BOM"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {bom.length > 0 && (
-                                        <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
-                                            {/* PROJECTION CALCULATOR */}
-                                            <div className="p-6 bg-gray-900 rounded-[2rem] text-white">
-                                                <div className="flex items-center justify-between mb-6">
-                                                    <div>
-                                                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Escalabilidad</h4>
-                                                        <p className="text-sm font-bold text-gray-100">Proyectar para:</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="bg-white/10 px-6 py-2 rounded-xl font-black text-white text-lg">
-                                                            {targetQuantity}
-                                                        </div>
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Prendas</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                                                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400 italic">Inversión Total Estimada OP (P. Unit x {targetQuantity})</span>
-                                                        <span className="text-3xl font-black text-white">S/ {totalProjectedCost.toFixed(2)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* DETAILED MATERIAL LIST FOR X QUANTITY */}
-                                            <div className="space-y-4">
-                                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Desglose de Materiales Necesarios</h4>
-                                                <div className="space-y-2">
-                                                    {bom.map(item => (
-                                                        <div key={item.productId || item.name} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl text-xs font-bold">
-                                                            <span className="text-gray-900">{item.name}</span>
-                                                            <div className="text-right">
-                                                                <span className="text-indigo-600 font-black text-xs uppercase italic">{ ( (item.quantityPerUnit || 0) * (targetQuantity || 0) ).toFixed(2) } Unidades/Metros</span>
-                                                                <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-tighter">Coste: S/ { ( (item.unitPrice || 0) * (item.quantityPerUnit || 0) * (targetQuantity || 0) ).toFixed(2) }</p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            </AnimatePresence>
-                        )}
-
-                        {/* FINAL ACTION BUTTONS FOR COMMERCIAL */}
-                        {canCommercialEdit && isCommercialMode && (
-                            <div className="space-y-4">
-                                <button
-                                    onClick={handleSaveReview}
-                                    disabled={isSaving || !reviewStatus}
-                                    className="w-full py-6 bg-gray-900 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl hover:bg-black transition active:scale-95 disabled:opacity-50 cursor-pointer"
-                                >
-                                    {isSaving ? (
-                                        <>Procesando...</>
-                                    ) : (
-                                        <>
-                                            <Save className="w-6 h-6" /> {sample.status === 'APROBADO' ? 'Guardar Cambios y Notificar a Admin' : 'Guardar Veredicto Final'}
-                                        </>
-                                    )}
-                                </button>
                             </div>
                         )}
 
-                        {/* ADMIN OP APPROVAL SECTION (IF PENDING OVERALL OP APPROVAL) */}
-                        {user?.role === 'ADMIN' && sample?.status === 'APROBADO' && sample?.adminOpApprovalStatus === 'PENDIENTE' && (
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl mt-8">
-                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-4 flex items-center gap-3">
-                                    <CheckCircle2 className="w-6 h-6 text-emerald-500" /> Aprobación Final de OP
-                                </h2>
-                                <p className="text-sm text-gray-500 font-bold mb-6">Comercial ha aprobado esta muestra y generado la OP {sample.op}. Requiere tu aprobación final para pasar a Auditoría.</p>
-                                <button
-                                    onClick={handleApproveOP}
-                                    disabled={isSaving}
-                                    className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-lg flex items-center justify-center gap-3 shadow-xl hover:bg-black transition active:scale-95 disabled:opacity-50"
-                                >
-                                    {isSaving ? 'Procesando...' : (
-                                        <>
-                                            <CheckCircle2 className="w-5 h-5" /> Aprobar OP {sample.op}
-                                        </>
+                        {/* CASE 2: SAMPLE IS APPROVED OR OBSERVED */}
+                        {sample.status !== 'PENDIENTE' && (
+                            <div className="space-y-8">
+                                {/* PROTOTYPE SUMMARY & STICKER CARD */}
+                                <div className={`${cardClass} border-emerald-100 shadow-emerald-100/20`}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                                            {sample.status === 'APROBADO' ? '✅ Prototipo Aprobado' : '❌ Muestra Observada'}
+                                        </span>
+                                        {sample.approvedAt && (
+                                            <span className="text-[10px] font-bold text-gray-400">
+                                                Aprobado el {new Date(sample.approvedAt).toLocaleDateString()}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {sample.observations && (
+                                        <div className="p-4 bg-gray-50 rounded-2xl mb-4 text-xs text-gray-700 font-bold italic">
+                                            "{sample.observations}"
+                                        </div>
                                     )}
-                                </button>
+
+                                    {sample.recommendations && (
+                                        <div className="p-4 bg-indigo-50/50 rounded-2xl mb-4 text-xs text-indigo-900 font-bold">
+                                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Recomendaciones:</span>
+                                            {sample.recommendations}
+                                        </div>
+                                    )}
+
+                                    {sample.status === 'APROBADO' && sample.barcode && (
+                                        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                                            <div className="flex flex-col items-center sm:items-start">
+                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU Numérico de Muestra</span>
+                                                <div className="my-2">
+                                                    <ProductBarcode value={sample.barcode} width={1.2} height={42} displayValue={false} />
+                                                </div>
+                                                <span className="font-mono font-black text-gray-900 text-sm tracking-widest">{sample.barcode}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSampleStickerModal(true)}
+                                                className="px-5 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition shadow-lg shadow-indigo-100 flex items-center gap-2"
+                                            >
+                                                <Printer className="w-4 h-4" /> Imprimir Sticker
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* PRODUCTION ORDER (OP) SECTION */}
+                                {sample.status === 'APROBADO' && (
+                                    <div className={`${cardClass} border-indigo-100`}>
+                                        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+                                            <div className="flex items-center gap-3">
+                                                <Package className="w-6 h-6 text-indigo-600" />
+                                                <div>
+                                                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Orden de Producción (OP)</h3>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confección masiva</p>
+                                                </div>
+                                            </div>
+                                            {sample.op && !isCreatingOP && canCommercialEdit && sample.adminOpApprovalStatus !== 'APROBADO' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsCreatingOP(true);
+                                                        setOpName(sample.op);
+                                                    }}
+                                                    className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
+                                                >
+                                                    <Edit className="w-3.5 h-3.5" /> Modificar OP
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* SUB-CASE A: NO OP CREATED YET & NOT CREATING */}
+                                        {!sample.op && !isCreatingOP && (
+                                            <div className="p-8 bg-gradient-to-br from-indigo-50/60 to-purple-50/40 rounded-3xl border border-indigo-100 text-center space-y-4">
+                                                <div className="w-14 h-14 bg-indigo-600 rounded-2xl text-white flex items-center justify-center mx-auto shadow-lg shadow-indigo-200">
+                                                    <Package className="w-7 h-7" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-base font-black text-gray-900 uppercase">¿Mandar a Confección Masiva?</h4>
+                                                    <p className="text-xs text-gray-500 font-bold max-w-sm mx-auto mt-1">
+                                                        Esta muestra está aprobada como prototipo. Puedes generar su Orden de Producción (OP) con tallas, cantidades y precios para enviarla a taller.
+                                                    </p>
+                                                </div>
+                                                {canCommercialEdit && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsCreatingOP(true);
+                                                            if (!opName) setOpName('OP-');
+                                                        }}
+                                                        className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-black transition active:scale-95 flex items-center gap-2 mx-auto"
+                                                    >
+                                                        <Plus className="w-4 h-4" /> Crear Orden de Producción (OP)
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* SUB-CASE B: OP CREATED & DISPLAY SUMMARY */}
+                                        {sample.op && !isCreatingOP && (
+                                            <div className="space-y-6">
+                                                <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">N° de OP</p>
+                                                            <p className="font-black text-emerald-950 text-xl font-mono">{sample.op}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total a Confeccionar</p>
+                                                            <p className="font-black text-emerald-950 text-xl">{sample.productionQuantity} prendas</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {sample.productionColor && (
+                                                        <div className="text-xs font-bold text-gray-600 mb-4">
+                                                            Color Principal: <span className="text-gray-900 uppercase font-black">{sample.productionColor}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* OP Barcode sticker button */}
+                                                    {sample.barcode && (
+                                                        <div className="pt-4 border-t border-emerald-100 flex items-center justify-between">
+                                                            <span className="text-[10px] font-black text-gray-500 uppercase">Etiqueta de OP</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowOPPrintModal(true)}
+                                                                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow-sm hover:bg-black transition"
+                                                            >
+                                                                <Printer className="w-3.5 h-3.5" /> Imprimir Etiqueta OP
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Size breakdown */}
+                                                {sample.productionSizeData && (
+                                                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                            <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Desglose de Fabricación por Talla
+                                                        </h4>
+                                                        <div className="space-y-2">
+                                                            {Array.isArray(sample.productionSizeData) ? (
+                                                                (sample.productionSizeData as any[]).map((row, i) => (
+                                                                    <div key={i} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl text-[11px] font-bold">
+                                                                        <div className="flex items-center gap-4">
+                                                                            <span className="w-10 text-indigo-600 font-black">T: {row.size}</span>
+                                                                            <span className="text-gray-500">Color: <span className="text-gray-900 uppercase">{row.color || 'Varios'}</span></span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            {row.salePrice > 0 && (
+                                                                                <span className="text-gray-400 font-mono text-[10px]">S/ {row.salePrice.toFixed(2)}</span>
+                                                                            )}
+                                                                            <span className="text-emerald-600 font-black">{row.quantity} uds.</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                Object.entries(sample.productionSizeData as { [key: string]: number }).map(([size, qty]) => (
+                                                                    <div key={size} className="px-4 py-2 bg-white border border-gray-200 rounded-xl flex items-center justify-between">
+                                                                        <span className="text-[10px] font-black text-gray-600 uppercase">Talla {size}</span>
+                                                                        <span className="text-sm font-black text-gray-900">{qty} uds.</span>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* SUB-CASE C: IS CREATING / EDITING OP */}
+                                        {isCreatingOP && (
+                                            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="p-6 bg-indigo-50/40 rounded-3xl border border-indigo-100 space-y-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Orden de Producción (OP) *</label>
+                                                            <input
+                                                                type="text"
+                                                                className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 uppercase font-mono"
+                                                                placeholder="Ej: OP-050"
+                                                                value={opName}
+                                                                onChange={e => setOpName(e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Total Prendas a Producir</label>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-black text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2"
+                                                                placeholder="Calculado de tallas"
+                                                                value={prodQuantity}
+                                                                onChange={e => setProdQuantity(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pt-2 border-t border-indigo-100/40">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Desglose (Talla, Color, Cantidad) *</label>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setProductionDetail([...productionDetail, { size: '32', color: '', quantity: 0 }])}
+                                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold hover:bg-black transition shadow-sm"
+                                                            >
+                                                                <Plus className="w-3.5 h-3.5" /> Agregar Item
+                                                            </button>
+                                                        </div>
+                                                        
+                                                        <div className="space-y-3">
+                                                            {productionDetail.map((item, idx) => (
+                                                                <div key={idx} className="grid grid-cols-12 gap-3 items-end bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                                                                    <div className="col-span-3">
+                                                                        <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Talla</label>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            placeholder="S, M, 32..."
+                                                                            className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold uppercase"
+                                                                            value={item.size}
+                                                                            onChange={e => {
+                                                                                const newList = [...productionDetail];
+                                                                                newList[idx].size = e.target.value.toUpperCase();
+                                                                                setProductionDetail(newList);
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="col-span-4">
+                                                                        <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Color</label>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            placeholder="Azul, Negro..."
+                                                                            className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold"
+                                                                            value={item.color}
+                                                                            onChange={e => {
+                                                                                const newList = [...productionDetail];
+                                                                                newList[idx].color = e.target.value;
+                                                                                setProductionDetail(newList);
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="col-span-3">
+                                                                        <label className="text-[8px] font-black text-gray-400 uppercase mb-1 block">Cantidad</label>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            className="w-full bg-gray-50 border-none rounded-xl p-2 text-xs font-bold"
+                                                                            value={item.quantity}
+                                                                            onChange={e => {
+                                                                                const val = parseInt(e.target.value) || 0;
+                                                                                const newList = [...productionDetail];
+                                                                                newList[idx].quantity = val;
+                                                                                setProductionDetail(newList);
+                                                                                const total = newList.reduce((a, b) => a + b.quantity, 0);
+                                                                                setProdQuantity(total.toString());
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="col-span-2 flex justify-end">
+                                                                        <button 
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const newList = productionDetail.filter((_, i) => i !== idx);
+                                                                                setProductionDetail(newList);
+                                                                                const total = newList.reduce((a, b) => a + b.quantity, 0);
+                                                                                setProdQuantity(total.toString());
+                                                                            }}
+                                                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            
+                                                            {productionDetail.length === 0 && (
+                                                                <div className="text-center py-6 bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100 italic text-gray-400 text-[10px] font-bold uppercase">
+                                                                    No se han añadido ítems de producción. Haz clic en "Agregar Item".
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {productionDetail.length > 0 && (
+                                                            <div className="pt-4 mt-4 border-t border-indigo-100/30">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowSalesPriceModal(true)}
+                                                                    className="w-full py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                                                                >
+                                                                    <Calculator className="w-5 h-5" /> Configurar Precio de Venta por Talla
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* OP Actions */}
+                                                <div className="flex gap-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsCreatingOP(false);
+                                                            fetchData();
+                                                        }}
+                                                        className="flex-1 py-5 bg-gray-50 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSaveOP}
+                                                        disabled={isSaving}
+                                                        className="flex-2 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition shadow-xl shadow-indigo-200 flex items-center justify-center gap-2"
+                                                    >
+                                                        <Save className="w-4 h-4" /> {isSaving ? 'Guardando...' : 'Guardar OP y Enviar a Admin'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* BOM SECTION (MATERIALS) - DISPLAYED WHEN CREATING/EDITING OP OR FOR AUDIT */}
+                                {(isCreatingOP || sample.op) && (
+                                    <div className={cardClass}>
+                                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <Calculator className="w-6 h-6 text-emerald-600" />
+                                                <span>Ficha de Materiales (BOM)</span>
+                                            </div>
+                                            {sample.udpRequirements && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setReqModalMode(isCreatingOP ? 'EDIT' : 'VIEW');
+                                                        setShowRequirementsModal(true);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[10px] font-black uppercase transition flex items-center gap-1.5"
+                                                >
+                                                    <Edit className="w-3.5 h-3.5" /> Ficha Técnica
+                                                </button>
+                                            )}
+                                        </h2>
+
+                                        {/* INVENTORY SEARCH FOR COMMERCIAL WHEN IN EDIT MODE */}
+                                        {isCreatingOP && (
+                                            <div className="bg-gray-900 p-6 rounded-[2rem] text-white space-y-4 mb-8 shadow-xl shadow-gray-900/10">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                                        <Search className="w-3.5 h-3.5" /> Agregar Insumo/Material del Inventario
+                                                    </h4>
+                                                    <span className="text-[9px] text-gray-400 font-bold">Avíos, Materiales, Telas</span>
+                                                </div>
+
+                                                {/* Type filter chips */}
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedType('')}
+                                                        className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
+                                                            selectedType === '' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                        }`}
+                                                    >
+                                                        TODOS
+                                                    </button>
+                                                    {inventoryTypes.map(type => (
+                                                        <button
+                                                            key={type}
+                                                            type="button"
+                                                            onClick={() => setSelectedType(type)}
+                                                            className={`px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition ${
+                                                                selectedType === type ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/40' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                            }`}
+                                                        >
+                                                            {type.replace('_', ' ')}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* Search input */}
+                                                <div className="relative">
+                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Buscar por nombre o SKU..."
+                                                        className="w-full bg-white/10 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 font-bold text-xs text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        value={reqSearch}
+                                                        onChange={e => setReqSearch(e.target.value)}
+                                                    />
+                                                </div>
+
+                                                {/* Quick Results */}
+                                                <div className="max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                                                    {filteredReqProducts.map(p => {
+                                                        const alreadyInBom = bom.some(b => b.productId === p.id);
+                                                        return (
+                                                            <div key={p.id} className="flex items-center justify-between p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition text-xs">
+                                                                <div className="truncate pr-2">
+                                                                    <span className="font-black text-white block truncate">{p.name}</span>
+                                                                    <span className="text-[9px] text-gray-400 font-mono">SKU: {p.sku} | Costo: S/ {p.purchasePrice || 0}</span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={alreadyInBom}
+                                                                    onClick={() => {
+                                                                        addMaterial(p);
+                                                                        toast.success(`${p.name} añadido a la BOM`);
+                                                                    }}
+                                                                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition shrink-0 ${
+                                                                        alreadyInBom
+                                                                        ? 'bg-white/10 text-gray-500 cursor-not-allowed'
+                                                                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                                                                    }`}
+                                                                >
+                                                                    {alreadyInBom ? 'Añadido' : '+ Añadir'}
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {filteredReqProducts.length === 0 && (
+                                                        <p className="text-[10px] text-gray-400 text-center py-2 italic">No se encontraron productos en el inventario</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {displayedMaterials.map(item => (
+                                                <div key={item.productId || item.name} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl group">
+                                                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-gray-300">
+                                                        <Package className="w-5 h-5" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-xs font-black text-gray-900 uppercase truncate">{item.name}</h4>
+                                                        <div className="flex items-center gap-4 mt-2">
+                                                            <div className="flex-1">
+                                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Cant. x Unidad</p>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-full bg-white border-none rounded-lg px-3 py-1 text-xs font-black mt-1"
+                                                                    value={item.quantityPerUnit ? item.quantityPerUnit.toFixed(4) : '1'}
+                                                                    onChange={e => updateBomQuantity(item.productId, parseFloat(e.target.value) || 0)}
+                                                                    disabled={!isCreatingOP}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">P. Unit</p>
+                                                                <p className="text-xs font-black text-gray-900 mt-2">S/ {(item.unitPrice || 0).toFixed(2)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {isCreatingOP && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeMaterial(item.productId)}
+                                                            className="p-2 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100"
+                                                            title="Eliminar de BOM"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {displayedMaterials.length === 0 && (
+                                                <p className="text-xs text-gray-400 text-center py-6">No hay insumos registrados en la BOM.</p>
+                                            )}
+                                        </div>
+
+                                        {activeBom.length > 0 && parseFloat(prodQuantity) > 0 && (
+                                            <div className="mt-8 pt-6 border-t border-gray-100">
+                                                <div className="p-6 bg-gray-900 rounded-[2rem] text-white flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Inversión Proyectada</h4>
+                                                        <p className="text-xs font-bold text-gray-300">Para {prodQuantity} prendas</p>
+                                                    </div>
+                                                    <span className="text-2xl font-black text-emerald-400">S/ {totalProjectedCost.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ADMIN OP APPROVAL SECTION */}
+                                {user?.role === 'ADMIN' && sample?.status === 'APROBADO' && sample?.op && sample?.adminOpApprovalStatus === 'PENDIENTE' && (
+                                    <div className={`${cardClass} border-amber-100 bg-amber-50/20`}>
+                                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-4 flex items-center gap-3">
+                                            <CheckCircle2 className="w-6 h-6 text-amber-500" /> Aprobación de OP por Administración
+                                        </h2>
+                                        <p className="text-sm text-gray-600 font-bold mb-6">
+                                            Comercial ha registrado la OP <span className="font-mono font-black text-gray-900">{sample.op}</span> ({sample.productionQuantity} prendas). Se requiere tu autorización final para pasar a Taller/Auditoría.
+                                        </p>
+                                        <button
+                                            onClick={handleApproveOP}
+                                            disabled={isSaving}
+                                            className="w-full py-5 bg-emerald-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-black transition active:scale-95 disabled:opacity-50"
+                                        >
+                                            {isSaving ? 'Procesando...' : (
+                                                <>
+                                                    <CheckCircle2 className="w-5 h-5" /> Autorizar OP {sample.op}
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1823,16 +1894,25 @@ export default function SampleDetailPage() {
                                                 <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-2">Resultados en {selectedType || 'Todo el Inventario'}</h4>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                     {filteredReqProducts.map(p => (
-                                                        <div key={p.id} className="bg-white/5 p-6 rounded-3xl border border-white/10 flex items-center justify-between hover:bg-white/10 transition group">
-                                                            <div className="min-w-0 flex-1">
-                                                                <p className="font-black text-white text-xs uppercase truncate tracking-tight">{p.name}</p>
-                                                                <p className="text-[9px] font-bold text-white/30 font-mono mt-1">{p.sku}</p>
+                                                        <div key={p.id} className="bg-white/5 p-4 rounded-3xl border border-white/10 flex items-center justify-between hover:bg-white/10 transition group">
+                                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                                <div className="w-11 h-11 rounded-xl bg-white/10 overflow-hidden flex items-center justify-center shrink-0 border border-white/10">
+                                                                    {p.imageUrl ? (
+                                                                        <img src={getImageUrl(p.imageUrl)} alt={p.name} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <Package className="w-5 h-5 text-indigo-400" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-black text-white text-xs uppercase truncate tracking-tight">{p.name}</p>
+                                                                    <p className="text-[9px] font-bold text-white/30 font-mono mt-0.5">{p.sku}</p>
+                                                                </div>
                                                             </div>
                                                             <button
                                                                 onClick={() => handleAddToPool(p)}
-                                                                className="ml-4 p-3 bg-indigo-600/20 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all transform active:scale-90"
+                                                                className="ml-3 p-3 bg-indigo-600/20 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all transform active:scale-90 shrink-0"
                                                             >
-                                                                <Plus className="w-5 h-5" />
+                                                                <Plus className="w-4 h-4" />
                                                             </button>
                                                         </div>
                                                     ))}
@@ -1858,14 +1938,21 @@ export default function SampleDetailPage() {
                                         {materialPool.length > 0 ? (
                                             <div className="flex flex-wrap gap-3">
                                                 {materialPool.map(p => (
-                                                    <div key={p.id} className="bg-indigo-50 border border-indigo-100 px-6 py-4 rounded-3xl flex items-center gap-4 transition shadow-sm hover:shadow-md">
+                                                    <div key={p.id} className="bg-indigo-50 border border-indigo-100 px-4 py-3 rounded-2xl flex items-center gap-3 transition shadow-sm hover:shadow-md">
+                                                        <div className="w-8 h-8 rounded-lg bg-white overflow-hidden flex items-center justify-center shrink-0 border border-indigo-100">
+                                                            {p.imageUrl ? (
+                                                                <img src={getImageUrl(p.imageUrl)} alt={p.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Package className="w-4 h-4 text-indigo-400" />
+                                                            )}
+                                                        </div>
                                                         <div>
                                                             <p className="font-black text-indigo-600 text-[10px] uppercase leading-tight">{p.name}</p>
                                                             <p className="text-[9px] font-bold text-indigo-300 font-mono uppercase mt-0.5">{p.sku}</p>
                                                         </div>
                                                         <button
                                                             onClick={() => handleRemoveFromPool(p.id)}
-                                                            className="p-1.5 hover:bg-rose-100 hover:text-rose-600 text-indigo-300 rounded-lg transition"
+                                                            className="p-1.5 hover:bg-rose-100 hover:text-rose-600 text-indigo-300 rounded-lg transition ml-2"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -2083,6 +2170,28 @@ export default function SampleDetailPage() {
                 <OPBarcodeModal 
                     sample={sample} 
                     onClose={() => setShowOPPrintModal(false)} 
+                />
+            )}
+            {/* SAMPLE PROTOTYPE STICKER PRINT MODAL */}
+            {showSampleStickerModal && (
+                <SampleBarcodeModal 
+                    sample={sample} 
+                    onClose={() => setShowSampleStickerModal(false)} 
+                />
+            )}
+            {/* SAMPLE MEASUREMENTS MODAL */}
+            {showMeasurementsModal && (
+                <SampleMeasurementsModal 
+                    sample={sample} 
+                    onClose={() => setShowMeasurementsModal(false)} 
+                />
+            )}
+            {/* UDP EDIT SAMPLE MODAL */}
+            {showUDPEditModal && (
+                <UDPEditSampleModal 
+                    sample={sample} 
+                    onClose={() => setShowUDPEditModal(false)} 
+                    onUpdated={fetchData} 
                 />
             )}
         </Layout>

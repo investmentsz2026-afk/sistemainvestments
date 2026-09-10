@@ -10,6 +10,15 @@ export class SamplesService {
     private notifications: NotificationsService
   ) { }
 
+  private generateNumericBarcode(): string {
+    const prefix = '775';
+    let randomPart = '';
+    for (let i = 0; i < 9; i++) {
+      randomPart += Math.floor(Math.random() * 10).toString();
+    }
+    return prefix + randomPart;
+  }
+
   async create(udpId: string, data: any) {
     const { name, code, description, characteristics, images, materials, isExisting } = data;
     
@@ -24,6 +33,7 @@ export class SamplesService {
           udpId,
           isExisting: !!isExisting,
           materialReceiptStatus: isExisting ? 'DESARROLLO_COMPLETADO' : (materials && materials.length > 0 ? 'PENDIENTE_ADMIN' : null),
+          adminOpApprovalStatus: 'SIN_OP',
         },
       });
 
@@ -101,8 +111,16 @@ export class SamplesService {
 
     const existingSample = await this.findOne(id);
 
-    if (existingSample.adminOpApprovalStatus === 'APROBADO') {
+    if (existingSample.adminOpApprovalStatus === 'APROBADO' && op && op !== existingSample.op) {
       throw new BadRequestException('Esta OP ya ha sido aprobada por el Administrador y no puede ser modificada.');
+    }
+
+    const hasOPCreation = !!(op && op.trim());
+    
+    // Ensure pure numeric barcode
+    let sampleBarcode = barcode || existingSample.barcode;
+    if (!sampleBarcode || !/^\d+$/.test(sampleBarcode)) {
+      sampleBarcode = this.generateNumericBarcode();
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -113,25 +131,25 @@ export class SamplesService {
           status,
           observations,
           recommendations,
-          op: status === 'APROBADO' ? (op || null) : null,
-          barcode: status === 'APROBADO' ? (barcode || null) : null,
-          productionQuantity: status === 'APROBADO' ? (productionQuantity || null) : null,
-          productionColor: status === 'APROBADO' ? (productionColor || null) : null,
-          productionSizeData: status === 'APROBADO' ? (productionSizeData || null) : null,
+          barcode: sampleBarcode,
+          op: hasOPCreation ? op.trim() : (status === 'APROBADO' ? existingSample.op : null),
+          productionQuantity: hasOPCreation ? (productionQuantity || null) : (status === 'APROBADO' ? existingSample.productionQuantity : null),
+          productionColor: hasOPCreation ? (productionColor || null) : (status === 'APROBADO' ? existingSample.productionColor : null),
+          productionSizeData: hasOPCreation ? (productionSizeData || null) : (status === 'APROBADO' ? existingSample.productionSizeData : null),
           commercialId,
-          approvedAt: status === 'APROBADO' ? new Date() : null,
-          adminOpApprovalStatus: status === 'APROBADO' ? 'PENDIENTE' : existingSample.adminOpApprovalStatus,
-          materialReceiptStatus: status === 'APROBADO' ? 'DESARROLLO_COMPLETADO' : existingSample.materialReceiptStatus,
+          approvedAt: status === 'APROBADO' ? (existingSample.approvedAt || new Date()) : null,
+          adminOpApprovalStatus: hasOPCreation ? 'PENDIENTE' : (status === 'APROBADO' ? (existingSample.adminOpApprovalStatus || 'SIN_OP') : 'SIN_OP'),
+          materialReceiptStatus: hasOPCreation ? 'DESARROLLO_COMPLETADO' : existingSample.materialReceiptStatus,
         },
       });
 
-      // 2. If approved, handle BOM (Materials) - This is for final production BOM
-      if (status === 'APROBADO' && materials && materials.length > 0) {
+      // 2. If approved/has materials, handle BOM (Materials)
+      if (materials && materials.length > 0) {
         // Clear previous materials if any
         await (tx as any).sampleMaterial.deleteMany({ where: { sampleId: id } });
 
         for (const mat of materials) {
-          const productIdVal = mat.productId || null;
+          const productIdVal = mat.productId && !String(mat.productId).startsWith('custom-') ? mat.productId : null;
 
           if (!productIdVal) {
             // Save as custom material if no product ID
@@ -173,14 +191,26 @@ export class SamplesService {
         }
       }
 
-      if (status === 'APROBADO') {
+      // If Commercial created an OP, notify Admin
+      if (hasOPCreation) {
         await tx.notification.create({
           data: {
-            title: existingSample.status === 'APROBADO' ? 'OP Actualizada por Comercial' : 'Muestra Aprobada (Nueva OP)',
-            message: `Comercial ha ${existingSample.status === 'APROBADO' ? 'actualizado los datos de la OP' : 'aprobado la muestra'} ${existingSample.name} (OP: ${op}). Pendiente de aprobación de Admin.`,
+            title: existingSample.op ? 'OP Actualizada por Comercial' : 'Nueva OP Creada para Producción',
+            message: `Comercial ha registrado la OP ${op.trim()} (${productionQuantity || 0} prendas) para la muestra ${existingSample.name}. Pendiente de aprobación de Admin.`,
             type: 'SAMPLE_APPROVED',
             referenceId: id,
             targetRole: 'ADMIN',
+          }
+        });
+      } else if (status === 'APROBADO' && existingSample.status !== 'APROBADO') {
+        // Just prototype approval
+        await tx.notification.create({
+          data: {
+            title: 'Muestra Aprobada por Comercial',
+            message: `Comercial ha aprobado el prototipo de la muestra: ${existingSample.name} ${existingSample.code ? `(${existingSample.code})` : ''}.`,
+            type: 'SAMPLE_APPROVED',
+            referenceId: id,
+            userId: (existingSample as any).udpId,
           }
         });
       }
@@ -338,22 +368,52 @@ export class SamplesService {
 
   async update(id: string, udpId: string, data: any) {
     const sample = await this.findOne(id);
-    if (sample.status !== 'PENDIENTE') {
-      throw new BadRequestException('No se puede editar una muestra que ya ha sido revisada');
-    }
-    if ((sample as any).udpId !== udpId) {
-      throw new BadRequestException('No tienes permiso para editar esta muestra');
+    if (sample.status === 'COMPLETADO_INVENTARIO') {
+      throw new BadRequestException('No se puede editar una muestra que ya ha sido completada en inventario');
     }
 
-    const { name, description, characteristics, images } = data;
-    return (this.prisma as any).productSample.update({
-      where: { id },
-      data: {
-        name,
-        description,
-        characteristics,
-        images: images || [],
-      },
+    const { name, code, description, characteristics, images, materials } = data;
+
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await (tx as any).productSample.update({
+        where: { id },
+        data: {
+          name: name !== undefined ? name : sample.name,
+          code: code !== undefined ? code : sample.code,
+          description: description !== undefined ? description : sample.description,
+          characteristics: characteristics !== undefined ? characteristics : sample.characteristics,
+          images: images !== undefined ? images : sample.images,
+          status: sample.status === 'OBSERVADO' ? 'PENDIENTE' : sample.status,
+        },
+      });
+
+      if (materials && Array.isArray(materials)) {
+        await (tx as any).sampleMaterial.deleteMany({ where: { sampleId: id } });
+        for (const mat of materials) {
+          await (tx as any).sampleMaterial.create({
+            data: {
+              sampleId: id,
+              productId: mat.productId || null,
+              customMaterial: mat.customMaterial || (!mat.productId ? mat.name : null),
+              quantity: mat.quantity || 1,
+              unitPriceAtTime: mat.unitPriceAtTime || 0,
+            },
+          });
+        }
+      }
+
+      // Notify Commercial about the update
+      await tx.notification.create({
+        data: {
+          title: 'Muestra Actualizada por UDP',
+          message: `UDP ha actualizado los datos de la muestra: ${updated.name} ${updated.code ? `(${updated.code})` : ''}. Lista para revisión comercial.`,
+          type: 'SAMPLE_DEVELOPMENT_COMPLETED',
+          referenceId: id,
+          targetRole: 'COMERCIAL',
+        }
+      });
+
+      return updated;
     });
   }
 }
