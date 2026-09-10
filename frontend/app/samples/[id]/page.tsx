@@ -34,6 +34,7 @@ import { OPBarcodeModal } from '../../../components/samples/OPBarcodeModal';
 import { SampleBarcodeModal } from '../../../components/samples/SampleBarcodeModal';
 import { SampleMeasurementsModal } from '../../../components/samples/SampleMeasurementsModal';
 import { UDPEditSampleModal } from '../../../components/samples/UDPEditSampleModal';
+import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 import { getImageUrl } from '../../../lib/imageUrl';
 
 export default function SampleDetailPage() {
@@ -165,19 +166,43 @@ export default function SampleDetailPage() {
         setUdpReqs(newReqs);
     };
 
-    const handleAddToPool = (prod: any) => {
-        if (materialPool.find(p => p.id === prod.id)) {
-            toast.error('Material ya está en la lista del proyecto');
+    const [pendingPoolProduct, setPendingPoolProduct] = useState<any | null>(null);
+
+    const handleSelectPoolProduct = (prod: any) => {
+        const variants = prod.variants || [];
+        const hasMultipleVariants = variants.length > 1 || variants.some((v: any) => v.color && v.color !== 'ÚNICO');
+
+        if (hasMultipleVariants && variants.length > 1) {
+            setPendingPoolProduct(prod);
+        } else if (variants.length === 1) {
+            applyAddToPool(prod, variants[0]);
+        } else {
+            applyAddToPool(prod, null);
+        }
+    };
+
+    const applyAddToPool = (prod: any, variant: any) => {
+        const variantColor = variant && variant.color !== 'ÚNICO' ? variant.color : null;
+        const displayName = variantColor ? `${prod.name} (${variantColor})` : prod.name;
+        const skuToUse = variant?.variantSku || prod.sku;
+        const poolId = variant ? `${prod.id}__${variant.id}` : prod.id;
+
+        if (materialPool.find(p => p.id === poolId)) {
+            toast.error('Este material / variante ya está en la lista del proyecto');
             return;
         }
-        setMaterialPool([...materialPool, {
-            id: prod.id,
-            name: prod.name,
-            sku: prod.sku,
+        setMaterialPool(prev => [...prev, {
+            id: poolId,
+            productId: prod.id,
+            variantId: variant?.id || null,
+            name: displayName,
+            sku: skuToUse,
+            imageUrl: prod.imageUrl,
             description: prod.description,
             price: prod.purchasePrice || 0
         }]);
-        toast.success(`${prod.name} añadido a la lista`);
+        setPendingPoolProduct(null);
+        toast.success(`${displayName} añadido a la lista`);
     };
 
     const handleRemoveFromPool = (id: string) => {
@@ -1938,7 +1963,7 @@ export default function SampleDetailPage() {
                                                                 </div>
                                                             </div>
                                                             <button
-                                                                onClick={() => handleAddToPool(p)}
+                                                                onClick={() => handleSelectPoolProduct(p)}
                                                                 className="ml-3 p-3 bg-indigo-600/20 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all transform active:scale-90 shrink-0"
                                                             >
                                                                 <Plus className="w-4 h-4" />
@@ -2221,6 +2246,14 @@ export default function SampleDetailPage() {
                     sample={sample} 
                     onClose={() => setShowUDPEditModal(false)} 
                     onUpdated={fetchData} 
+                />
+            )}
+            {/* SELECT VARIANT MODAL */}
+            {pendingPoolProduct && (
+                <SelectVariantModal
+                    product={pendingPoolProduct}
+                    onSelectVariant={(variant) => applyAddToPool(pendingPoolProduct, variant)}
+                    onClose={() => setPendingPoolProduct(null)}
                 />
             )}
         </Layout>

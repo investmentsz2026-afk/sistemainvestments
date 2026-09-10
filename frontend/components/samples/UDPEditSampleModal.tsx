@@ -19,6 +19,7 @@ import {
 import api from '../../lib/axios';
 import { getImageUrl } from '../../lib/imageUrl';
 import toast from 'react-hot-toast';
+import { SelectVariantModal } from './SelectVariantModal';
 
 interface UDPEditSampleModalProps {
   sample: any;
@@ -108,18 +109,39 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
     }
   };
 
-  const addMaterial = (prod: any) => {
-    if (materials.some(m => m.productId === prod.id)) {
-      toast.error('Este material ya está en la lista');
+  const [pendingVariantProduct, setPendingVariantProduct] = useState<any | null>(null);
+
+  const handleSelectMaterialProduct = (prod: any) => {
+    const variants = prod.variants || [];
+    const hasMultipleVariants = variants.length > 1 || variants.some((v: any) => v.color && v.color !== 'ÚNICO');
+
+    if (hasMultipleVariants && variants.length > 1) {
+      setPendingVariantProduct(prod);
+    } else if (variants.length === 1) {
+      applyAddMaterial(prod, variants[0]);
+    } else {
+      applyAddMaterial(prod, null);
+    }
+  };
+
+  const applyAddMaterial = (prod: any, variant: any) => {
+    const variantColor = variant && variant.color !== 'ÚNICO' ? variant.color : null;
+    const displayName = variantColor ? `${prod.name} (${variantColor})` : prod.name;
+    const skuToUse = variant?.variantSku || prod.sku;
+
+    if (materials.some(m => (m.variantId && m.variantId === variant?.id) || (!m.variantId && m.productId === prod.id && !variantColor))) {
+      toast.error('Este material / variante ya está en la lista');
       return;
     }
+
     setMaterials(prev => [
       ...prev,
       {
         productId: prod.id,
-        name: prod.name,
+        variantId: variant?.id || null,
+        name: displayName,
         imageUrl: prod.imageUrl,
-        sku: prod.sku,
+        sku: skuToUse,
         quantity: 1,
         unitPriceAtTime: prod.purchasePrice || 0,
         customMaterial: null
@@ -127,7 +149,8 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
     ]);
     setSearchQuery('');
     setSearchResults([]);
-    toast.success(`${prod.name} añadido`);
+    setPendingVariantProduct(null);
+    toast.success(`${displayName} añadido`);
   };
 
   const addCustomMaterial = () => {
@@ -375,7 +398,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
                     <button
                       key={prod.id}
                       type="button"
-                      onClick={() => addMaterial(prod)}
+                      onClick={() => handleSelectMaterialProduct(prod)}
                       className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition text-left group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -519,6 +542,14 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
         </div>
 
       </div>
+
+      {pendingVariantProduct && (
+        <SelectVariantModal
+          product={pendingVariantProduct}
+          onSelectVariant={(variant) => applyAddMaterial(pendingVariantProduct, variant)}
+          onClose={() => setPendingVariantProduct(null)}
+        />
+      )}
     </div>
   );
 }

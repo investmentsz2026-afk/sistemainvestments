@@ -24,6 +24,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../../../lib/imageUrl';
+import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 
 export default function NewSamplePage() {
     const { user } = useAuth();
@@ -47,6 +48,7 @@ export default function NewSamplePage() {
     const [isSearching, setIsSearching] = useState(false);
     const [customMatName, setCustomMatName] = useState('');
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [pendingVariantProduct, setPendingVariantProduct] = useState<any>(null);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -108,23 +110,43 @@ export default function NewSamplePage() {
         }
     };
 
-    const addMaterial = (prod: any) => {
-        if (materials.some(m => m.productId === prod.id)) {
-            toast.error('Este material ya está en la lista');
+    const handleSelectMaterialProduct = (prod: any) => {
+        const variants = prod.variants || [];
+        const multipleRealVariants = variants.length > 1 || variants.some((v: any) => v.color && v.color !== 'ÚNICO');
+
+        if (multipleRealVariants && variants.length > 1) {
+            setPendingVariantProduct(prod);
+        } else if (variants.length === 1) {
+            applyAddMaterial(prod, variants[0]);
+        } else {
+            applyAddMaterial(prod, null);
+        }
+    };
+
+    const applyAddMaterial = (prod: any, variant: any) => {
+        const variantColor = variant && variant.color !== 'ÚNICO' ? variant.color : null;
+        const displayName = variantColor ? `${prod.name} (${variantColor})` : prod.name;
+        const skuToUse = variant?.variantSku || prod.sku;
+
+        if (materials.some(m => (m.variantId && m.variantId === variant?.id) || (!m.variantId && m.productId === prod.id && !variantColor))) {
+            toast.error('Este material / variante ya está en la lista');
             return;
         }
-        setMaterials([...materials, {
+
+        setMaterials(prev => [...prev, {
             productId: prod.id,
-            name: prod.name,
+            variantId: variant?.id || null,
+            name: displayName,
             imageUrl: prod.imageUrl,
-            sku: prod.sku,
+            sku: skuToUse,
             quantity: 1,
             unitPriceAtTime: prod.purchasePrice || 0,
             customMaterial: null
         }]);
         setSearchQuery('');
         setSearchResults([]);
-        toast.success(`${prod.name} añadido`);
+        setPendingVariantProduct(null);
+        toast.success(`${displayName} añadido`);
     };
 
     const addCustomMaterial = () => {
@@ -309,7 +331,7 @@ export default function NewSamplePage() {
                                             <button
                                                 key={prod.id}
                                                 type="button"
-                                                onClick={() => addMaterial(prod)}
+                                                onClick={() => handleSelectMaterialProduct(prod)}
                                                 className="w-full flex items-center justify-between p-3.5 hover:bg-gray-50 rounded-xl transition text-left group"
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -611,6 +633,15 @@ export default function NewSamplePage() {
                     </div>
                 </form>
             </div>
+
+            {/* VARIANT SELECTOR MODAL */}
+            {pendingVariantProduct && (
+                <SelectVariantModal
+                    product={pendingVariantProduct}
+                    onSelectVariant={(variant) => applyAddMaterial(pendingVariantProduct, variant)}
+                    onClose={() => setPendingVariantProduct(null)}
+                />
+            )}
         </Layout>
     );
 }
