@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Patch, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Patch, Delete, UseGuards, Req } from '@nestjs/common';
 import { SamplesService } from './samples.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -30,6 +30,11 @@ export class SamplesController {
   @Put(':id')
   update(@Req() req: any, @Param('id') id: string, @Body() data: any) {
     return this.samplesService.update(id, req.user.id, data);
+  }
+
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.samplesService.remove(id, req.user);
   }
 
   @Patch(':id/admin-approve-materials')

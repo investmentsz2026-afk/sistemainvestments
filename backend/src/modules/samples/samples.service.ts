@@ -416,4 +416,36 @@ export class SamplesService {
       return updated;
     });
   }
+
+  async remove(id: string, user: any) {
+    const sample = await this.findOne(id);
+    if (!sample) {
+      throw new NotFoundException('Muestra no encontrada');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Delete associated ProcessAudits if any
+      const audits = await (tx as any).processAudit.findMany({ where: { sampleId: id } });
+      if (audits.length > 0) {
+        for (const audit of audits) {
+          await (tx as any).auditFinding.deleteMany({ where: { auditId: audit.id } });
+        }
+        await (tx as any).processAudit.deleteMany({ where: { sampleId: id } });
+      }
+
+      // 2. Delete measurements
+      await (tx as any).productMeasurement.deleteMany({ where: { sampleId: id } });
+
+      // 3. Delete sample materials
+      await (tx as any).sampleMaterial.deleteMany({ where: { sampleId: id } });
+
+      // 4. Delete notifications referencing this sample
+      await (tx as any).notification.deleteMany({ where: { referenceId: id } });
+
+      // 5. Delete the sample itself
+      await (tx as any).productSample.delete({ where: { id } });
+
+      return { success: true, message: `Muestra ${sample.name} eliminada correctamente` };
+    });
+  }
 }

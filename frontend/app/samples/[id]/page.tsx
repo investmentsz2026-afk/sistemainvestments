@@ -62,11 +62,28 @@ export default function SampleDetailPage() {
     const [isCreatingOP, setIsCreatingOP] = useState(false);
     const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
     const [showUDPEditModal, setShowUDPEditModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Permission helpers for Commercial editing
     const userRole = (user?.role || '').toString().trim().toUpperCase();
     const canCommercialEdit = (userRole === 'COMERCIAL' || userRole === 'ADMIN' || !userRole) && sample?.adminOpApprovalStatus !== 'APROBADO';
     const isCommercialMode = sample?.status === 'PENDIENTE' || isCommercialEditing;
+
+    const handleDeleteSample = async () => {
+        if (!window.confirm(`¿Estás seguro de eliminar la muestra "${sample?.name}"?\n\nEsta acción eliminará definitivamente la muestra, sus medidas, materiales y OP asociada para poder registrarla nuevamente.`)) {
+            return;
+        }
+        setIsDeleting(true);
+        try {
+            await api.delete(`/samples/${sample.id}`);
+            toast.success('Muestra eliminada correctamente');
+            router.push('/samples');
+        } catch (err: any) {
+            console.error('Error deleting sample:', err);
+            toast.error(err.response?.data?.message || 'Error al eliminar la muestra');
+            setIsDeleting(false);
+        }
+    };
 
     // Edit State (UDP)
     const [isEditing, setIsEditing] = useState(false);
@@ -781,6 +798,18 @@ export default function SampleDetailPage() {
                                 className="flex items-center gap-2 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-rose-100 transition"
                             >
                                 <XCircle className="w-4 h-4" /> Cancelar Edición
+                            </button>
+                        )}
+
+                        {/* DELETE SAMPLE BUTTON (COMERCIAL, UDP, ADMIN) */}
+                        {(userRole === 'COMERCIAL' || userRole === 'UDP' || userRole === 'ADMIN') && (
+                            <button
+                                type="button"
+                                onClick={handleDeleteSample}
+                                disabled={isDeleting}
+                                className="flex items-center gap-2 px-5 py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-rose-600 hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
+                            >
+                                <Trash2 className="w-4 h-4" /> {isDeleting ? 'Eliminando...' : 'Eliminar Muestra'}
                             </button>
                         )}
                     </div>

@@ -15,10 +15,12 @@ import {
     ArrowRight,
     Camera,
     ClipboardList,
-    Beaker
+    Beaker,
+    Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 export default function SamplesPage() {
     const { user } = useAuth();
@@ -26,6 +28,7 @@ export default function SamplesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSamples();
@@ -39,6 +42,25 @@ export default function SamplesPage() {
             console.error('Error fetching samples:', error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDeleteSample = async (id: string, name: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!window.confirm(`¿Estás seguro de eliminar la muestra "${name}"?\n\nEsta acción borrará definitivamente la muestra, sus medidas y OP asociada para poder registrarla nuevamente.`)) {
+            return;
+        }
+        setDeletingId(id);
+        try {
+            await api.delete(`/samples/${id}`);
+            toast.success('Muestra eliminada correctamente');
+            setSamples((prev: any) => prev.filter((s: any) => s.id !== id));
+        } catch (err: any) {
+            console.error('Error deleting sample:', err);
+            toast.error(err.response?.data?.message || 'Error al eliminar la muestra');
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -158,6 +180,20 @@ export default function SamplesPage() {
                                             <span className="text-[10px] font-black uppercase mt-2">Sin Evidencia Visual</span>
                                         </div>
                                     )}
+
+                                    {/* DELETE BUTTON (COMERCIAL / UDP / ADMIN) */}
+                                    {(user?.role === 'COMERCIAL' || user?.role === 'UDP' || user?.role === 'ADMIN') && (
+                                        <button
+                                            type="button"
+                                            title="Eliminar Muestra"
+                                            onClick={(e) => handleDeleteSample(sample.id, sample.name, e)}
+                                            disabled={deletingId === sample.id}
+                                            className="absolute top-4 left-4 p-2.5 bg-white/90 hover:bg-rose-600 text-rose-500 hover:text-white rounded-xl shadow-lg backdrop-blur-sm transition active:scale-90 z-10 disabled:opacity-50"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+
                                     <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
                                         <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-gray-200/50 ${
                                             sample.status === 'COMPLETADO_INVENTARIO' ? 'bg-blue-600 text-white' :
@@ -204,16 +240,29 @@ export default function SamplesPage() {
                                     </div>
                                 </div>
 
-                                <Link 
-                                    href={`/samples/${sample.id}`}
-                                    className="mt-8 w-full py-4 bg-gray-50 text-gray-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                                >
-                                    {user?.role === 'COMERCIAL' && (sample.status === 'PENDIENTE' || (sample.status === 'APROBADO' && sample.adminOpApprovalStatus !== 'APROBADO')) ? (
-                                        <>{sample.status === 'PENDIENTE' ? 'Revisar Muestra' : (!sample.op || sample.adminOpApprovalStatus === 'SIN_OP' ? 'Gestionar / Crear OP' : 'Editar / Ver OP')} <ArrowRight className="w-4 h-4" /></>
-                                    ) : (
-                                        <>Ver Detalles <Eye className="w-4 h-4" /></>
+                                <div className="mt-8 flex items-center gap-2">
+                                    <Link 
+                                        href={`/samples/${sample.id}`}
+                                        className="flex-1 py-4 bg-gray-50 text-gray-900 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                        {user?.role === 'COMERCIAL' && (sample.status === 'PENDIENTE' || (sample.status === 'APROBADO' && sample.adminOpApprovalStatus !== 'APROBADO')) ? (
+                                            <>{sample.status === 'PENDIENTE' ? 'Revisar Muestra' : (!sample.op || sample.adminOpApprovalStatus === 'SIN_OP' ? 'Gestionar / Crear OP' : 'Editar / Ver OP')} <ArrowRight className="w-4 h-4" /></>
+                                        ) : (
+                                            <>Ver Detalles <Eye className="w-4 h-4" /></>
+                                        )}
+                                    </Link>
+                                    {(user?.role === 'COMERCIAL' || user?.role === 'UDP' || user?.role === 'ADMIN') && (
+                                        <button
+                                            type="button"
+                                            title="Eliminar Muestra"
+                                            onClick={(e) => handleDeleteSample(sample.id, sample.name, e)}
+                                            disabled={deletingId === sample.id}
+                                            className="p-4 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-2xl transition shadow-sm active:scale-90 disabled:opacity-50"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     )}
-                                </Link>
+                                </div>
                             </motion.div>
                         ))
                     )}
