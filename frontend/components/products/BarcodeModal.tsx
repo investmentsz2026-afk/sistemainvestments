@@ -22,6 +22,20 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
   const [quantity, setQuantity] = useState(1);
   const [copiedVariant, setCopiedVariant] = useState<string | null>(null);
 
+  const isNotClothing = (variant?: any) => {
+    const invType = (product.inventoryType || '').toUpperCase();
+    const cat = (product.category || '').toUpperCase();
+    const nonClothingTypes = ['AVIOS', 'AVÍOS', 'MATERIALES', 'MAQUINARIA', 'EQUIPOS', 'OTROS', 'TELAS', 'INSUMOS'];
+    if (nonClothingTypes.includes(invType) || nonClothingTypes.includes(cat)) {
+      return true;
+    }
+    const sizeVal = (variant?.size || '').trim().toUpperCase();
+    if (['ESTÁNDAR', 'ESTANDAR', 'UNICA', 'ÚNICA', 'UNICO', 'ÚNICO', 'N/A', '-', 'STD', 'STANDARD'].includes(sizeVal)) {
+      return true;
+    }
+    return false;
+  };
+
   const categoryDisplay = product.category
     ? (product.category.toUpperCase() === 'PANTALONES' || product.category.toUpperCase() === 'PANTALON' || product.category.toUpperCase() === 'PANTALÓN'
       ? 'PANTALÓN CABALLERO'
@@ -235,7 +249,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const items = Array(quantity).fill(0).map((_, index) => {
       const variant = selectedVariant;
       const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}`;
-      const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
+      const hideSize = isNotClothing(variant);
+      const hasSize = !hideSize && variant.size && variant.size !== 'N/A' && variant.size !== '-';
       const hasPrice = parseFloat(product.sellingPrice) > 0;
 
       return `
@@ -302,7 +317,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
     const items = product.variants.flatMap((variant: any) =>
       Array(quantity).fill(0).map((_, index) => {
         const modelDisplay = `${product.name}${product.entalle ? ' - ' + product.entalle : ''}`;
-        const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
+        const hideSize = isNotClothing(variant);
+        const hasSize = !hideSize && variant.size && variant.size !== 'N/A' && variant.size !== '-';
         const hasPrice = parseFloat(product.sellingPrice) > 0;
 
         return `
@@ -371,7 +387,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
       'Producto': product.name,
       'SKU Producto': product.sku,
       'SKU Variante': v.variantSku,
-      'Talla': v.size,
+      'Talla': isNotClothing(v) ? '-' : v.size,
       'Color': v.color,
       'Código Barras': v.variantSku,
       'Precio': product.sellingPrice
@@ -392,7 +408,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
 
       const tableColumn = ['Talla', 'Color', 'SKU', 'Código'];
       const tableRows = product.variants.map((v: any) => [
-        v.size,
+        isNotClothing(v) ? '-' : v.size,
         v.color,
         v.variantSku,
         v.variantSku
@@ -430,19 +446,22 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Variante</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {product.variants.map((variant: any) => (
-                <button
-                  key={variant.id}
-                  onClick={() => setSelectedVariant(variant)}
-                  className={`p-3 border rounded-lg text-left transition ${selectedVariant?.id === variant.id
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                    : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
-                    }`}
-                >
-                  <p className="font-medium text-gray-900">{variant.size}</p>
-                  <p className="text-sm text-gray-600">{variant.color}</p>
-                </button>
-              ))}
+              {product.variants.map((variant: any) => {
+                const hideSize = isNotClothing(variant);
+                return (
+                  <button
+                    key={variant.id}
+                    onClick={() => setSelectedVariant(variant)}
+                    className={`p-3 border rounded-lg text-left transition ${selectedVariant?.id === variant.id
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                      : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
+                      }`}
+                  >
+                    {!hideSize && <p className="font-medium text-gray-900">{variant.size}</p>}
+                    <p className={!hideSize ? "text-sm text-gray-600" : "font-bold text-gray-900"}>{variant.color || (hideSize ? 'ÚNICA' : variant.size)}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -473,7 +492,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ product, onClose, se
                         />
                         <div style={{ fontSize: '6.2pt' }} className="font-bold mt-[0.1mm]">{selectedVariant.variantSku}</div>
                       </div>
-                      {selectedVariant.size && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
+                      {selectedVariant.size && !isNotClothing(selectedVariant) && selectedVariant.size !== 'N/A' && selectedVariant.size !== '-' && (
                         <div style={{ fontSize: '19pt' }} className="font-black leading-none ml-[2mm]">
                           {selectedVariant.size}
                         </div>
