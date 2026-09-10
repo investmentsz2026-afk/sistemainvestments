@@ -12,22 +12,16 @@ import {
   Tag, 
   Info, 
   Beaker, 
-  Layers, 
   Trophy, 
-  Package, 
   CheckCircle2, 
   Loader2,
-  Building2,
-  Calendar
+  Printer,
+  Copy,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { getImageUrl } from '../../../lib/imageUrl';
-
-interface ColumnType {
-  id: string; // unique, e.g. "OP-02|Camello"
-  op: string; // e.g. "OP-02"
-  color: string; // e.g. "Camello"
-}
 
 const MEASUREMENT_KEYS = [
   { key: 'cintura', label: 'CINTURA' },
@@ -41,9 +35,9 @@ const MEASUREMENT_KEYS = [
 ];
 
 const STAGES = [
-  { id: 'OFICIAL', label: 'Medidas Oficiales (Ficha UDP)', color: 'indigo' },
-  { id: 'ANTES_LAVAR', label: 'Antes de Lavar (Crudo)', color: 'amber' },
-  { id: 'DESPUES_LAVAR', label: 'Después de Lavar (Acabado)', color: 'emerald' },
+  { id: 'OFICIAL', label: 'Medidas Oficiales (Ficha UDP)', color: 'indigo', desc: 'Patrón y especificación base del desarrollo' },
+  { id: 'ANTES_LAVAR', label: 'Antes de Lavar (Crudo)', color: 'amber', desc: 'Medidas en tela cruda antes del proceso de lavandería' },
+  { id: 'DESPUES_LAVAR', label: 'Después de Lavar (Acabado)', color: 'emerald', desc: 'Medidas finales tras encogimiento y acabado' },
 ];
 
 function parseInches(text: string): number | null {
@@ -141,9 +135,8 @@ function formatBotaPieCell(value: string): string {
 }
 
 export default function MeasurementsPage() {
-  const [activeTab, setActiveTab] = useState<'MUESTRAS' | 'COMPETENCIA' | 'TERMINADOS' | 'SEGUNDA' | 'TALLAS ESPECIALES'>('MUESTRAS');
+  const [activeTab, setActiveTab] = useState<'MUESTRAS' | 'COMPETENCIA'>('MUESTRAS');
   
-  const [products, setProducts] = useState<any[]>([]);
   const [samples, setSamples] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,22 +146,25 @@ export default function MeasurementsPage() {
   const [customNewSize, setCustomNewSize] = useState('');
   const [activeStage, setActiveStage] = useState('OFICIAL');
   
-  const [columns, setColumns] = useState<ColumnType[]>([]);
-  const [customOp, setCustomOp] = useState('');
-  const [customColor, setCustomColor] = useState('');
-  
-  const [registeredMeasurements, setRegisteredMeasurements] = useState<any[]>([]);
-  const [searchRegisteredText, setSearchRegisteredText] = useState('');
+  const [sampleMeasurements, setSampleMeasurements] = useState<any[]>([]);
+  const [currentForm, setCurrentForm] = useState<Record<string, string>>({
+    cintura: '',
+    cadera: '',
+    muslo: '',
+    rodilla: '',
+    botaPie: '',
+    tiroDel: '',
+    tiroPos: '',
+    largoTotal: ''
+  });
 
-  const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Competitor form state
+  // Competitor state
   const [compBrand, setCompBrand] = useState('');
   const [compGarment, setCompGarment] = useState('');
   const [compSize, setCompSize] = useState('32');
-  const [compNotes, setCompNotes] = useState('');
   const [compForm, setCompForm] = useState<Record<string, string>>({
     cintura: '',
     cadera: '',
@@ -183,221 +179,147 @@ export default function MeasurementsPage() {
   const [searchCompText, setSearchCompText] = useState('');
 
   useEffect(() => {
-    fetchItems();
+    fetchInitialData();
   }, [activeTab]);
 
-  const fetchItems = async () => {
+  const fetchInitialData = async () => {
     try {
-      setSelectedItem(null);
-      setSearchQuery('');
-      setSearchRegisteredText('');
-      
       if (activeTab === 'COMPETENCIA') {
         const resp = await api.get('/products-measurements', { params: { stage: 'COMPETENCIA' } });
         setCompetitorList(resp.data || []);
         return;
       }
 
-      const [itemsResp, measurementsResp] = await Promise.all([
-        activeTab === 'MUESTRAS' ? api.get('/samples') : api.get('/products'),
-        api.get('/products-measurements')
-      ]);
-
-      if (activeTab === 'MUESTRAS') {
-        setSamples(itemsResp.data || []);
-      } else {
-        const filtered = (itemsResp.data || []).filter((p: any) => p.inventoryType === activeTab);
-        setProducts(filtered);
-      }
-
-      setRegisteredMeasurements(measurementsResp.data || []);
+      const resp = await api.get('/samples');
+      setSamples(resp.data || []);
     } catch (err) {
       console.error(err);
       toast.error('Error al cargar datos');
     }
   };
 
-  // Initialize columns and load measurements when selected item or size changes
+  // Load measurements whenever selected sample changes
   useEffect(() => {
-    if (!selectedItem) return;
-    
-    const baseCols: ColumnType[] = [];
-    
-    if (activeStage === 'OFICIAL') {
-      baseCols.push({
-        id: 'OFFICIAL_COLUMN',
-        op: '',
-        color: ''
-      });
-    } else {
-      if (activeTab === 'MUESTRAS') {
-        if (selectedItem.productionColor) {
-          baseCols.push({
-            id: `${selectedItem.op || ''}|${selectedItem.productionColor}`,
-            op: selectedItem.op || '',
-            color: selectedItem.productionColor
-          });
-        }
-      } else {
-        const variants = selectedItem.variants || [];
-        variants.forEach((v: any) => {
-          const id = `${v.op || ''}|${v.color}`;
-          if (!baseCols.some(c => c.id === id)) {
-            baseCols.push({
-              id,
-              op: v.op || '',
-              color: v.color
-            });
-          }
-        });
-      }
+    if (!selectedItem) {
+      setSampleMeasurements([]);
+      return;
     }
+    loadSampleMeasurements();
+  }, [selectedItem]);
 
-    setColumns(baseCols);
-    loadMeasurements();
-  }, [selectedItem, selectedSize, activeStage]);
-
-  const loadMeasurements = async () => {
+  const loadSampleMeasurements = async () => {
     if (!selectedItem) return;
     setIsLoading(true);
     try {
-      let stageMeasurements: any[] = [];
-      if (activeTab === 'MUESTRAS') {
-        const resp = await api.get('/products-measurements', { params: { sampleId: selectedItem.id, size: selectedSize } });
-        stageMeasurements = (resp.data || []).filter((m: any) => m.stage === activeStage);
-      } else {
-        const ids = selectedItem.siblingIds || [selectedItem.id];
-        const promises = ids.map((id: string) => api.get('/products-measurements', { params: { productId: id, size: selectedSize } }));
-        const responses = await Promise.all(promises);
-        stageMeasurements = responses.flatMap((resp: any) => resp.data || []).filter((m: any) => m.stage === activeStage);
-      }
-
-      const newMatrix: Record<string, Record<string, string>> = {};
-      
-      if (activeStage === 'OFICIAL') {
-        let officialMeasure = stageMeasurements.find((m: any) => !m.color || m.color === '');
-        if (!officialMeasure && stageMeasurements.length > 0) {
-          officialMeasure = stageMeasurements[0];
-        }
-        newMatrix['OFFICIAL_COLUMN'] = {};
-        MEASUREMENT_KEYS.forEach(({ key }) => {
-          newMatrix['OFFICIAL_COLUMN'][key] = officialMeasure ? (officialMeasure[key] || '') : '';
-        });
-      } else {
-        setColumns(prev => {
-          const existingCols = stageMeasurements
-            .filter((m: any) => m.color)
-            .map((m: any) => ({
-              id: `${m.op || ''}|${m.color}`,
-              op: m.op || '',
-              color: m.color
-            }));
-          
-          const map = new Map<string, ColumnType>();
-          prev.forEach(c => map.set(c.id, c));
-          existingCols.forEach(c => map.set(c.id, c));
-          
-          return Array.from(map.values());
-        });
-
-        stageMeasurements.forEach((m: any) => {
-          if (!m.color) return;
-          const colId = `${m.op || ''}|${m.color}`;
-          if (!newMatrix[colId]) newMatrix[colId] = {};
-          
-          MEASUREMENT_KEYS.forEach(({ key }) => {
-            newMatrix[colId][key] = m[key] || '';
-          });
-        });
-      }
-      
-      setMatrix(newMatrix);
+      const resp = await api.get('/products-measurements', { 
+        params: { sampleId: selectedItem.id } 
+      });
+      setSampleMeasurements(resp.data || []);
     } catch (err) {
-      console.error(err);
-      toast.error('Error al cargar medidas');
+      console.error('Error fetching sample measurements:', err);
+      toast.error('Error al cargar medidas de la muestra');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCellChange = (columnId: string, key: string, value: string) => {
-    setMatrix(prev => ({
+  // Sync form values when activeStage or selectedSize or sampleMeasurements change
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const currentRecord = sampleMeasurements.find(
+      (m: any) => m.stage === activeStage && m.size === selectedSize
+    );
+
+    if (currentRecord) {
+      setCurrentForm({
+        cintura: currentRecord.cintura || '',
+        cadera: currentRecord.cadera || '',
+        muslo: currentRecord.muslo || '',
+        rodilla: currentRecord.rodilla || '',
+        botaPie: currentRecord.botaPie || '',
+        tiroDel: currentRecord.tiroDel || '',
+        tiroPos: currentRecord.tiroPos || '',
+        largoTotal: currentRecord.largoTotal || ''
+      });
+    } else {
+      setCurrentForm({
+        cintura: '',
+        cadera: '',
+        muslo: '',
+        rodilla: '',
+        botaPie: '',
+        tiroDel: '',
+        tiroPos: '',
+        largoTotal: ''
+      });
+    }
+  }, [selectedItem, activeStage, selectedSize, sampleMeasurements]);
+
+  const handleFormChange = (key: string, value: string) => {
+    setCurrentForm(prev => ({
       ...prev,
-      [columnId]: {
-        ...(prev[columnId] || {}),
-        [key]: value
-      }
+      [key]: key === 'botaPie' ? formatBotaPieCell(value) : value
     }));
   };
 
-  const handleSave = async () => {
-    if (!selectedItem) return;
+  const handleSaveMeasurement = async () => {
+    if (!selectedItem) {
+      toast.error('Selecciona una muestra primero');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const promises: Promise<any>[] = [];
+      const payload = {
+        sampleId: selectedItem.id,
+        stage: activeStage,
+        size: selectedSize,
+        op: selectedItem.op || null,
+        color: selectedItem.productionColor || null,
+        cintura: currentForm.cintura || null,
+        cadera: currentForm.cadera || null,
+        muslo: currentForm.muslo || null,
+        rodilla: currentForm.rodilla || null,
+        botaPie: currentForm.botaPie || null,
+        tiroDel: currentForm.tiroDel || null,
+        tiroPos: currentForm.tiroPos || null,
+        largoTotal: currentForm.largoTotal || null,
+      };
 
-      if (activeStage === 'OFICIAL') {
-        const measurements = matrix['OFFICIAL_COLUMN'] || {};
-        const payload: any = {
-          size: selectedSize,
-          stage: 'OFICIAL',
-          cintura: measurements.cintura || null,
-          cadera: measurements.cadera || null,
-          muslo: measurements.muslo || null,
-          rodilla: measurements.rodilla || null,
-          botaPie: measurements.botaPie || null,
-          tiroDel: measurements.tiroDel || null,
-          tiroPos: measurements.tiroPos || null,
-          largoTotal: measurements.largoTotal || null,
-        };
-
-        if (activeTab === 'MUESTRAS') {
-          payload.sampleId = selectedItem.id;
-          payload.op = selectedItem.op || null;
-        } else {
-          payload.productId = selectedItem.id;
-          payload.op = selectedItem.op || null;
-        }
-
-        promises.push(api.post('/products-measurements', payload));
-      } else {
-        columns.forEach(col => {
-          const measurements = matrix[col.id] || {};
-          const payload: any = {
-            size: selectedSize,
-            color: col.color,
-            op: col.op,
-            stage: activeStage,
-            cintura: measurements.cintura || null,
-            cadera: measurements.cadera || null,
-            muslo: measurements.muslo || null,
-            rodilla: measurements.rodilla || null,
-            botaPie: measurements.botaPie || null,
-            tiroDel: measurements.tiroDel || null,
-            tiroPos: measurements.tiroPos || null,
-            largoTotal: measurements.largoTotal || null,
-          };
-
-          if (activeTab === 'MUESTRAS') {
-            payload.sampleId = selectedItem.id;
-          } else {
-            payload.productId = selectedItem.id;
-          }
-
-          promises.push(api.post('/products-measurements', payload));
-        });
-      }
-
-      await Promise.all(promises);
-      toast.success('Medidas guardadas correctamente');
-      fetchItems();
-      loadMeasurements();
-    } catch (err) {
+      await api.post('/products-measurements', payload);
+      toast.success(`Medidas de talla ${selectedSize} (${STAGES.find(s => s.id === activeStage)?.label}) guardadas`);
+      loadSampleMeasurements();
+    } catch (err: any) {
       console.error(err);
-      toast.error('Error al guardar medidas');
+      toast.error(err.response?.data?.message || 'Error al guardar medidas');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCopyFromStage = (sourceStage: string) => {
+    const sourceRecord = sampleMeasurements.find(
+      (m: any) => m.stage === sourceStage && m.size === selectedSize
+    );
+
+    if (!sourceRecord) {
+      toast.error(`No hay medidas en "${STAGES.find(s => s.id === sourceStage)?.label}" para la talla ${selectedSize}`);
+      return;
+    }
+
+    setCurrentForm({
+      cintura: sourceRecord.cintura || '',
+      cadera: sourceRecord.cadera || '',
+      muslo: sourceRecord.muslo || '',
+      rodilla: sourceRecord.rodilla || '',
+      botaPie: sourceRecord.botaPie || '',
+      tiroDel: sourceRecord.tiroDel || '',
+      tiroPos: sourceRecord.tiroPos || '',
+      largoTotal: sourceRecord.largoTotal || ''
+    });
+
+    toast.success(`Medidas copiadas desde "${STAGES.find(s => s.id === sourceStage)?.label}"`);
   };
 
   const handleSaveCompetitor = async (e: React.FormEvent) => {
@@ -435,7 +357,7 @@ export default function MeasurementsPage() {
         tiroPos: '',
         largoTotal: ''
       });
-      fetchItems();
+      fetchInitialData();
     } catch (err) {
       console.error(err);
       toast.error('Error al guardar medida de competencia');
@@ -449,56 +371,50 @@ export default function MeasurementsPage() {
     try {
       await api.delete(`/products-measurements/${id}`);
       toast.success('Registro eliminado');
-      fetchItems();
+      fetchInitialData();
     } catch (err) {
       console.error(err);
       toast.error('Error al eliminar');
     }
   };
 
-  const addColumn = () => {
-    if (!customColor.trim()) {
-      toast.error('Por favor ingresa un color');
-      return;
-    }
-    const id = `${customOp.trim()}|${customColor.trim()}`;
-    if (columns.some(c => c.id === id)) {
-      toast.error('Esta variante ya está en la tabla');
-      return;
-    }
-    setColumns([...columns, { id, op: customOp.trim(), color: customColor.trim() }]);
-    setCustomOp('');
-    setCustomColor('');
-  };
-
-  const removeColumn = (colId: string) => {
-    setColumns(columns.filter(c => c.id !== colId));
-  };
-
-  // Group items suggestions for search
-  const currentItemsList = activeTab === 'MUESTRAS' ? samples : products;
   const filteredSuggestions = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return [];
-    return currentItemsList.filter(item => 
+    return samples.filter(item => 
       (item.name || '').toLowerCase().includes(term) ||
       (item.code || '').toLowerCase().includes(term) ||
       (item.sku || '').toLowerCase().includes(term)
     ).slice(0, 10);
-  }, [currentItemsList, searchQuery]);
+  }, [samples, searchQuery]);
 
-  // Sizes for sample/product
   const standardSizes = ['26', '28', '30', '32', '34', '36', '38', '40', '42', 'S', 'M', 'L', 'XL', 'XXL'];
 
-  // All sizes that already have measurements for the selected item
-  const existingSampleSizes = useMemo(() => {
-    if (!selectedItem) return [];
-    const itemMeasurements = registeredMeasurements.filter((m: any) => 
-      (activeTab === 'MUESTRAS' && m.sampleId === selectedItem.id) ||
-      (activeTab !== 'MUESTRAS' && (m.productId === selectedItem.id || selectedItem.siblingIds?.includes(m.productId)))
-    );
-    return Array.from(new Set(itemMeasurements.map((m: any) => m.size)));
-  }, [selectedItem, registeredMeasurements, activeTab]);
+  // All sizes for the active stage
+  const registeredSizesInActiveStage = useMemo(() => {
+    return sampleMeasurements
+      .filter((m: any) => m.stage === activeStage)
+      .map((m: any) => m.size);
+  }, [sampleMeasurements, activeStage]);
+
+  // Curve sizes ordered
+  const tableCurveSizes = useMemo(() => {
+    const activeStageSizes = sampleMeasurements
+      .filter((m: any) => m.stage === activeStage)
+      .map((m: any) => m.size);
+    
+    const unique = Array.from(new Set(activeStageSizes));
+    return unique.sort((a: any, b: any) => {
+      const numA = parseFloat(a);
+      const numB = parseFloat(b);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return String(a).localeCompare(String(b));
+    });
+  }, [sampleMeasurements, activeStage]);
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <Layout>
@@ -516,17 +432,17 @@ export default function MeasurementsPage() {
                 Control de Medidas
               </h1>
               <p className="text-gray-500 font-medium text-sm md:text-base mt-0.5">
-                Ficha técnica de medidas para prototipos UDP, producción y benchmarking de la competencia.
+                Ficha técnica de medidas para prototipos UDP (Nuevas y Existentes) y benchmarking de la competencia.
               </p>
             </div>
           </div>
         </div>
 
-        {/* MAIN CATEGORY TABS */}
-        <div className="bg-white rounded-3xl p-2 border border-gray-100 shadow-sm flex flex-wrap gap-2">
+        {/* MAIN CATEGORY TABS (ONLY MUESTRAS AND COMPETENCIA) */}
+        <div className="bg-white rounded-3xl p-2 border border-gray-100 shadow-sm flex flex-wrap gap-2 print:hidden">
           <button
             onClick={() => setActiveTab('MUESTRAS')}
-            className={`flex-1 min-w-[180px] py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 min-w-[240px] py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
               activeTab === 'MUESTRAS'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-102'
                 : 'bg-transparent text-gray-500 hover:bg-gray-50'
@@ -537,46 +453,13 @@ export default function MeasurementsPage() {
 
           <button
             onClick={() => setActiveTab('COMPETENCIA')}
-            className={`flex-1 min-w-[180px] py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 min-w-[240px] py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
               activeTab === 'COMPETENCIA'
                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-102'
                 : 'bg-transparent text-gray-500 hover:bg-gray-50'
             }`}
           >
             <Trophy className="w-4 h-4" /> 🏆 Medidas de la Competencia
-          </button>
-
-          <button
-            onClick={() => setActiveTab('TERMINADOS')}
-            className={`py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'TERMINADOS'
-                ? 'bg-gray-900 text-white shadow-lg scale-102'
-                : 'bg-transparent text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            <Package className="w-4 h-4" /> Terminados
-          </button>
-
-          <button
-            onClick={() => setActiveTab('SEGUNDA')}
-            className={`py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'SEGUNDA'
-                ? 'bg-gray-900 text-white shadow-lg scale-102'
-                : 'bg-transparent text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            Segunda
-          </button>
-
-          <button
-            onClick={() => setActiveTab('TALLAS ESPECIALES')}
-            className={`py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'TALLAS ESPECIALES'
-                ? 'bg-gray-900 text-white shadow-lg scale-102'
-                : 'bg-transparent text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            Especiales
           </button>
         </div>
 
@@ -765,19 +648,19 @@ export default function MeasurementsPage() {
           </div>
         ) : (
           /* ========================================================================= */
-          /* CASE 2: SYSTEM SAMPLES & INVENTORY PRODUCTS */
+          /* CASE 2: UDP SAMPLES (NUEVAS Y EXISTENTES) */
           /* ========================================================================= */
           <div className="space-y-8">
             
             {/* SEARCH & SELECTOR CARD */}
-            <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 space-y-4">
+            <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 space-y-4 print:hidden">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-xl font-black text-gray-900 uppercase">
-                    {activeTab === 'MUESTRAS' ? '1. Selecciona la Muestra de Desarrollo' : '1. Selecciona el Producto del Inventario'}
+                    1. Selecciona la Muestra de Desarrollo (Nueva o Existente)
                   </h3>
                   <p className="text-xs font-bold text-gray-400">
-                    Busca por nombre o código para autocompletar su información e ingresar medidas
+                    Busca por nombre o código para autocompletar su información e ingresar las medidas de cada etapa
                   </p>
                 </div>
               </div>
@@ -788,7 +671,7 @@ export default function MeasurementsPage() {
                   <Search className="w-5 h-5 text-indigo-400 absolute left-5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder={selectedItem ? `${selectedItem.name}` : `Escribe para buscar ${activeTab === 'MUESTRAS' ? 'muestra (ej: Camisa, SMP...)' : 'producto'}...`}
+                    placeholder={selectedItem ? `${selectedItem.name} (${selectedItem.code || 'SMP'})` : 'Escribe para buscar muestra por nombre o código...'}
                     value={searchQuery}
                     onChange={e => {
                       setSearchQuery(e.target.value);
@@ -825,7 +708,7 @@ export default function MeasurementsPage() {
                           <div className="min-w-0">
                             <p className="font-black text-gray-900 text-sm uppercase truncate">{item.name}</p>
                             <p className="text-[10px] font-bold text-gray-400 font-mono mt-0.5">
-                              {item.code || item.sku || 'SMP'} • {item.udp?.name || item.category || 'Muestra'}
+                              {item.code || 'SMP'} • Creado por: {item.udp?.name || 'UDP'}
                             </p>
                           </div>
                         </div>
@@ -859,11 +742,16 @@ export default function MeasurementsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] font-black uppercase border border-indigo-100">
-                          {selectedItem.code || selectedItem.sku || 'MUESTRA'}
+                          {selectedItem.code || 'MUESTRA UDP'}
                         </span>
                         {selectedItem.status && (
                           <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase">
                             {selectedItem.status}
+                          </span>
+                        )}
+                        {selectedItem.udp?.name && (
+                          <span className="text-xs font-bold text-gray-400">
+                            Resp: {selectedItem.udp.name}
                           </span>
                         )}
                       </div>
@@ -873,42 +761,87 @@ export default function MeasurementsPage() {
                     </div>
                   </div>
 
-                  {/* STAGE BUTTONS */}
-                  <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 rounded-2xl w-full lg:w-auto">
+                  {/* STAGE BUTTONS (OFICIALES, ANTES DE LAVAR, DESPUÉS DE LAVAR) */}
+                  <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 rounded-2xl w-full lg:w-auto print:hidden">
                     {STAGES.map(s => {
                       const isActive = activeStage === s.id;
+                      const count = sampleMeasurements.filter((m: any) => m.stage === s.id).length;
                       return (
                         <button
                           key={s.id}
                           onClick={() => setActiveStage(s.id)}
-                          className={`flex-1 lg:flex-initial px-5 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${
+                          className={`flex-1 lg:flex-initial px-5 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
                             isActive
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-102'
                               : 'bg-transparent text-gray-600 hover:bg-white'
                           }`}
                         >
-                          {s.label}
+                          <span>{s.label}</span>
+                          {count > 0 && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                              {count}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
+                {/* STAGE DESCRIPTION BANNER */}
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <Info className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-indigo-900 uppercase">
+                        Etapa Activa: {STAGES.find(s => s.id === activeStage)?.label}
+                      </h4>
+                      <p className="text-[11px] font-bold text-indigo-600/80">
+                        {STAGES.find(s => s.id === activeStage)?.desc}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* QUICK COPY BUTTONS */}
+                  <div className="flex items-center gap-2 print:hidden">
+                    {activeStage !== 'OFICIAL' && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyFromStage('OFICIAL')}
+                        className="px-3 py-2 bg-white border border-indigo-200 rounded-xl text-[10px] font-black uppercase text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-sm flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copiar de Oficiales
+                      </button>
+                    )}
+                    {activeStage === 'DESPUES_LAVAR' && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyFromStage('ANTES_LAVAR')}
+                        className="px-3 py-2 bg-white border border-amber-200 rounded-xl text-[10px] font-black uppercase text-amber-700 hover:bg-amber-600 hover:text-white transition shadow-sm flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copiar de Antes Lavar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* SIZE CURVE SELECTOR PILLS */}
-                <div className="space-y-3">
+                <div className="space-y-3 print:hidden">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                      2. Selecciona la Talla a Editar / Registrar
+                      2. Selecciona la Talla a Registrar / Modificar
                     </label>
                     <span className="text-xs font-bold text-indigo-600">
-                      Talla activa: <strong className="font-black text-sm">{selectedSize}</strong>
+                      Talla editando: <strong className="font-black text-sm">{selectedSize}</strong>
                     </span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {standardSizes.map(sz => {
                       const isSelected = selectedSize === sz;
-                      const hasRegistered = existingSampleSizes.includes(sz);
+                      const hasRegistered = registeredSizesInActiveStage.includes(sz);
                       return (
                         <button
                           key={sz}
@@ -918,7 +851,7 @@ export default function MeasurementsPage() {
                             isSelected
                               ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105'
                               : hasRegistered
-                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                               : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
                           }`}
                         >
@@ -954,11 +887,12 @@ export default function MeasurementsPage() {
                   </div>
                 </div>
 
-                {/* MEASUREMENT MATRIX INPUTS */}
-                <div className="space-y-4">
+                {/* MEASUREMENT INPUTS FOR SELECTED SIZE & STAGE */}
+                <div className="space-y-4 print:hidden">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                      3. Medidas de Talla {selectedSize} ({STAGES.find(s => s.id === activeStage)?.label})
+                    <h4 className="text-xs font-black text-gray-600 uppercase tracking-widest flex items-center gap-2">
+                      <Ruler className="w-4 h-4 text-indigo-500" />
+                      3. Medidas de Talla {selectedSize} en {STAGES.find(s => s.id === activeStage)?.label}
                     </h4>
                     <span className="text-[11px] font-bold text-gray-400">
                       Valores en pulgadas o cm (conversión automática)
@@ -966,39 +900,120 @@ export default function MeasurementsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                    {MEASUREMENT_KEYS.map(k => {
-                      const val = (matrix['OFFICIAL_COLUMN'] || {})[k.key] || '';
-                      return (
-                        <div key={k.key} className="space-y-1.5 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-center">
-                          <span className="text-[10px] font-black text-gray-700 uppercase tracking-wider block truncate">
-                            {k.label}
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="-"
-                            value={val}
-                            onChange={e => {
-                              const text = e.target.value;
-                              handleCellChange('OFFICIAL_COLUMN', k.key, k.key === 'botaPie' ? formatBotaPieCell(text) : text);
-                            }}
-                            className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-1.5 text-center font-black text-sm text-indigo-950 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                          />
-                        </div>
-                      );
-                    })}
+                    {MEASUREMENT_KEYS.map(k => (
+                      <div key={k.key} className="space-y-1.5 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-center hover:border-indigo-200 transition">
+                        <span className="text-[10px] font-black text-gray-700 uppercase tracking-wider block truncate">
+                          {k.label}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="-"
+                          value={currentForm[k.key] || ''}
+                          onChange={e => handleFormChange(k.key, e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-1.5 text-center font-black text-sm text-indigo-950 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveMeasurement}
+                      disabled={isSaving}
+                      className="px-8 py-4 bg-indigo-600 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-indigo-200 transition active:scale-95 disabled:opacity-50"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Guardar Medidas de Talla {selectedSize}
+                    </button>
                   </div>
                 </div>
 
-                {/* ACTION BUTTONS */}
-                <div className="flex justify-end pt-4 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="px-8 py-4 bg-indigo-600 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-indigo-200 transition active:scale-95 disabled:opacity-50"
-                  >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Guardar Medidas de Talla {selectedSize}
-                  </button>
+                {/* COMPLETE CURVE COMPARISON TABLE */}
+                <div className="pt-6 border-t border-gray-100 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        Curva de Medidas Registradas ({STAGES.find(s => s.id === activeStage)?.label})
+                      </h3>
+                      <p className="text-xs font-bold text-gray-400">
+                        Visualización completa de todas las tallas registradas en esta etapa
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition active:scale-95 self-start sm:self-auto print:hidden"
+                    >
+                      <Printer className="w-4 h-4" /> Imprimir Ficha
+                    </button>
+                  </div>
+
+                  {tableCurveSizes.length === 0 ? (
+                    <div className="py-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                      <Ruler className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">
+                        Aún no se han guardado tallas en {STAGES.find(s => s.id === activeStage)?.label}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border border-gray-200 rounded-3xl shadow-sm bg-white">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-gray-900 text-white">
+                            <th className="px-5 py-4 text-xs font-black uppercase tracking-wider border-r border-gray-800">
+                              Punto de Medida
+                            </th>
+                            {tableCurveSizes.map(size => (
+                              <th 
+                                key={size} 
+                                onClick={() => setSelectedSize(size)}
+                                className={`px-5 py-4 text-xs font-black uppercase tracking-wider text-center border-r border-gray-800 last:border-r-0 cursor-pointer transition ${
+                                  selectedSize === size ? 'bg-indigo-600 text-white' : 'bg-indigo-950/60 hover:bg-indigo-900/80'
+                                }`}
+                                title="Click para editar esta talla"
+                              >
+                                Talla {size}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 font-bold text-sm">
+                          {MEASUREMENT_KEYS.map((keyObj, idx) => (
+                            <tr key={keyObj.key} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                              <td className="px-5 py-3.5 text-xs font-black text-gray-900 uppercase border-r border-gray-100">
+                                {keyObj.label}
+                              </td>
+                              {tableCurveSizes.map(size => {
+                                const mObj = sampleMeasurements.find(
+                                  (m: any) => m.stage === activeStage && m.size === size
+                                );
+                                const val = mObj ? (mObj[keyObj.key] || '-') : '-';
+                                return (
+                                  <td 
+                                    key={size} 
+                                    onClick={() => setSelectedSize(size)}
+                                    className={`px-5 py-3.5 text-center text-xs font-black text-indigo-950 border-r border-gray-100 last:border-r-0 cursor-pointer ${
+                                      selectedSize === size ? 'bg-indigo-50/40' : ''
+                                    }`}
+                                  >
+                                    {val !== '-' ? (
+                                      <span className="px-2.5 py-1 bg-indigo-50/70 text-indigo-700 rounded-lg border border-indigo-100/80 inline-block font-mono">
+                                        {val}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-300">-</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
               </div>
