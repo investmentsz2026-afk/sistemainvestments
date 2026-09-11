@@ -393,6 +393,7 @@ export default function CollectionsPage() {
                     onClose={() => {
                         setIsModalOpen(false);
                         setSelectedSaleId(null);
+                        fetchSales();
                     }}
                 />
             )}

@@ -18,7 +18,8 @@ import {
     Eye,
     Truck,
     AlertCircle,
-    Upload
+    Upload,
+    Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../lib/axios';
@@ -54,6 +55,49 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
     const [invoiceValue, setInvoiceValue] = useState('');
     const [isSavingInvoice, setIsSavingInvoice] = useState(false);
     const [customFechaEmision, setCustomFechaEmision] = useState<string>('');
+    const [showSecretDelete, setShowSecretDelete] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setShowSecretDelete(false);
+            return;
+        }
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+                e.preventDefault();
+                setShowSecretDelete(prev => {
+                    const next = !prev;
+                    if (next) {
+                        toast('Modo eliminación forzada activado (Ctrl + B)', {
+                            icon: '⚠️',
+                            style: {
+                                borderRadius: '1rem',
+                                background: '#18181b',
+                                color: '#fff',
+                                fontWeight: 'bold',
+                                fontSize: '12px'
+                            }
+                        });
+                    } else {
+                        toast('Modo eliminación forzada desactivado', {
+                            style: {
+                                borderRadius: '1rem',
+                                background: '#374151',
+                                color: '#fff',
+                                fontWeight: 'bold',
+                                fontSize: '12px'
+                            }
+                        });
+                    }
+                    return next;
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen]);
 
     const getPeruDateStrings = () => {
         const today = new Date();
@@ -337,6 +381,53 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                         className="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-rose-700 transition shadow-lg shadow-rose-200"
                     >
                         Sí, Anular Todo
+                    </button>
+                </div>
+            </div>
+        ), { duration: Infinity });
+    };
+
+    const executePermanentDeleteSale = async () => {
+        try {
+            toast.loading('Eliminando venta permanentemente...', { id: 'permanent-delete' });
+            await api.delete(`/sales/${saleId}?permanent=true`);
+            toast.success('Venta eliminada permanentemente del sistema. El inventario se mantuvo intacto.', { id: 'permanent-delete', duration: 4000 });
+            onClose();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Error al eliminar la venta', { id: 'permanent-delete' });
+        }
+    };
+
+    const handleDeletePermanentSale = () => {
+        toast.custom((t) => (
+            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col p-6 border-2 border-red-500`}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center shrink-0">
+                        <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-black text-red-600 text-lg uppercase tracking-tight">Eliminar Venta</h3>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Modo Forzado (Ctrl + B)</span>
+                    </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-6 font-medium leading-relaxed">
+                    ¿Está seguro de eliminar esta venta? <strong className="text-red-600">Se descontará de las ganancias y ventas totales</strong> como si nunca hubiera existido, y <strong className="text-gray-900">los productos NO volverán a ingresar al inventario</strong>.
+                </p>
+                <div className="flex gap-3 justify-end">
+                    <button 
+                        onClick={() => toast.dismiss(t.id)} 
+                        className="px-5 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-gray-200 transition"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            executePermanentDeleteSale();
+                        }} 
+                        className="px-5 py-2.5 bg-red-600 text-white font-black rounded-xl text-xs uppercase tracking-wider hover:bg-red-700 transition shadow-lg shadow-red-200 active:scale-95"
+                    >
+                        Sí, Eliminar Venta
                     </button>
                 </div>
             </div>
@@ -887,6 +978,16 @@ export default function SaleDetailsModal({ saleId, isOpen, onClose }: SaleDetail
                                                 <X className="w-3.5 h-3.5" /> Anular Venta y Despacho
                                             </button>
                                         </div>
+                                    )}
+
+                                    {showSecretDelete && (user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                        <button
+                                            onClick={handleDeletePermanentSale}
+                                            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-red-500/30 hover:bg-red-700 transition active:scale-95 animate-pulse"
+                                            title="Eliminar venta completamente sin devolver productos al inventario"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" /> Eliminar Venta
+                                        </button>
                                     )}
 
                                     {sale.sunatPdfUrl && (

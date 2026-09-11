@@ -121,8 +121,21 @@ export class SalesController {
   }
 
   @Delete(':id')
-  annul(@Param('id') id: string, @Req() req: any, @Query('revertDispatch') revertDispatch?: string) {
+  annul(
+    @Param('id') id: string, 
+    @Req() req: any, 
+    @Query('revertDispatch') revertDispatch?: string,
+    @Query('permanent') permanent?: string
+  ) {
+    if (permanent === 'true') {
+      return this.salesService.deletePermanentSale(id, req.user);
+    }
     return this.salesService.annulSale(id, req.user, revertDispatch === 'true');
+  }
+
+  @Delete(':id/permanent')
+  deletePermanent(@Param('id') id: string, @Req() req: any) {
+    return this.salesService.deletePermanentSale(id, req.user);
   }
 
   @Post(':id/payments')

@@ -1266,6 +1266,52 @@ export class SalesService {
     };
   }
 
+  async deletePermanentSale(id: string, user: any) {
+    if (user.role !== 'ADMIN' && user.role !== 'COMERCIAL') {
+      throw new BadRequestException('No tienes permisos para eliminar ventas');
+    }
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+      include: { 
+        items: true, 
+        payments: { 
+          include: { letraDetails: true } 
+        } 
+      }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    // Permanently delete the sale and its direct relations without modifying stock
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Delete associated letra details & payments
+      for (const payment of sale.payments) {
+        await tx.letraDetail.deleteMany({
+          where: { paymentId: payment.id }
+        });
+      }
+      await tx.salePayment.deleteMany({
+        where: { saleId: id }
+      });
+
+      // 2. Delete sale items
+      await tx.saleItem.deleteMany({
+        where: { saleId: id }
+      });
+
+      // 3. Delete the sale itself
+      await tx.sale.delete({
+        where: { id }
+      });
+    });
+
+    return { 
+      success: true, 
+      message: 'Venta eliminada permanentemente. El stock en inventario se mantuvo intacto.' 
+    };
+  }
+
   async findAllClients(user: any) {
     const where: any = {};
 

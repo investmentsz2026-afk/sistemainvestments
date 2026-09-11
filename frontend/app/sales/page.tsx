@@ -644,6 +644,7 @@ export default function SalesPage() {
                     onClose={() => {
                         setIsModalOpen(false);
                         setSelectedSaleId(null);
+                        fetchSales();
                     }}
                 />
             )}
