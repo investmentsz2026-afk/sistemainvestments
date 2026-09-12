@@ -28,6 +28,7 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Vestidos', label: '👗 Vestidos' },
     { value: 'Faldas', label: '🩳 Faldas' },
     { value: 'Bermudas', label: '🩳 Bermudas / Shorts' },
+    { value: 'Correas', label: '👔 Correas y Cinturones' },
     { value: 'Deportivo', label: '🏃 Ropa Deportiva' },
     { value: 'Formal', label: '🤵 Ropa Formal' },
   ],
@@ -80,6 +81,7 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Otros Materiales', label: '🧱 Otros Materiales de Producción' },
   ],
   AVIOS: [
+    { value: 'Correas', label: '👔 Correas' },
     { value: 'Botones y Broches', label: '🔘 Botones, Broches y Remaches' },
     { value: 'Remaches y Placas', label: '🏷️ Remaches Metálicos y Placas' },
     { value: 'Cierres y Deslizadores', label: '🧷 Cierres, Cremalleras y Deslizadores' },
@@ -140,8 +142,9 @@ const getProductSchema = (isEditing: boolean) => z.object({
     variantSku: z.string().optional(),
   })).optional(),
 }).superRefine((data, ctx) => {
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(data.inventoryType);
-  const showPrices = isMaterialOrMachinery || !!data.op || !!data.purchaseItemId;
+  const isCorreas = (data.category || '').toLowerCase().includes('correa');
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType) && !isCorreas;
+  const showPrices = isMaterialOrMachinery || !!data.op || !!data.purchaseItemId || isCorreas;
 
   // Validar precio de venta solo si NO es material/maquinaria y showPrices es true
   if (showPrices && !isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
@@ -269,8 +272,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchSellingPrice = watch('sellingPrice');
   const watchRealPrice = watch('realPrice');
   const watchInventoryType = watch('inventoryType');
+  const watchCategory = watch('category') || '';
+  const isCorreas = watchCategory.toLowerCase().includes('correa');
 
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(watchInventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(watchInventoryType) && !isCorreas;
 
   const margin = watchPurchasePrice > 0 && watchRealPrice > 0
     ? ((watchRealPrice - watchPurchasePrice) / watchPurchasePrice * 100)
@@ -278,14 +283,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const AVAILABLE_SIZES = watchInventoryType === 'TALLAS ESPECIALES' 
     ? ['48', '50', '52'] 
-    : ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46'];
+    : ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', 'ESTÁNDAR'];
 
   const watchSizes = watch('sizes') || [];
   const watchColors = watch('colors') || [];
   const watchOp = watch('op');
   const watchOpVariants = watch('opVariants') || {};
   const watchImportedStockQuantities = watch('importedStockQuantities') || {};
-  const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
+  const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId') || isCorreas;
 
   const [colorInput, setColorInput] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -475,7 +480,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   };
 
   const handleFormSubmit = (data: ProductFormData) => {
-    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType);
+    const isCorreas = (data.category || '').toLowerCase().includes('correa');
+    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType) && !isCorreas;
     if (isMat) {
       data.sizes = ['ESTÁNDAR'];
       const validColors = (data.colors || []).filter(c => c && c.trim() && c.trim() !== 'ÚNICO');
@@ -503,6 +509,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           };
         });
       }
+    } else if (data.sizes && data.sizes.length > 0 && data.colors && data.colors.length > 0 && !data.op) {
+      // For products with sizes and colors (like 1ra or Correas without OP):
+      const existingVariants = data.variants || [];
+      const generatedVariants: any[] = [];
+      data.sizes.forEach(size => {
+        data.colors!.forEach(color => {
+          const existing = existingVariants.find((v: any) => v.size === size && v.color === color);
+          generatedVariants.push({
+            id: existing?.id,
+            size,
+            color,
+            stock: existing?.stock !== undefined ? existing.stock : (existing?.initialStock || 0),
+            initialStock: existing?.initialStock || 0,
+            variantSku: existing?.variantSku || undefined,
+          });
+        });
+      });
+      data.variants = generatedVariants;
     }
 
     if (data.op && data.opVariants) {

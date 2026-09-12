@@ -70,6 +70,16 @@ export class ProductsService {
       for (const variant of createProductDto.variants) {
         await this.createVariant(userId, product.id, variant, isOnlyVariant);
       }
+    } else if (createProductDto.sizes && createProductDto.sizes.length > 0 && createProductDto.colors && createProductDto.colors.length > 0 && !createProductDto.sizes.includes('ESTÁNDAR')) {
+      for (const size of createProductDto.sizes) {
+        for (const color of createProductDto.colors) {
+          await this.createVariant(userId, product.id, {
+            size,
+            color,
+            initialStock: 0,
+          });
+        }
+      }
     } else {
       // Si no se proporcionaron variantes, crear la variante base única con el SKU del producto
       await this.createVariant(userId, product.id, {

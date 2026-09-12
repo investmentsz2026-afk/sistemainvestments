@@ -9,6 +9,7 @@ import { Layout } from '../../../components/common/Layout';
 import api from '../../../lib/axios';
 import toast from 'react-hot-toast';
 import { ProductBarcode } from '../../../components/products/Barcode';
+import { getUnitSymbol } from '../../../utils/units';
 
 const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
 
@@ -231,7 +232,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             </div>
             <span className="text-sm text-gray-500">Stock Total</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totalStock}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {totalStock} <span className="text-sm font-normal text-gray-500">{getUnitSymbol(product.unit)}</span>
+          </p>
           <p className="text-xs text-gray-400 mt-1">{product.variants.length} variantes</p>
         </div>
 
@@ -364,7 +367,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                         ? 'text-yellow-600'
                         : 'text-green-600'
                     }`}>
-                      {variant.stock} uni.
+                      {variant.stock} {getUnitSymbol(product.unit)}
                     </span>
                   </div>
 

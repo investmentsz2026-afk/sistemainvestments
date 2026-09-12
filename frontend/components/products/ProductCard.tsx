@@ -3,6 +3,7 @@ import React from 'react';
 import { Edit, Trash2, Eye, AlertTriangle, Barcode, Image as ImageIcon, Maximize2 } from 'lucide-react';
 import Link from 'next/link';
 import { getImageUrl } from '../../lib/imageUrl';
+import { getUnitSymbol } from '../../utils/units';
 
 interface ProductCardProps {
   product: any;
@@ -27,87 +28,100 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     product.inventoryType?.toLowerCase() === 'avios' ||
     product.inventoryType?.toLowerCase() === 'avíos' ||
     product.category?.toLowerCase() === 'avios' ||
-    product.category?.toLowerCase() === 'avíos' ||
-    product.category?.toLowerCase() === 'avio';
+    product.category?.toLowerCase() === 'avíos';
+
+  const isTelas =
+    product.inventoryType === 'MATERIALES' ||
+    product.category?.toLowerCase().includes('tela');
 
   const getInventoryTypeBadge = (type: string) => {
     switch (type) {
       case 'TERMINADOS':
-        return { label: 'Primera', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+        return { text: '1ra Calidad', color: 'bg-green-100 text-green-800' };
       case 'SEGUNDA':
-        return { label: 'Segunda', className: 'bg-amber-50 text-amber-700 border-amber-100' };
+        return { text: '2da Calidad', color: 'bg-yellow-100 text-yellow-800' };
       case 'PROCESO':
-        return { label: 'En Proceso', className: 'bg-indigo-50 text-indigo-700 border-indigo-100' };
+        return { text: 'En Proceso', color: 'bg-blue-100 text-blue-800' };
       case 'TALLAS ESPECIALES':
-        return { label: 'Plus Size', className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' };
-      case 'AVIOS':
-        return { label: 'Avíos', className: 'bg-purple-50 text-purple-700 border-purple-100' };
-      case 'MATERIALES':
-        return { label: 'Materiales', className: 'bg-blue-50 text-blue-700 border-blue-100' };
+        return { text: 'Plus Size', color: 'bg-indigo-100 text-indigo-800' };
       case 'MAQUINARIA':
-        return { label: 'Maquinaria', className: 'bg-cyan-50 text-cyan-700 border-cyan-100' };
+        return { text: 'Maquinaria', color: 'bg-gray-100 text-gray-800' };
+      case 'MATERIALES':
+        return { text: 'Materiales', color: 'bg-orange-100 text-orange-800' };
+      case 'AVIOS':
+        return { text: 'Avíos', color: 'bg-purple-100 text-purple-800' };
       case 'OTROS':
-        return { label: 'Otros', className: 'bg-slate-50 text-slate-700 border-slate-100' };
+        return { text: 'Otros', color: 'bg-slate-100 text-slate-800' };
       default:
-        return { label: type, className: 'bg-gray-50 text-gray-700 border-gray-100' };
+        return { text: type, color: 'bg-gray-100 text-gray-800' };
     }
   };
 
   const badge = getInventoryTypeBadge(product.inventoryType);
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS'].includes(product.inventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(product.inventoryType) && !(product.category || '').toLowerCase().includes('correa');
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition group">
-      <div className="p-5">
-        {/* Header con acciones */}
-        <div className="flex items-start justify-between mb-3 gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Thumbnail solo para Avíos */}
-            {isAvio && (
-              product.imageUrl ? (
-                <button
-                  type="button"
-                  onClick={() => onZoomImage?.(product)}
-                  className="relative group/thumb w-14 h-14 flex-shrink-0 rounded-xl overflow-hidden border-2 border-purple-200 hover:border-purple-500 bg-gray-50 shadow-sm transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
-                  title="Click para ver imagen ampliada"
-                >
-                  <img
-                    src={getImageUrl(product.imageUrl)}
-                    alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
-                    <Maximize2 className="w-4 h-4 text-white drop-shadow" />
-                  </div>
-                </button>
-              ) : (
-                <div
-                  className="w-14 h-14 flex-shrink-0 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex flex-col items-center justify-center text-gray-400"
-                  title="Avío sin imagen"
-                >
-                  <ImageIcon className="w-5 h-5 text-gray-300" />
-                  <span className="text-[9px] font-medium text-gray-400">Sin foto</span>
-                </div>
-              )
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+      {/* Header con Imagen */}
+      <div className="relative h-48 bg-gray-100 flex items-center justify-center">
+        {product.imageUrl ? (
+          <>
+            <img
+              src={getImageUrl(product.imageUrl)}
+              alt={product.name}
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={() => onZoomImage?.(product)}
+            />
+            {onZoomImage && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onZoomImage(product);
+                }}
+                className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg backdrop-blur-sm transition opacity-80 hover:opacity-100"
+                title="Ampliar imagen"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
             )}
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center text-gray-400">
+            <ImageIcon className="w-12 h-12 mb-1" />
+            <span className="text-xs">Sin foto</span>
+          </div>
+        )}
+        
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge.color}`}>
+            {badge.text}
+          </span>
+          {product.op && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+              OP: {product.op}
+            </span>
+          )}
+        </div>
+      </div>
 
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-gray-900 truncate" title={product.name}>
+      {/* Content */}
+      <div className="p-4">
+        {/* Title and Category */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 min-w-0 mr-2">
+            <Link href={`/products/${product.id}`} className="block">
+              <h3 className="font-semibold text-gray-900 truncate hover:text-blue-600 transition">
                 {product.name}
               </h3>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full truncate max-w-[100px]">
-                  {product.category}
-                </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold truncate ${badge.className}`}>
-                  {badge.label}
-                </span>
-                <span className="text-xs text-gray-400 truncate">SKU: {product.sku}</span>
-              </div>
-            </div>
+            </Link>
+            <p className="text-xs text-gray-500 truncate">{product.category}</p>
+            <p className="text-xs font-mono text-gray-400 mt-0.5">SKU: {product.sku}</p>
           </div>
-
-          <div className="flex gap-1 flex-shrink-0">
+          
+          {/* Actions */}
+          <div className="flex items-center gap-1">
             <button
               onClick={onViewBarcodes}
               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -117,14 +131,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </button>
             <Link
               href={`/products/${product.id}`}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-              title="Ver detalles"
+              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
+              title="Ver detalle"
             >
               <Eye className="w-4 h-4" />
             </Link>
             <button
               onClick={onEdit}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition"
               title="Editar"
             >
               <Edit className="w-4 h-4" />
@@ -148,7 +162,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 totalStock === 0 ? 'text-red-600' : hasLowStock ? 'text-yellow-600' : 'text-green-600'
               }`}
             >
-              {totalStock} <span className="text-xs font-normal text-gray-500">{product.unit || 'uds'}</span>
+              {totalStock} <span className="text-xs font-normal text-gray-500">{getUnitSymbol(product.unit)}</span>
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
@@ -186,7 +200,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     variant.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'
                   }`}
                 >
-                  {variant.stock} uni.
+                  {variant.stock} {getUnitSymbol(product.unit)}
                 </span>
               </div>
             ))}
