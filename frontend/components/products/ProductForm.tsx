@@ -145,30 +145,31 @@ const getProductSchema = (isEditing: boolean) => z.object({
   const isCorreas = (data.category || '').toLowerCase().includes('correa');
   const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType);
   const hasSizeAndColorVariants = !isMaterialOrMachinery || isCorreas;
+  const showPrices = isMaterialOrMachinery || !!data.op || !!data.purchaseItemId;
 
-  // Validar precio de venta solo si NO es material/maquinaria/avíos (prendas terminadas de venta)
-  if (!isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
+  // Validar precio de venta solo si tiene OP o compra y NO es material/maquinaria/avíos
+  if (showPrices && !isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'El precio de venta es requerido para este tipo de producto',
+      message: 'El precio sugerido es requerido para productos con OP',
       path: ['sellingPrice'],
     });
   }
 
-  // Validar precio real solo si NO es material/maquinaria/avíos
-  if (!isMaterialOrMachinery && (!data.realPrice || data.realPrice <= 0)) {
+  // Validar precio real solo si tiene OP o compra y NO es material/maquinaria/avíos
+  if (showPrices && !isMaterialOrMachinery && (!data.realPrice || data.realPrice <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'El precio real es requerido para este tipo de producto',
+      message: 'El precio real es requerido para productos con OP',
       path: ['realPrice'],
     });
   }
 
-  // Validar precio de compra para todos
-  if (!data.purchasePrice || data.purchasePrice < 0.01) {
+  // Validar precio de compra solo si es material/maquinaria o tiene OP/compra
+  if (showPrices && (!data.purchasePrice || data.purchasePrice < 0.01)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'El precio de compra debe ser mayor a 0',
+      message: isMaterialOrMachinery ? 'El precio de compra debe ser mayor a 0' : 'El costo de producción debe ser mayor a 0',
       path: ['purchasePrice'],
     });
   }
@@ -282,7 +283,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchOp = watch('op');
   const watchOpVariants = watch('opVariants') || {};
   const watchImportedStockQuantities = watch('importedStockQuantities') || {};
-  const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId') || isCorreas;
+  const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
 
   const [colorInput, setColorInput] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -556,8 +557,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     onSubmit(data);
   };
 
+  const handleFormError = (formErrors: any) => {
+    console.error('Errores de validación en formulario de producto:', formErrors);
+    const errorKeys = Object.keys(formErrors);
+    if (errorKeys.length > 0) {
+      const firstError = formErrors[errorKeys[0]];
+      toast.error(firstError?.message || 'Por favor completa todos los campos requeridos (*) antes de guardar');
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit, handleFormError)} className="space-y-6">
       {/* ── Información Básica ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/30">
