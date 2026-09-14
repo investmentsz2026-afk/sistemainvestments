@@ -143,11 +143,11 @@ const getProductSchema = (isEditing: boolean) => z.object({
   })).optional(),
 }).superRefine((data, ctx) => {
   const isCorreas = (data.category || '').toLowerCase().includes('correa');
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType) && !isCorreas;
-  const showPrices = isMaterialOrMachinery || !!data.op || !!data.purchaseItemId || isCorreas;
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType);
+  const hasSizeAndColorVariants = !isMaterialOrMachinery || isCorreas;
 
-  // Validar precio de venta solo si NO es material/maquinaria y showPrices es true
-  if (showPrices && !isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
+  // Validar precio de venta solo si NO es material/maquinaria/avíos (prendas terminadas de venta)
+  if (!isMaterialOrMachinery && (!data.sellingPrice || data.sellingPrice <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'El precio de venta es requerido para este tipo de producto',
@@ -155,8 +155,8 @@ const getProductSchema = (isEditing: boolean) => z.object({
     });
   }
 
-  // Validar precio real solo si NO es material/maquinaria y showPrices es true
-  if (showPrices && !isMaterialOrMachinery && (!data.realPrice || data.realPrice <= 0)) {
+  // Validar precio real solo si NO es material/maquinaria/avíos
+  if (!isMaterialOrMachinery && (!data.realPrice || data.realPrice <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'El precio real es requerido para este tipo de producto',
@@ -164,8 +164,8 @@ const getProductSchema = (isEditing: boolean) => z.object({
     });
   }
 
-  // Validar precio de compra solo si showPrices es true
-  if (showPrices && (!data.purchasePrice || data.purchasePrice < 0.01)) {
+  // Validar precio de compra para todos
+  if (!data.purchasePrice || data.purchasePrice < 0.01) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'El precio de compra debe ser mayor a 0',
@@ -173,8 +173,8 @@ const getProductSchema = (isEditing: boolean) => z.object({
     });
   }
 
-  // Validar tallas y colores solo si NO es material/maquinaria
-  if (!isMaterialOrMachinery) {
+  // Validar tallas y colores si tiene variantes de talla y color (prendas o correas)
+  if (hasSizeAndColorVariants) {
     if (!data.sizes || data.sizes.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -199,67 +199,57 @@ const getProductSchema = (isEditing: boolean) => z.object({
   }
 });
 
-type ProductFormData = z.infer<ReturnType<typeof getProductSchema>>;
+export type ProductFormData = z.infer<ReturnType<typeof getProductSchema>>;
 
 interface ProductFormProps {
-  onSubmit: (data: ProductFormData) => void;
   initialData?: any;
+  onSubmit: (data: ProductFormData) => void;
   isLoading?: boolean;
   isEditing?: boolean;
 }
 
 export const ProductForm: React.FC<ProductFormProps> = ({
-  onSubmit,
   initialData,
+  onSubmit,
   isLoading,
   isEditing = false,
 }) => {
+  const isEditingMode = isEditing || !!initialData;
   const {
     register,
     handleSubmit,
-    formState: { errors },
-    watch,
     setValue,
+    watch,
     reset,
+    formState: { errors },
   } = useForm<ProductFormData>({
-    resolver: zodResolver(getProductSchema(isEditing)),
-    defaultValues: initialData || {
-      name: '',
-      category: '',
-      inventoryType: 'TERMINADOS',
+    resolver: zodResolver(getProductSchema(isEditingMode)),
+    defaultValues: {
       unit: 'UND',
-      description: '',
-      sku: '',
-      op: '',
-      entalle: '',
       purchasePrice: 0,
       sellingPrice: 0,
       realPrice: 0,
       minStock: 5,
       sizes: [],
       colors: [],
-      imageUrl: '',
+      inventoryType: 'TERMINADOS',
+      category: 'Jeans',
+      ...initialData,
     },
   });
 
-  // Reset form when initialData changes (e.g., when importing from purchases)
+  // Cargar datos si es edición
   React.useEffect(() => {
     if (initialData) {
       const dataToReset = { ...initialData };
-      if (initialData.variants && (!initialData.sizes || !initialData.colors)) {
-        dataToReset.sizes = Array.from(new Set(initialData.variants.map((v: any) => v.size).filter(Boolean))) as string[];
-        dataToReset.colors = Array.from(new Set(initialData.variants.map((v: any) => v.color).filter(Boolean))) as string[];
-      }
-      if (initialData.variants && !initialData.opVariants) {
+      if (initialData.variants && initialData.variants.length > 0 && initialData.op) {
         const opVariants: Record<string, string[]> = {};
         initialData.variants.forEach((v: any) => {
-          if (v.size && v.color) {
-            if (!opVariants[v.size]) {
-              opVariants[v.size] = [];
-            }
-            if (!opVariants[v.size].includes(v.color)) {
-              opVariants[v.size].push(v.color);
-            }
+          if (!opVariants[v.size]) {
+            opVariants[v.size] = [];
+          }
+          if (!opVariants[v.size].includes(v.color)) {
+            opVariants[v.size].push(v.color);
           }
         });
         dataToReset.opVariants = opVariants;
@@ -275,7 +265,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchCategory = watch('category') || '';
   const isCorreas = watchCategory.toLowerCase().includes('correa');
 
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(watchInventoryType) && !isCorreas;
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(watchInventoryType);
+  const hasSizeAndColorVariants = !isMaterialOrMachinery || isCorreas;
+  const showMaterialOptionalColors = isMaterialOrMachinery && !isCorreas;
 
   const margin = watchPurchasePrice > 0 && watchRealPrice > 0
     ? ((watchRealPrice - watchPurchasePrice) / watchPurchasePrice * 100)
@@ -952,8 +944,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         </div>
       )}
 
-      {/* ── Tallas y Colores ── */}
-      {!isMaterialOrMachinery && (
+      {/* ── Tallas y Colores (Prendas y Correas) ── */}
+      {hasSizeAndColorVariants && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50/50 to-purple-50/30">
             <div className="flex items-center gap-3">
@@ -1112,7 +1104,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       )}
 
       {/* ── Colores / Variantes para Avíos, Materiales, Maquinaria, Otros (Opcional) ── */}
-      {isMaterialOrMachinery && (
+      {showMaterialOptionalColors && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-amber-50/50 to-orange-50/30">
             <div className="flex items-center gap-3">

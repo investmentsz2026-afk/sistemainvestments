@@ -36,6 +36,7 @@ export interface ProductVariant {
   color: string;
   stock: number;
   variantSku: string;
+  op?: string;
   product?: Product;
 }
 

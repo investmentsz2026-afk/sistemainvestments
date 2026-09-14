@@ -30,6 +30,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { NotaPedidoModal } from '../../components/orders/NotaPedidoModal';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { useProducts } from '../../hooks/useProducts';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -41,6 +42,7 @@ const formatDate = (dateString: string) => {
 
 export default function DispatchPage() {
     const { user } = useAuth();
+    const { products } = useProducts();
     const [orders, setOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -130,7 +132,24 @@ export default function DispatchPage() {
         const activeLabel = activeLabelMap[viewMode] || 'Despacho';
         const cleanLabel = activeLabel.toLowerCase().replace(/\s+/g, '_');
 
-        const data = dispatchOrders.map(order => {
+        // Build fast lookup maps from products catalog
+        const variantMap = new Map<string, any>();
+        const productByNameMap = new Map<string, any>();
+
+        (products || []).forEach((p: any) => {
+            if (p.name) {
+                productByNameMap.set(p.name.trim().toUpperCase(), p);
+            }
+            (p.variants || []).forEach((v: any) => {
+                variantMap.set(v.id, { ...v, product: p });
+                if (v.variantSku) {
+                    variantMap.set(v.variantSku.trim().toUpperCase(), { ...v, product: p });
+                }
+            });
+        });
+
+        // ── HOJA 1: RESUMEN GENERAL DE DESPACHOS ──
+        const summaryData = dispatchOrders.map(order => {
             const qty = (order.status === 'DESPACHADO' || order.status === 'ENTREGADO' || order.status === 'COMPLETADO') && Array.isArray(order.dispatchDetails) && order.dispatchDetails.length > 0 
                 ? order.dispatchDetails.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
                 : order.totalQuantity;
@@ -156,13 +175,22 @@ export default function DispatchPage() {
             };
         });
 
-        const ws = XLSX.utils.json_to_sheet(data);
+        const ws1 = XLSX.utils.json_to_sheet(summaryData.length > 0 ? summaryData : [{
+            'Nro Pedido': '--',
+            'Fecha de Aprobación': '--',
+            'Cliente': '--',
+            'Zona': '--',
+            'Dirección de Entrega': '--',
+            'Estado': '--',
+            'Cantidad Prendas': 0,
+            'Total Pedido': 0
+        }]);
 
-        // Column widths
-        ws['!cols'] = [
+        // Column widths for sheet 1
+        ws1['!cols'] = [
             { wch: 15 }, // Nro Pedido
             { wch: 22 }, // Fecha de Aprobación
-            { wch: 30 }, // Cliente
+            { wch: 32 }, // Cliente
             { wch: 16 }, // Zona
             { wch: 45 }, // Dirección
             { wch: 25 }, // Estado
@@ -170,12 +198,10 @@ export default function DispatchPage() {
             { wch: 18 }  // Total Pedido
         ];
 
-        // Auto-filter
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-        ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+        const range1 = XLSX.utils.decode_range(ws1['!ref'] || 'A1:A1');
+        ws1['!autofilter'] = { ref: XLSX.utils.encode_range(range1) };
 
-        // Freeze top row
-        ws['!views'] = [
+        ws1['!views'] = [
             {
                 state: 'frozen',
                 ySplit: 1,
@@ -185,10 +211,9 @@ export default function DispatchPage() {
             }
         ];
 
-        // Format cell values
-        for (const cellAddress in ws) {
+        for (const cellAddress in ws1) {
             if (cellAddress.startsWith('!')) continue;
-            const cell = ws[cellAddress];
+            const cell = ws1[cellAddress];
             const decoded = XLSX.utils.decode_cell(cellAddress);
             const colIndex = decoded.c;
             const rowIndex = decoded.r;
@@ -208,8 +233,239 @@ export default function DispatchPage() {
             }
         }
 
+        // ── HOJA 2: DETALLE DE PRENDAS Y OP POR PEDIDO ──
+        const detailRows: any[] = [];
+
+        dispatchOrders.forEach(order => {
+            const orderNum = `#${order.orderNumber || order.id.slice(-6).toUpperCase()}`;
+            const orderDate = order.createdAt ? formatDate(order.createdAt) : '--';
+            const clientName = order.client?.name || '--';
+            const clientZone = order.client?.zone || order.zone || 'OFICINA';
+            
+            let statusText = 'POR DESPACHAR';
+            if (order.status === 'DESPACHADO') statusText = 'DESPACHADO';
+            else if (order.status === 'COMPLETADO' || order.status === 'ENTREGADO') statusText = 'COMPLETADO / ENTREGADO';
+            else if (order.status === 'ANULADO') statusText = 'ANULADO';
+
+            const dispatchDetails = Array.isArray(order.dispatchDetails) ? order.dispatchDetails : [];
+
+            if (dispatchDetails.length > 0) {
+                // Exact scanned/dispatched items from dispatchDetails
+                dispatchDetails.forEach((dd: any) => {
+                    const qty = Number(dd.quantity || 0);
+                    if (qty <= 0) return;
+
+                    const matchedVariant = variantMap.get(dd.variantId);
+                    const prod = matchedVariant?.product || (dd.productName ? productByNameMap.get(dd.productName.trim().toUpperCase()) : null);
+
+                    // Find corresponding order item price
+                    let unitPrice = 0;
+                    if (Array.isArray(order.items)) {
+                        const oi = order.items.find((item: any) => {
+                            const nameMatch = prod?.name && item.modelName && 
+                                (prod.name.trim().toUpperCase() === item.modelName.trim().toUpperCase() ||
+                                 prod.name.trim().toUpperCase().includes(item.modelName.trim().toUpperCase()) ||
+                                 item.modelName.trim().toUpperCase().includes(prod.name.trim().toUpperCase()));
+                            const colorMatch = (matchedVariant?.color || dd.color) && item.color &&
+                                (matchedVariant?.color || dd.color).trim().toUpperCase() === item.color.trim().toUpperCase();
+                            return nameMatch && colorMatch;
+                        });
+                        if (oi) {
+                            unitPrice = Number(oi.unitPrice || 0);
+                        }
+                    }
+                    if (unitPrice === 0) {
+                        unitPrice = Number(dd.unitPrice || prod?.sellingPrice || prod?.purchasePrice || 0);
+                    }
+
+                    const opVal = dd.op || matchedVariant?.op || matchedVariant?.product?.op || prod?.op || '--';
+                    const productNameVal = dd.productName || matchedVariant?.product?.name || prod?.name || '--';
+                    const colorVal = dd.color || matchedVariant?.color || '--';
+                    const sizeVal = dd.size || matchedVariant?.size || '--';
+                    const skuVal = dd.sku || matchedVariant?.variantSku || prod?.sku || '--';
+
+                    detailRows.push({
+                        'Nro Pedido': orderNum,
+                        'Fecha': orderDate,
+                        'Cliente': clientName,
+                        'Zona': clientZone,
+                        'OP': opVal,
+                        'Prenda / Modelo': productNameVal,
+                        'Color': colorVal,
+                        'Talla': sizeVal,
+                        'SKU': skuVal,
+                        'Cantidad': qty,
+                        'Precio Unit.': unitPrice,
+                        'Total': qty * unitPrice,
+                        'Estado Pedido': statusText
+                    });
+                });
+            } else if (Array.isArray(order.items) && order.items.length > 0) {
+                // Pending or legacy orders: extract breakdown from order.items
+                order.items.forEach((oi: any) => {
+                    const prod = productByNameMap.get((oi.modelName || '').trim().toUpperCase());
+                    const unitPrice = Number(oi.unitPrice || prod?.sellingPrice || 0);
+                    const isDispatched = order.status === 'DESPACHADO' || order.status === 'COMPLETADO' || order.status === 'ENTREGADO';
+
+                    const sizeFields = [
+                        { key: '28', disp: oi.dispS28, ord: oi.s28 },
+                        { key: '30', disp: oi.dispM30, ord: oi.m30 },
+                        { key: '32', disp: oi.dispL32, ord: oi.l32 },
+                        { key: '34', disp: oi.dispXL34, ord: oi.xl34 },
+                        { key: '36', disp: oi.dispXXL36, ord: oi.xxl36 },
+                        { key: '38', disp: oi.dispSize38, ord: oi.size38 },
+                        { key: '40', disp: oi.dispSize40, ord: oi.size40 },
+                        { key: '42', disp: oi.dispSize42, ord: oi.size42 },
+                        { key: '44', disp: oi.dispSize44, ord: oi.size44 },
+                        { key: '46', disp: oi.dispSize46, ord: oi.size46 },
+                        { key: '48', disp: oi.dispSize48, ord: oi.size48 },
+                        { key: '50', disp: oi.dispSize50, ord: oi.size50 },
+                        { key: '52', disp: oi.dispSize52, ord: oi.size52 },
+                    ];
+
+                    let hasSizeRows = false;
+
+                    sizeFields.forEach(sf => {
+                        const qty = isDispatched && (oi.dispQuantity !== undefined && oi.dispQuantity > 0)
+                            ? Number(sf.disp || 0)
+                            : Number(sf.ord || 0);
+
+                        if (qty > 0) {
+                            hasSizeRows = true;
+                            // Match variant
+                            const matchedVariant = (prod?.variants || []).find((v: any) => 
+                                v.size.toString().trim() === sf.key && 
+                                v.color.trim().toUpperCase() === (oi.color || '').trim().toUpperCase()
+                            );
+
+                            const opVal = matchedVariant?.op || prod?.op || '--';
+                            const skuVal = matchedVariant?.variantSku || prod?.sku || '--';
+
+                            detailRows.push({
+                                'Nro Pedido': orderNum,
+                                'Fecha': orderDate,
+                                'Cliente': clientName,
+                                'Zona': clientZone,
+                                'OP': opVal,
+                                'Prenda / Modelo': oi.modelName || '--',
+                                'Color': oi.color || '--',
+                                'Talla': sf.key,
+                                'SKU': skuVal,
+                                'Cantidad': qty,
+                                'Precio Unit.': unitPrice,
+                                'Total': qty * unitPrice,
+                                'Estado Pedido': statusText
+                            });
+                        }
+                    });
+
+                    // If no individual size breakdown had quantity > 0 but total quantity > 0
+                    if (!hasSizeRows) {
+                        const fallbackQty = isDispatched && oi.dispQuantity ? Number(oi.dispQuantity) : Number(oi.quantity || 0);
+                        if (fallbackQty > 0) {
+                            const matchedVariant = (prod?.variants || []).find((v: any) => 
+                                v.color.trim().toUpperCase() === (oi.color || '').trim().toUpperCase()
+                            );
+
+                            detailRows.push({
+                                'Nro Pedido': orderNum,
+                                'Fecha': orderDate,
+                                'Cliente': clientName,
+                                'Zona': clientZone,
+                                'OP': matchedVariant?.op || prod?.op || '--',
+                                'Prenda / Modelo': oi.modelName || '--',
+                                'Color': oi.color || '--',
+                                'Talla': 'ESTÁNDAR',
+                                'SKU': matchedVariant?.variantSku || prod?.sku || '--',
+                                'Cantidad': fallbackQty,
+                                'Precio Unit.': unitPrice,
+                                'Total': fallbackQty * unitPrice,
+                                'Estado Pedido': statusText
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        const ws2 = XLSX.utils.json_to_sheet(detailRows.length > 0 ? detailRows : [{
+            'Nro Pedido': '--',
+            'Fecha': '--',
+            'Cliente': '--',
+            'Zona': '--',
+            'OP': '--',
+            'Prenda / Modelo': '--',
+            'Color': '--',
+            'Talla': '--',
+            'SKU': '--',
+            'Cantidad': 0,
+            'Precio Unit.': 0,
+            'Total': 0,
+            'Estado Pedido': '--'
+        }]);
+
+        // Column widths for sheet 2
+        ws2['!cols'] = [
+            { wch: 15 }, // Nro Pedido
+            { wch: 14 }, // Fecha
+            { wch: 32 }, // Cliente
+            { wch: 14 }, // Zona
+            { wch: 16 }, // OP
+            { wch: 32 }, // Prenda / Modelo
+            { wch: 16 }, // Color
+            { wch: 10 }, // Talla
+            { wch: 22 }, // SKU
+            { wch: 12 }, // Cantidad
+            { wch: 16 }, // Precio Unit.
+            { wch: 16 }, // Total
+            { wch: 22 }  // Estado Pedido
+        ];
+
+        const range2 = XLSX.utils.decode_range(ws2['!ref'] || 'A1:A1');
+        ws2['!autofilter'] = { ref: XLSX.utils.encode_range(range2) };
+
+        ws2['!views'] = [
+            {
+                state: 'frozen',
+                ySplit: 1,
+                xSplit: 0,
+                topLeftCell: 'A2',
+                activePane: 'bottomLeft'
+            }
+        ];
+
+        for (const cellAddress in ws2) {
+            if (cellAddress.startsWith('!')) continue;
+            const cell = ws2[cellAddress];
+            const decoded = XLSX.utils.decode_cell(cellAddress);
+            const colIndex = decoded.c;
+            const rowIndex = decoded.r;
+
+            if (rowIndex === 0) continue;
+
+            // Cantidad (col 9) -> Integer
+            if (colIndex === 9) {
+                cell.t = 'n';
+                cell.z = '#,##0';
+            }
+
+            // Precio Unit. (col 10) -> Currency (S/)
+            if (colIndex === 10) {
+                cell.t = 'n';
+                cell.z = '"S/"#,##0.00';
+            }
+
+            // Total (col 11) -> Currency (S/)
+            if (colIndex === 11) {
+                cell.t = 'n';
+                cell.z = '"S/"#,##0.00';
+            }
+        }
+
+        // ── CREAR Y DESCARGAR ARCHIVO EXCEL MULTI-HOJA ──
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Despachos');
+        XLSX.utils.book_append_sheet(wb, ws1, 'Resumen Despachos');
+        XLSX.utils.book_append_sheet(wb, ws2, 'Detalle de Prendas');
         
         const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '') + '_' + new Date().toTimeString().slice(0, 5).replace(/:/g, '');
         XLSX.writeFile(wb, `DESPACHOS_${cleanLabel.toUpperCase()}_${timestamp}.xlsx`);

@@ -131,6 +131,19 @@ export default function DispatchProcessPage() {
         return null;
     };
 
+    // Find a variant by ID
+    const findVariantById = (id: string) => {
+        if (!products) return null;
+        for (const p of products) {
+            for (const v of (p.variants || [])) {
+                if (v.id === id) {
+                    return { ...v, product: p };
+                }
+            }
+        }
+        return null;
+    };
+
     // Match scanned variant to an order item
     const matchVariantToOrderItem = (variant: any) => {
         const productName = variant.product.name.toUpperCase();
@@ -429,13 +442,19 @@ export default function DispatchProcessPage() {
         setIsDispatching(true);
         try {
             // Build inventory deduction items
-            const deductionItems: { variantId: string; quantity: number }[] = [];
+            const deductionItems: any[] = [];
 
             for (const [variantId, quantity] of Object.entries(dispatchedVariants)) {
                 if (quantity > 0) {
+                    const matchedVar = findVariantById(variantId);
                     deductionItems.push({
                         variantId,
                         quantity,
+                        productName: matchedVar?.product?.name || '',
+                        op: matchedVar?.op || matchedVar?.product?.op || '',
+                        size: matchedVar?.size || '',
+                        color: matchedVar?.color || '',
+                        sku: matchedVar?.variantSku || matchedVar?.product?.sku || '',
                     });
                 }
             }
