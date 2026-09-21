@@ -10,22 +10,16 @@ import {
   Plus, 
   Trash2, 
   Tag, 
-  Info, 
-  Beaker, 
-  Trophy, 
-  CheckCircle2, 
-  Loader2,
-  Printer,
-  Copy,
-  Sparkles,
-  ArrowRight,
-  Package,
-  Layers,
-  Sliders,
-  Scissors
+  Info,
+  ChevronDown
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import { getImageUrl } from '../../../lib/imageUrl';
+
+interface ColumnType {
+  id: string; // unique, e.g. "OP-02|Camello"
+  op: string; // e.g. "OP-02"
+  color: string; // e.g. "Camello"
+}
 
 const MEASUREMENT_KEYS = [
   { key: 'cintura', label: 'CINTURA' },
@@ -39,23 +33,16 @@ const MEASUREMENT_KEYS = [
 ];
 
 const STAGES = [
-  { id: 'OFICIAL', label: 'Medidas Oficiales', color: 'indigo', desc: 'Patrón y especificación oficial de la prenda' },
-  { id: 'ANTES_LAVAR', label: 'Antes de Lavar (Crudo)', color: 'amber', desc: 'Medidas en tela cruda antes de lavandería' },
-  { id: 'DESPUES_LAVAR', label: 'Después de Lavar (Acabado)', color: 'emerald', desc: 'Medidas finales tras encogimiento y acabado' },
-];
-
-const CATEGORY_TABS = [
-  { id: 'TERMINADOS', label: 'Prendas 1ra Calidad', icon: Package, color: 'indigo' },
-  { id: 'SEGUNDA', label: 'Prendas de Segunda', icon: Layers, color: 'rose' },
-  { id: 'TALLAS_ESPECIALES', label: 'Tallas Especiales', icon: Scissors, color: 'purple' },
-  { id: 'MUESTRAS', label: 'Muestras UDP', icon: Beaker, color: 'blue' },
-  { id: 'COMPETENCIA', label: 'Competencia', icon: Trophy, color: 'amber' },
+  { id: 'OFICIAL', label: 'Medidas Oficiales', color: 'indigo' },
+  { id: 'ANTES_LAVAR', label: 'Antes de Lavar', color: 'amber' },
+  { id: 'DESPUES_LAVAR', label: 'Después de Lavar', color: 'emerald' },
 ];
 
 function parseInches(text: string): number | null {
   const clean = text.replace(/"/g, '').trim();
   if (!clean) return null;
 
+  // Pattern 1: "7 1/8" or "7-1/8"
   const fractionParts = clean.split(/[\s-]+/);
   if (fractionParts.length === 2) {
     const whole = parseFloat(fractionParts[0]);
@@ -70,6 +57,7 @@ function parseInches(text: string): number | null {
     }
   }
 
+  // Pattern 2: "1/8"
   const slashIndex = clean.indexOf('/');
   if (slashIndex > 0 && fractionParts.length === 1) {
     const num = parseFloat(clean.substring(0, slashIndex));
@@ -79,6 +67,7 @@ function parseInches(text: string): number | null {
     }
   }
 
+  // Pattern 3: "7.125" or "7"
   const num = parseFloat(clean);
   if (!isNaN(num)) {
     return num;
@@ -151,341 +140,363 @@ function formatBotaPieCell(value: string): string {
 }
 
 export default function MeasurementsPage() {
-  const [activeTab, setActiveTab] = useState<'TERMINADOS' | 'SEGUNDA' | 'TALLAS_ESPECIALES' | 'MUESTRAS' | 'COMPETENCIA'>('TERMINADOS');
-  
-  const [itemsList, setItemsList] = useState<any[]>([]);
-  const [allMeasurements, setAllMeasurements] = useState<any[]>([]);
+  const [inventoryType, setInventoryType] = useState('TERMINADOS'); // TERMINADOS, SEGUNDA, TALLAS ESPECIALES, MUESTRAS
+  const [products, setProducts] = useState<any[]>([]);
+  const [samples, setSamples] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchRegisteredText, setSearchRegisteredText] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   
   const [selectedSize, setSelectedSize] = useState('32');
-  const [customNewSize, setCustomNewSize] = useState('');
   const [activeStage, setActiveStage] = useState('OFICIAL');
+  const [botaPieUnit, setBotaPieUnit] = useState<'cm' | 'pulg'>('pulg');
   
-  const [itemMeasurements, setItemMeasurements] = useState<any[]>([]);
-  const [currentForm, setCurrentForm] = useState<Record<string, string>>({
-    cintura: '',
-    cadera: '',
-    muslo: '',
-    rodilla: '',
-    botaPie: '',
-    tiroDel: '',
-    tiroPos: '',
-    largoTotal: ''
-  });
+  // Columns/Colors listed in the table
+  const [columns, setColumns] = useState<ColumnType[]>([]);
+  const [customOp, setCustomOp] = useState('');
+  const [customColor, setCustomColor] = useState('');
+  
+  // Registered measurements list for pre-filled models table
+  const [registeredMeasurements, setRegisteredMeasurements] = useState<any[]>([]);
+  const [searchRegisteredText, setSearchRegisteredText] = useState('');
 
+  // Matrix data structure: { [columnId]: { [measurementKey]: value } }
+  const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Competitor state
-  const [compBrand, setCompBrand] = useState('');
-  const [compGarment, setCompGarment] = useState('');
-  const [compSize, setCompSize] = useState('32');
-  const [compForm, setCompForm] = useState<Record<string, string>>({
-    cintura: '',
-    cadera: '',
-    muslo: '',
-    rodilla: '',
-    botaPie: '',
-    tiroDel: '',
-    tiroPos: '',
-    largoTotal: ''
-  });
-  const [competitorList, setCompetitorList] = useState<any[]>([]);
-  const [searchCompText, setSearchCompText] = useState('');
-
+  // Load items
   useEffect(() => {
-    setSelectedItem(null);
-    setSearchQuery('');
-    setSearchRegisteredText('');
-    fetchInitialData();
-  }, [activeTab]);
+    fetchItems();
+  }, [inventoryType]);
 
-  const fetchInitialData = async () => {
-    setIsLoading(true);
+  const fetchItems = async () => {
     try {
-      if (activeTab === 'COMPETENCIA') {
-        const resp = await api.get('/products-measurements', { params: { stage: 'COMPETENCIA' } });
-        setCompetitorList(resp.data || []);
-        return;
+      setSelectedItem(null);
+      setSearchQuery('');
+      setSearchRegisteredText('');
+      
+      const [itemsResp, measurementsResp] = await Promise.all([
+        inventoryType === 'MUESTRAS' ? api.get('/samples') : api.get('/products'),
+        api.get('/products-measurements')
+      ]);
+
+      if (inventoryType === 'MUESTRAS') {
+        setSamples(itemsResp.data || []);
+      } else {
+        const filtered = (itemsResp.data || []).filter((p: any) => p.inventoryType === inventoryType);
+        setProducts(filtered);
       }
 
-      if (activeTab === 'MUESTRAS') {
-        const [samplesResp, measurementsResp] = await Promise.all([
-          api.get('/samples'),
-          api.get('/products-measurements')
-        ]);
-        setItemsList(samplesResp.data || []);
-        setAllMeasurements(measurementsResp.data || []);
-      } else {
-        const invType = activeTab === 'TALLAS_ESPECIALES' ? 'TALLAS ESPECIALES' : activeTab;
-        const [productsResp, measurementsResp] = await Promise.all([
-          api.get('/products'),
-          api.get('/products-measurements')
-        ]);
-        const filtered = (productsResp.data || []).filter((p: any) => p.inventoryType === invType);
-        setItemsList(filtered);
-        setAllMeasurements(measurementsResp.data || []);
-      }
+      setRegisteredMeasurements(measurementsResp.data || []);
     } catch (err) {
       console.error(err);
-      toast.error('Error al cargar datos');
-    } finally {
-      setIsLoading(false);
+      toast.error('Error al cargar items');
     }
   };
 
-  // Load measurements whenever selected item changes
-  useEffect(() => {
-    if (!selectedItem) {
-      setItemMeasurements([]);
-      return;
-    }
-    loadItemMeasurements();
-  }, [selectedItem]);
+  // Grouped suggestions for autocomplete
+  const groupedSuggestions = useMemo(() => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return [];
 
-  const loadItemMeasurements = async () => {
+    const items = inventoryType === 'MUESTRAS' ? samples : products;
+    const matches = items.filter((item: any) => 
+      (item.name || '').toLowerCase().includes(term) ||
+      (item.sku || '').toLowerCase().includes(term) ||
+      (item.code || '').toLowerCase().includes(term)
+    );
+
+    const grouped: any[] = [];
+    const seenNames = new Set<string>();
+
+    matches.forEach((item: any) => {
+      const nameKey = (item.name || '').trim().toLowerCase();
+      if (!seenNames.has(nameKey)) {
+        seenNames.add(nameKey);
+        
+        // Find all siblings with the same name to aggregate colors, sizes, and variants
+        const siblings = items.filter((x: any) => (x.name || '').trim().toLowerCase() === nameKey);
+        const allVariants = siblings.flatMap((x: any) => x.variants || []);
+        const allSizes = Array.from(new Set(siblings.flatMap((x: any) => x.sizes || [])));
+        const allColors = Array.from(new Set(siblings.flatMap((x: any) => x.colors || [])));
+
+        grouped.push({
+          ...item,
+          variants: allVariants,
+          sizes: allSizes,
+          colors: allColors,
+          siblingIds: siblings.map((x: any) => x.id)
+        });
+      }
+    });
+
+    return grouped.slice(0, 10);
+  }, [searchQuery, products, samples, inventoryType]);
+
+  // Grouped registered models
+  const registeredItems = useMemo(() => {
+    const itemsList = inventoryType === 'MUESTRAS' ? samples : products;
+    const isSample = inventoryType === 'MUESTRAS';
+    
+    // Find all items that have measurements
+    const matchedItems = itemsList.filter((item: any) => {
+      return registeredMeasurements.some((m: any) => 
+        isSample ? m.sampleId === item.id : m.productId === item.id
+      );
+    });
+
+    const grouped: any[] = [];
+    const seenNames = new Set<string>();
+
+    matchedItems.forEach((item: any) => {
+      const nameKey = (item.name || '').trim().toLowerCase();
+      if (!seenNames.has(nameKey)) {
+        seenNames.add(nameKey);
+        const siblings = itemsList.filter((x: any) => (x.name || '').trim().toLowerCase() === nameKey);
+        const allVariants = siblings.flatMap((x: any) => x.variants || []);
+        const allSizes = Array.from(new Set(siblings.flatMap((x: any) => x.sizes || [])));
+        const allColors = Array.from(new Set(siblings.flatMap((x: any) => x.colors || [])));
+
+        grouped.push({
+          ...item,
+          variants: allVariants,
+          sizes: allSizes,
+          colors: allColors,
+          siblingIds: siblings.map((x: any) => x.id)
+        });
+      }
+    });
+
+    return grouped;
+  }, [registeredMeasurements, products, samples, inventoryType]);
+
+  const filteredRegistered = useMemo(() => {
+    const term = searchRegisteredText.toLowerCase().trim();
+    if (!term) return registeredItems;
+    return registeredItems.filter((item: any) => {
+      return (
+        (item.name || '').toLowerCase().includes(term) ||
+        (item.sku || '').toLowerCase().includes(term) ||
+        (item.op || '').toLowerCase().includes(term)
+      );
+    });
+  }, [registeredItems, searchRegisteredText]);
+
+  // Initialize columns and load measurements when selected item or size changes
+  useEffect(() => {
+    if (!selectedItem) return;
+    
+    // Auto-select first available size if current selectedSize is not in the item's sizes
+    const availableSizes = selectedItem.sizes || [];
+    if (availableSizes.length > 0 && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(availableSizes[0]);
+    }
+
+    const baseCols: ColumnType[] = [];
+    
+    if (activeStage === 'OFICIAL') {
+      baseCols.push({
+        id: 'OFFICIAL_COLUMN',
+        op: '',
+        color: ''
+      });
+    } else {
+      if (inventoryType === 'MUESTRAS') {
+        if (selectedItem.productionColor) {
+          baseCols.push({
+            id: `${selectedItem.op || ''}|${selectedItem.productionColor}`,
+            op: selectedItem.op || '',
+            color: selectedItem.productionColor
+          });
+        }
+      } else {
+        const variants = selectedItem.variants || [];
+        variants.forEach((v: any) => {
+          const id = `${v.op || ''}|${v.color}`;
+          if (!baseCols.some(c => c.id === id)) {
+            baseCols.push({
+              id,
+              op: v.op || '',
+              color: v.color
+            });
+          }
+        });
+      }
+    }
+
+    setColumns(baseCols);
+    loadMeasurements();
+  }, [selectedItem, selectedSize, activeStage]);
+
+  const loadMeasurements = async () => {
     if (!selectedItem) return;
     setIsLoading(true);
     try {
-      const isSample = activeTab === 'MUESTRAS';
-      const resp = await api.get('/products-measurements', { 
-        params: isSample ? { sampleId: selectedItem.id } : { productId: selectedItem.id }
-      });
-      setItemMeasurements(resp.data || []);
+      let stageMeasurements: any[] = [];
+      if (inventoryType === 'MUESTRAS') {
+        const resp = await api.get('/products-measurements', { params: { sampleId: selectedItem.id, size: selectedSize } });
+        stageMeasurements = (resp.data || []).filter((m: any) => m.stage === activeStage);
+      } else {
+        const ids = selectedItem.siblingIds || [selectedItem.id];
+        const promises = ids.map((id: string) => api.get('/products-measurements', { params: { productId: id, size: selectedSize } }));
+        const responses = await Promise.all(promises);
+        stageMeasurements = responses.flatMap((resp: any) => resp.data || []).filter((m: any) => m.stage === activeStage);
+      }
+
+      const newMatrix: Record<string, Record<string, string>> = {};
+      
+      if (activeStage === 'OFICIAL') {
+        // Only 1 column
+        let officialMeasure = stageMeasurements.find((m: any) => !m.color || m.color === '');
+        if (!officialMeasure && stageMeasurements.length > 0) {
+          officialMeasure = stageMeasurements[0];
+        }
+        newMatrix['OFFICIAL_COLUMN'] = {};
+        MEASUREMENT_KEYS.forEach(({ key }) => {
+          newMatrix['OFFICIAL_COLUMN'][key] = officialMeasure ? (officialMeasure[key] || '') : '';
+        });
+      } else {
+        // Prefill columns list from measurements if they have custom values
+        setColumns(prev => {
+          const existingCols = stageMeasurements
+            .filter((m: any) => m.color)
+            .map((m: any) => ({
+              id: `${m.op || ''}|${m.color}`,
+              op: m.op || '',
+              color: m.color
+            }));
+          
+          const map = new Map<string, ColumnType>();
+          prev.forEach(c => map.set(c.id, c));
+          existingCols.forEach(c => map.set(c.id, c));
+          
+          return Array.from(map.values());
+        });
+
+        stageMeasurements.forEach((m: any) => {
+          if (!m.color) return;
+          const colId = `${m.op || ''}|${m.color}`;
+          if (!newMatrix[colId]) newMatrix[colId] = {};
+          
+          MEASUREMENT_KEYS.forEach(({ key }) => {
+            newMatrix[colId][key] = m[key] || '';
+          });
+        });
+      }
+      
+      setMatrix(newMatrix);
     } catch (err) {
-      console.error('Error fetching measurements:', err);
+      console.error(err);
       toast.error('Error al cargar medidas');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Sync form values when activeStage or selectedSize or itemMeasurements change
-  useEffect(() => {
-    if (!selectedItem) return;
-
-    const currentRecord = itemMeasurements.find(
-      (m: any) => m.stage === activeStage && m.size === selectedSize
-    );
-
-    if (currentRecord) {
-      setCurrentForm({
-        cintura: currentRecord.cintura || '',
-        cadera: currentRecord.cadera || '',
-        muslo: currentRecord.muslo || '',
-        rodilla: currentRecord.rodilla || '',
-        botaPie: currentRecord.botaPie || '',
-        tiroDel: currentRecord.tiroDel || '',
-        tiroPos: currentRecord.tiroPos || '',
-        largoTotal: currentRecord.largoTotal || ''
-      });
-    } else {
-      setCurrentForm({
-        cintura: '',
-        cadera: '',
-        muslo: '',
-        rodilla: '',
-        botaPie: '',
-        tiroDel: '',
-        tiroPos: '',
-        largoTotal: ''
-      });
-    }
-  }, [selectedItem, activeStage, selectedSize, itemMeasurements]);
-
-  const handleFormChange = (key: string, value: string) => {
-    let finalVal = value;
-    if (key === 'botaPie') {
-      finalVal = formatBotaPieCell(value);
-    }
-    setCurrentForm(prev => ({
+  const handleCellChange = (columnId: string, key: string, value: string) => {
+    setMatrix(prev => ({
       ...prev,
-      [key]: finalVal
+      [columnId]: {
+        ...(prev[columnId] || {}),
+        [key]: value
+      }
     }));
   };
 
-  const handleSaveMeasurement = async () => {
-    if (!selectedItem) return;
-    setIsSaving(true);
-    try {
-      const isSample = activeTab === 'MUESTRAS';
-      const payload = {
-        productId: isSample ? null : selectedItem.id,
-        sampleId: isSample ? selectedItem.id : null,
-        stage: activeStage,
-        size: selectedSize,
-        op: selectedItem.op || null,
-        color: selectedItem.productionColor || null,
-        cintura: currentForm.cintura || null,
-        cadera: currentForm.cadera || null,
-        muslo: currentForm.muslo || null,
-        rodilla: currentForm.rodilla || null,
-        botaPie: currentForm.botaPie || null,
-        tiroDel: currentForm.tiroDel || null,
-        tiroPos: currentForm.tiroPos || null,
-        largoTotal: currentForm.largoTotal || null,
-      };
-
-      await api.post('/products-measurements', payload);
-      toast.success(`Medidas de talla ${selectedSize} (${STAGES.find(s => s.id === activeStage)?.label}) guardadas`);
-      loadItemMeasurements();
-      // Also refresh all measurements in background
-      api.get('/products-measurements').then(res => setAllMeasurements(res.data || []));
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Error al guardar medidas');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCopyFromStage = (sourceStage: string) => {
-    const sourceRecord = itemMeasurements.find(
-      (m: any) => m.stage === sourceStage && m.size === selectedSize
-    );
-
-    if (!sourceRecord) {
-      toast.error(`No hay medidas en "${STAGES.find(s => s.id === sourceStage)?.label}" para la talla ${selectedSize}`);
+  const addColumn = () => {
+    const colName = customColor.trim();
+    const opName = customOp.trim();
+    if (!colName) {
+      toast.error('El color es obligatorio');
       return;
     }
-
-    setCurrentForm({
-      cintura: sourceRecord.cintura || '',
-      cadera: sourceRecord.cadera || '',
-      muslo: sourceRecord.muslo || '',
-      rodilla: sourceRecord.rodilla || '',
-      botaPie: sourceRecord.botaPie || '',
-      tiroDel: sourceRecord.tiroDel || '',
-      tiroPos: sourceRecord.tiroPos || '',
-      largoTotal: sourceRecord.largoTotal || ''
-    });
-
-    toast.success(`Medidas copiadas desde "${STAGES.find(s => s.id === sourceStage)?.label}"`);
-  };
-
-  const handleSaveCompetitor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!compBrand.trim() || !compGarment.trim() || !compSize.trim()) {
-      toast.error('Completa la marca, prenda y talla');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await api.post('/products-measurements', {
-        stage: 'COMPETENCIA',
-        color: compBrand.trim().toUpperCase(),
-        op: compGarment.trim(),
-        size: compSize.trim().toUpperCase(),
-        cintura: compForm.cintura || null,
-        cadera: compForm.cadera || null,
-        muslo: compForm.muslo || null,
-        rodilla: compForm.rodilla || null,
-        botaPie: compForm.botaPie || null,
-        tiroDel: compForm.tiroDel || null,
-        tiroPos: compForm.tiroPos || null,
-        largoTotal: compForm.largoTotal || null,
-      });
-
-      toast.success('Medida de competencia registrada');
-      setCompForm({
-        cintura: '',
-        cadera: '',
-        muslo: '',
-        rodilla: '',
-        botaPie: '',
-        tiroDel: '',
-        tiroPos: '',
-        largoTotal: ''
-      });
-      fetchInitialData();
-    } catch (err) {
-      console.error(err);
-      toast.error('Error al guardar medida de competencia');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteCompetitor = async (id: string) => {
-    if (!confirm('¿Eliminar este registro de medidas?')) return;
-    try {
-      await api.delete(`/products-measurements/${id}`);
-      toast.success('Registro eliminado');
-      fetchInitialData();
-    } catch (err) {
-      console.error(err);
-      toast.error('Error al eliminar');
-    }
-  };
-
-  const filteredSuggestions = useMemo(() => {
-    const term = searchQuery.toLowerCase().trim();
-    if (!term) return [];
-    return itemsList.filter(item => 
-      (item.name || '').toLowerCase().includes(term) ||
-      (item.code || '').toLowerCase().includes(term) ||
-      (item.sku || '').toLowerCase().includes(term) ||
-      (item.op || '').toLowerCase().includes(term)
-    ).slice(0, 10);
-  }, [itemsList, searchQuery]);
-
-  // Registered models list for the active category
-  const registeredItems = useMemo(() => {
-    const isSample = activeTab === 'MUESTRAS';
-    return itemsList.filter(item => 
-      allMeasurements.some(m => isSample ? m.sampleId === item.id : m.productId === item.id)
-    );
-  }, [itemsList, allMeasurements, activeTab]);
-
-  const filteredRegistered = useMemo(() => {
-    const term = searchRegisteredText.toLowerCase().trim();
-    if (!term) return registeredItems;
-    return registeredItems.filter(item => 
-      (item.name || '').toLowerCase().includes(term) ||
-      (item.code || '').toLowerCase().includes(term) ||
-      (item.sku || '').toLowerCase().includes(term) ||
-      (item.op || '').toLowerCase().includes(term)
-    );
-  }, [registeredItems, searchRegisteredText]);
-
-  const standardSizes = useMemo(() => {
-    if (activeTab === 'TALLAS_ESPECIALES') {
-      return ['48', '50', '52', '44', '46'];
-    }
-    if (selectedItem?.sizes && selectedItem.sizes.length > 0) {
-      return selectedItem.sizes;
-    }
-    return ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL'];
-  }, [activeTab, selectedItem]);
-
-  // All sizes for the active stage
-  const registeredSizesInActiveStage = useMemo(() => {
-    return itemMeasurements
-      .filter((m: any) => m.stage === activeStage)
-      .map((m: any) => m.size);
-  }, [itemMeasurements, activeStage]);
-
-  // Curve sizes ordered
-  const tableCurveSizes = useMemo(() => {
-    const activeStageSizes = itemMeasurements
-      .filter((m: any) => m.stage === activeStage)
-      .map((m: any) => m.size);
     
-    const unique = Array.from(new Set(activeStageSizes));
-    return unique.sort((a: any, b: any) => {
-      const numA = parseFloat(a);
-      const numB = parseFloat(b);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      return String(a).localeCompare(String(b));
-    });
-  }, [itemMeasurements, activeStage]);
+    const id = `${opName}|${colName}`;
+    if (columns.some(c => c.id === id)) {
+      toast.error('Esta combinación de OP y Color ya existe en la tabla');
+      return;
+    }
 
-  const handlePrint = () => {
-    window.print();
+    setColumns([...columns, { id, op: opName, color: colName }]);
+    setCustomColor('');
+    setCustomOp('');
+  };
+
+  const removeColumn = (columnId: string) => {
+    setColumns(columns.filter(c => c.id !== columnId));
+    setMatrix(prev => {
+      const copy = { ...prev };
+      delete copy[columnId];
+      return copy;
+    });
+  };
+
+  const saveAll = async () => {
+    if (!selectedItem) return;
+    setIsLoading(true);
+    try {
+      const promises = columns.map(col => {
+        const measurements = matrix[col.id] || {};
+        const payload: any = {
+          size: selectedSize,
+          color: activeStage === 'OFICIAL' ? null : (col.color || null),
+          op: activeStage === 'OFICIAL' ? null : (col.op || null),
+          stage: activeStage,
+          cintura: measurements.cintura || null,
+          cadera: measurements.cadera || null,
+          muslo: measurements.muslo || null,
+          rodilla: measurements.rodilla || null,
+          botaPie: measurements.botaPie || null,
+          tiroDel: measurements.tiroDel || null,
+          tiroPos: measurements.tiroPos || null,
+          largoTotal: measurements.largoTotal || null,
+        };
+
+        if (inventoryType === 'MUESTRAS') {
+          payload.sampleId = selectedItem.id;
+        } else {
+          let targetProductId = selectedItem.id;
+          if (activeStage !== 'OFICIAL' && selectedItem.siblingIds) {
+            const matchingSibling = products.find((p: any) => 
+              selectedItem.siblingIds.includes(p.id) && 
+              (p.variants || []).some((v: any) => (v.op || '') === col.op && v.color === col.color)
+            );
+            if (matchingSibling) {
+              targetProductId = matchingSibling.id;
+            }
+          }
+          payload.productId = targetProductId;
+        }
+
+        return api.post('/products-measurements', payload);
+      });
+
+      await Promise.all(promises);
+      toast.success('Medidas guardadas correctamente');
+      loadMeasurements();
+      api.get('/products-measurements').then(res => setRegisteredMeasurements(res.data || []));
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar medidas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStageColorClass = (stageId: string) => {
+    const current = STAGES.find(s => s.id === stageId);
+    if (activeStage === stageId) {
+      if (current?.color === 'indigo') return 'bg-indigo-600 text-white shadow-lg shadow-indigo-200';
+      if (current?.color === 'amber') return 'bg-amber-600 text-white shadow-lg shadow-amber-200';
+      if (current?.color === 'emerald') return 'bg-emerald-600 text-white shadow-lg shadow-emerald-200';
+    }
+    return 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200';
+  };
+
+  const getStageBorderClass = () => {
+    if (activeStage === 'OFICIAL') return 'border-indigo-500';
+    if (activeStage === 'ANTES_LAVAR') return 'border-amber-500';
+    return 'border-emerald-500';
   };
 
   return (
@@ -493,621 +504,300 @@ export default function MeasurementsPage() {
       <Toaster position="top-right" />
       <div className="max-w-7xl mx-auto space-y-8 pb-20">
         
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-200 flex items-center justify-center text-white">
-              <Ruler className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight uppercase">
-                Control de Medidas
-              </h1>
-              <p className="text-gray-500 font-medium text-sm md:text-base mt-0.5">
-                Ficha técnica y control de medidas oficiales, antes de lavar y después de lavado para todas las prendas y prototipos.
-              </p>
-            </div>
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <div className="p-4 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-200">
+            <Ruler className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">Control de Medidas</h1>
+            <p className="text-gray-500 font-medium text-lg mt-1">Medidas oficiales, prelavado y postlavado por OP.</p>
           </div>
         </div>
 
-        {/* MAIN CATEGORY TABS (TERMINADOS, SEGUNDA, TALLAS ESPECIALES, MUESTRAS, COMPETENCIA) */}
-        <div className="bg-white rounded-3xl p-2 border border-gray-100 shadow-sm flex flex-wrap gap-2 print:hidden">
-          {CATEGORY_TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 min-w-[170px] py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-102'
-                    : 'bg-transparent text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <Icon className="w-4 h-4" /> {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* Filters Panel */}
+        <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+          {/* Inventory Type Select */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Inventario</label>
+            <select
+              className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
+              value={inventoryType}
+              onChange={(e) => setInventoryType(e.target.value)}
+            >
+              <option value="TERMINADOS">📦 Productos Terminados</option>
+              <option value="SEGUNDA">♻️ Productos de Segunda</option>
+              <option value="TALLAS ESPECIALES">🌟 Tallas Especiales</option>
+              <option value="MUESTRAS">🧪 Muestras de Desarrollo</option>
+            </select>
+          </div>
 
-        {/* ========================================================================= */}
-        {/* CASE 1: COMPETITOR MEASUREMENTS TAB */}
-        {/* ========================================================================= */}
-        {activeTab === 'COMPETENCIA' ? (
-          <div className="space-y-8">
-            
-            {/* COMPETITOR REGISTRATION FORM */}
-            <form onSubmit={handleSaveCompetitor} className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 space-y-6">
-              <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <Trophy className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-gray-900 uppercase">Registrar Prenda de la Competencia</h3>
-                  <p className="text-xs font-bold text-gray-400">Ingresa las medidas tomadas a marcas externas para comparativas de calce</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                    Marca / Competidor
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej: Zara, Levi's, Pionier, Tommy..."
-                    value={compBrand}
-                    onChange={e => setCompBrand(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 font-black text-sm uppercase text-gray-900 outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                    Prenda / Modelo
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej: Jean Slim Fit, Cargo, Oversize..."
-                    value={compGarment}
-                    onChange={e => setCompGarment(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 font-black text-sm uppercase text-gray-900 outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                    Talla Medida
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej: 28, 30, 32, M, L..."
-                    value={compSize}
-                    onChange={e => setCompSize(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 font-black text-sm uppercase text-gray-900 outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* MEASUREMENTS INPUTS */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                  Medidas Tomadas
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                  {MEASUREMENT_KEYS.map(k => (
-                    <div key={k.key} className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-100 text-center">
-                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block truncate">
-                        {k.label}
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="-"
-                        value={compForm[k.key] || ''}
-                        onChange={e => {
-                          let val = e.target.value;
-                          if (k.key === 'botaPie') val = formatBotaPieCell(val);
-                          setCompForm(prev => ({ ...prev, [k.key]: val }));
-                        }}
-                        className="w-full bg-white border border-gray-200 rounded-xl py-2 px-1 text-center font-black text-sm text-gray-900 outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-amber-200 transition active:scale-95 disabled:opacity-50"
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Guardar Medida de Competencia
-                </button>
-              </div>
-            </form>
-
-            {/* COMPETITOR MEASUREMENTS HISTORY TABLE */}
-            <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                <div>
-                  <h3 className="text-xl font-black text-gray-900 uppercase">Historial de Medidas de Competencia</h3>
-                  <p className="text-xs font-bold text-gray-400">Prendas externas evaluadas para referencias de patronaje</p>
-                </div>
-
-                <div className="relative w-full md:w-80">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Filtrar por marca o modelo..."
-                    value={searchCompText}
-                    onChange={e => setSearchCompText(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl font-bold text-sm outline-none ring-2 ring-transparent focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-2xl border border-gray-100">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-wider">
-                      <th className="p-4 border border-gray-800">Marca</th>
-                      <th className="p-4 border border-gray-800">Prenda / Modelo</th>
-                      <th className="p-4 border border-gray-800 text-center">Talla</th>
-                      {MEASUREMENT_KEYS.map(k => (
-                        <th key={k.key} className="p-4 border border-gray-800 text-center">{k.label}</th>
-                      ))}
-                      <th className="p-4 border border-gray-800 text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-bold text-xs">
-                    {competitorList
-                      .filter(item => {
-                        const term = searchCompText.toLowerCase();
-                        return (
-                          (item.color || '').toLowerCase().includes(term) ||
-                          (item.op || '').toLowerCase().includes(term)
-                        );
-                      })
-                      .map((item: any) => (
-                        <tr key={item.id} className="hover:bg-gray-50/50 transition">
-                          <td className="p-4 font-black uppercase text-amber-700 bg-amber-50/30">
-                            {item.color || 'DESCONOCIDO'}
-                          </td>
-                          <td className="p-4 uppercase text-gray-900 font-black">
-                            {item.op || '-'}
-                          </td>
-                          <td className="p-4 text-center font-mono font-black text-indigo-700">
-                            {item.size}
-                          </td>
-                          {MEASUREMENT_KEYS.map(k => (
-                            <td key={k.key} className="p-4 text-center font-mono text-gray-700">
-                              {item[k.key] || '-'}
-                            </td>
-                          ))}
-                          <td className="p-4 text-right">
-                            <button
-                              onClick={() => handleDeleteCompetitor(item.id)}
-                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition"
-                              title="Eliminar registro"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+          {/* Search autocomplete */}
+          <div className="space-y-2 relative">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Buscar Modelo / SKU</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={selectedItem ? `${selectedItem.name}` : "Escribe el nombre del modelo o SKU..."}
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm pr-12"
+              />
+              <Search className="w-5 h-5 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
             </div>
 
-          </div>
-        ) : (
-          /* ========================================================================= */
-          /* CASE 2: CLOTHING / SAMPLES MEASUREMENTS WORKFLOW */
-          /* ========================================================================= */
-          <div className="space-y-8">
-            
-            {/* SEARCH & SELECTION BAR */}
-            <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-gray-100 shadow-xl shadow-gray-200/20 space-y-4 print:hidden">
-              <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <Search className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-gray-900 uppercase">
-                    1. Buscar y Seleccionar {CATEGORY_TABS.find(t => t.id === activeTab)?.label}
-                  </h3>
-                  <p className="text-xs font-bold text-gray-400">
-                    Escribe el nombre del modelo, SKU o código para abrir su ficha de medidas
-                  </p>
-                </div>
-              </div>
-
-              <div className="relative">
-                <div className="relative flex items-center">
-                  <Search className="w-5 h-5 text-gray-400 absolute left-5" />
-                  <input
-                    type="text"
-                    placeholder={`Buscar en ${CATEGORY_TABS.find(t => t.id === activeTab)?.label}... (ej. Modelo, SKU)`}
-                    value={searchQuery}
-                    onChange={e => {
-                      setSearchQuery(e.target.value);
-                      setShowDropdown(true);
-                    }}
-                    onFocus={() => setShowDropdown(true)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-12 py-4 font-black text-sm uppercase text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner"
-                  />
-                  {searchQuery && (
+            {showDropdown && searchQuery && (
+              <div className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                {groupedSuggestions.length > 0 ? (
+                  groupedSuggestions.map((item: any) => (
                     <button
+                      key={item.id}
                       onClick={() => {
+                        setSelectedItem(item);
                         setSearchQuery('');
                         setShowDropdown(false);
                       }}
-                      className="absolute right-4 p-1.5 text-gray-400 hover:text-gray-700 bg-gray-200 rounded-full text-xs"
+                      className="w-full text-left p-4 hover:bg-indigo-50/50 transition font-semibold text-gray-800 border-b border-gray-50 last:border-none flex justify-between items-center"
                     >
-                      ✕
+                      <div>
+                        <p className="font-black text-gray-900 uppercase">{item.name}</p>
+                        <p className="text-xs text-gray-400 font-mono">SKU: {item.sku || 'N/A'}</p>
+                      </div>
+                      <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full uppercase border border-indigo-100">
+                        MODELO ÚNICO
+                      </span>
                     </button>
-                  )}
-                </div>
-
-                {/* AUTOCOMPLETE DROPDOWN */}
-                {showDropdown && filteredSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden divide-y divide-gray-50 max-h-80 overflow-y-auto">
-                    {filteredSuggestions.map((item: any) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setShowDropdown(false);
-                          setSearchQuery('');
-                        }}
-                        className="w-full px-5 py-3.5 text-left hover:bg-indigo-50/50 transition flex items-center justify-between gap-4 group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden border border-gray-200 flex items-center justify-center shrink-0">
-                            {item.images && item.images.length > 0 ? (
-                              <img src={getImageUrl(item.images[0])} alt={item.name} className="w-full h-full object-cover" />
-                            ) : item.imageUrl ? (
-                              <img src={getImageUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <Package className="w-5 h-5 text-indigo-400" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-black text-gray-900 text-sm uppercase truncate">{item.name}</p>
-                            <p className="text-[10px] font-bold text-gray-400 font-mono mt-0.5">
-                              {item.sku || item.code || 'SIN SKU'} • {item.category || item.inventoryType || 'PRENDA'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-xl uppercase border border-indigo-100 shrink-0 ml-2">
-                          Seleccionar
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  ))
+                ) : (
+                  <p className="p-4 text-sm text-gray-400 italic">No se encontraron resultados</p>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Measurements Matrix Table */}
+        {selectedItem ? (
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 space-y-8">
+            {/* Upper selector & stage tabs */}
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pb-6 border-b border-gray-100">
+              {/* Product Info */}
+              <div className="flex items-center gap-4">
+                <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
+                  <Tag className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 uppercase">{selectedItem.name}</h2>
+                  <div className="flex items-center gap-4 mt-2">
+                    {/* Size Select next to model details */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TALLA:</span>
+                      <select
+                        className="bg-gray-100 px-3 py-1.5 rounded-xl font-bold text-sm outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 transition cursor-pointer"
+                        value={selectedSize}
+                        onChange={(e) => setSelectedSize(e.target.value)}
+                      >
+                        {(selectedItem.sizes && selectedItem.sizes.length > 0
+                          ? selectedItem.sizes
+                          : ['28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52']
+                        ).map((sz: string) => (
+                          <option key={sz} value={sz}>{sz}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stage buttons */}
+              <div className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-2xl self-stretch lg:self-auto">
+                {STAGES.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => setActiveStage(s.id)}
+                    className={`flex-1 lg:flex-initial px-6 py-3 rounded-xl font-bold text-sm transition active:scale-95 ${getStageColorClass(s.id)}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* SELECTED ITEM DETAILS & MEASUREMENTS MATRIX */}
-            {selectedItem ? (
-              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-6 md:p-8 space-y-8">
-                
-                {/* HERO INFO */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-gray-100">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 overflow-hidden border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
-                      {selectedItem.images && selectedItem.images.length > 0 ? (
-                        <img src={getImageUrl(selectedItem.images[0])} alt={selectedItem.name} className="w-full h-full object-cover" />
-                      ) : selectedItem.imageUrl ? (
-                        <img src={getImageUrl(selectedItem.imageUrl)} alt={selectedItem.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package className="w-8 h-8 text-indigo-500" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono text-[10px] font-black uppercase border border-indigo-100">
-                          {selectedItem.sku || selectedItem.code || 'PRENDA'}
-                        </span>
-                        {selectedItem.category && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase">
-                            {selectedItem.category}
-                          </span>
-                        )}
-                        {selectedItem.op && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-black uppercase">
-                            OP: {selectedItem.op}
-                          </span>
-                        )}
-                      </div>
-                      <h2 className="text-2xl font-black text-gray-900 uppercase mt-1">
-                        {selectedItem.name}
-                      </h2>
-                    </div>
-                  </div>
+            {/* Stage Info Banner */}
+            <div className="flex items-center gap-3 bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
+              <Info className="w-5 h-5 text-indigo-600 shrink-0" />
+              <p className="text-sm font-semibold text-indigo-900">
+                Estás visualizando/editando las medidas de tipo:{' '}
+                <span className="font-black uppercase">{STAGES.find(s => s.id === activeStage)?.label}</span>
+              </p>
+            </div>
 
-                  {/* STAGE BUTTONS (OFICIALES, ANTES DE LAVAR, DESPUÉS DE LAVAR) */}
-                  <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 rounded-2xl w-full lg:w-auto print:hidden">
-                    {STAGES.map(s => {
-                      const isActive = activeStage === s.id;
-                      const count = itemMeasurements.filter((m: any) => m.stage === s.id).length;
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => setActiveStage(s.id)}
-                          className={`flex-1 lg:flex-initial px-5 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                            isActive
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-102'
-                              : 'bg-transparent text-gray-600 hover:bg-white'
-                          }`}
-                        >
-                          <span>{s.label}</span>
-                          {count > 0 && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                              {count}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+            {/* Custom Column / Color adder */}
+            {activeStage !== 'OFICIAL' && (
+              <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Añadir Variante:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="OP (Ej: OP-02)"
+                    value={customOp}
+                    onChange={(e) => setCustomOp(e.target.value)}
+                    className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-36"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Color (Ej: Camello)"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="bg-white px-4 py-2 rounded-xl outline-none border border-gray-200 focus:ring-2 focus:ring-indigo-500 font-semibold text-sm w-44"
+                  />
+                  <button
+                    onClick={addColumn}
+                    className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
-
-                {/* STAGE DESCRIPTION BANNER */}
-                <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                      <Info className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-indigo-900 uppercase">
-                        Etapa Activa: {STAGES.find(s => s.id === activeStage)?.label}
-                      </h4>
-                      <p className="text-[11px] font-bold text-indigo-600/80">
-                        {STAGES.find(s => s.id === activeStage)?.desc}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* QUICK COPY BUTTONS */}
-                  <div className="flex items-center gap-2 print:hidden">
-                    {activeStage !== 'OFICIAL' && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyFromStage('OFICIAL')}
-                        className="px-3 py-2 bg-white border border-indigo-200 rounded-xl text-[10px] font-black uppercase text-indigo-700 hover:bg-indigo-600 hover:text-white transition shadow-sm flex items-center gap-1.5"
-                      >
-                        <Copy className="w-3.5 h-3.5" /> Copiar de Oficiales
-                      </button>
-                    )}
-                    {activeStage === 'DESPUES_LAVAR' && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyFromStage('ANTES_LAVAR')}
-                        className="px-3 py-2 bg-white border border-amber-200 rounded-xl text-[10px] font-black uppercase text-amber-700 hover:bg-amber-600 hover:text-white transition shadow-sm flex items-center gap-1.5"
-                      >
-                        <Copy className="w-3.5 h-3.5" /> Copiar de Antes Lavar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* SIZE CURVE SELECTOR PILLS */}
-                <div className="space-y-3 print:hidden">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                      2. Selecciona la Talla a Registrar / Modificar
-                    </label>
-                    <span className="text-xs font-bold text-indigo-600">
-                      Talla editando: <strong className="font-black text-sm">{selectedSize}</strong>
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {standardSizes.map((sz: string) => {
-                      const isSelected = selectedSize === sz;
-                      const hasRegistered = registeredSizesInActiveStage.includes(sz);
-                      return (
-                        <button
-                          key={sz}
-                          type="button"
-                          onClick={() => setSelectedSize(sz)}
-                          className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all relative ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105'
-                              : hasRegistered
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                              : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
-                          }`}
-                        >
-                          Talla {sz}
-                          {hasRegistered && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-1 -right-1 ring-2 ring-white" />
-                          )}
-                        </button>
-                      );
-                    })}
-
-                    {/* CUSTOM SIZE INPUT */}
-                    <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-2xl border border-gray-200">
-                      <input
-                        type="text"
-                        placeholder="+ Talla..."
-                        value={customNewSize}
-                        onChange={e => setCustomNewSize(e.target.value.toUpperCase())}
-                        className="w-20 px-2.5 py-1.5 bg-transparent font-black text-xs outline-none uppercase text-gray-900"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!customNewSize.trim()) return;
-                          setSelectedSize(customNewSize.trim());
-                          setCustomNewSize('');
-                        }}
-                        className="p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-black transition"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* MEASUREMENT INPUTS FOR SELECTED SIZE & STAGE */}
-                <div className="space-y-4 print:hidden">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h4 className="text-xs font-black text-gray-600 uppercase tracking-widest flex items-center gap-2">
-                      <Ruler className="w-4 h-4 text-indigo-500" />
-                      3. Medidas de Talla {selectedSize} en {STAGES.find(s => s.id === activeStage)?.label}
-                    </h4>
-                    <span className="text-[11px] font-bold text-gray-400">
-                      Valores en pulgadas o cm (conversión automática)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                    {MEASUREMENT_KEYS.map(k => (
-                      <div key={k.key} className="space-y-1.5 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 text-center hover:border-indigo-200 transition">
-                        <span className="text-[10px] font-black text-gray-700 uppercase tracking-wider block truncate">
-                          {k.label}
-                        </span>
-                        <input
-                          type="text"
-                          placeholder="-"
-                          value={currentForm[k.key] || ''}
-                          onChange={e => handleFormChange(k.key, e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-1.5 text-center font-black text-sm text-indigo-950 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveMeasurement}
-                      disabled={isSaving}
-                      className="px-8 py-4 bg-indigo-600 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-indigo-200 transition active:scale-95 disabled:opacity-50"
-                    >
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Guardar Medidas de Talla {selectedSize}
-                    </button>
-                  </div>
-                </div>
-
-                {/* COMPLETE CURVE COMPARISON TABLE */}
-                <div className="pt-6 border-t border-gray-100 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-black text-gray-900 uppercase flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                        Curva de Medidas Registradas ({STAGES.find(s => s.id === activeStage)?.label})
-                      </h3>
-                      <p className="text-xs font-bold text-gray-400">
-                        Visualización completa de todas las tallas registradas en esta etapa
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handlePrint}
-                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition active:scale-95 self-start sm:self-auto print:hidden"
-                    >
-                      <Printer className="w-4 h-4" /> Imprimir Ficha
-                    </button>
-                  </div>
-
-                  {tableCurveSizes.length === 0 ? (
-                    <div className="py-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                      <Ruler className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                      <p className="text-xs font-black text-gray-500 uppercase tracking-widest">
-                        Aún no se han guardado tallas en {STAGES.find(s => s.id === activeStage)?.label}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto border border-gray-200 rounded-3xl shadow-sm bg-white">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-gray-900 text-white">
-                            <th className="px-5 py-4 text-xs font-black uppercase tracking-wider border-r border-gray-800">
-                              Punto de Medida
-                            </th>
-                            {tableCurveSizes.map(size => (
-                              <th 
-                                key={size} 
-                                onClick={() => setSelectedSize(size)}
-                                className={`px-5 py-4 text-xs font-black uppercase tracking-wider text-center border-r border-gray-800 last:border-r-0 cursor-pointer transition ${
-                                  selectedSize === size ? 'bg-indigo-600 text-white' : 'bg-indigo-950/60 hover:bg-indigo-900/80'
-                                }`}
-                                title="Click para editar esta talla"
-                              >
-                                Talla {size}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 font-bold text-sm">
-                          {MEASUREMENT_KEYS.map((keyObj, idx) => (
-                            <tr key={keyObj.key} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                              <td className="px-5 py-3.5 text-xs font-black text-gray-900 uppercase border-r border-gray-100">
-                                {keyObj.label}
-                              </td>
-                              {tableCurveSizes.map(size => {
-                                const mObj = itemMeasurements.find(
-                                  (m: any) => m.stage === activeStage && m.size === size
-                                );
-                                const val = mObj ? (mObj[keyObj.key] || '-') : '-';
-                                return (
-                                  <td 
-                                    key={size} 
-                                    onClick={() => setSelectedSize(size)}
-                                    className={`px-5 py-3.5 text-center text-xs font-black text-indigo-950 border-r border-gray-100 last:border-r-0 cursor-pointer ${
-                                      selectedSize === size ? 'bg-indigo-50/40' : ''
-                                    }`}
-                                  >
-                                    {val !== '-' ? (
-                                      <span className="px-2.5 py-1 bg-indigo-50/70 text-indigo-700 rounded-lg border border-indigo-100/80 inline-block font-mono">
-                                        {val}
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-300">-</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
               </div>
-            ) : (
-              /* REGISTERED MODELS TABLE (WHEN NO ITEM IS SELECTED) */
+            )}
+
+            {/* Matrix table container */}
+            <div className="overflow-x-auto rounded-3xl border border-gray-100 shadow-inner">
+              <table className={`w-full text-left border-collapse border-b-4 ${getStageBorderClass()}`}>
+                <thead>
+                  <tr className="bg-gray-900 text-white">
+                    <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 min-w-[150px] bg-gray-950 sticky left-0 z-20 border-r-2 border-r-gray-800">
+                      OP / COLOR
+                    </th>
+                    {columns.map(col => {
+                      const isOfficial = activeStage === 'OFICIAL';
+                      return (
+                        <th key={col.id} className="p-3 font-black uppercase text-[10px] tracking-widest text-center border border-gray-800 relative group min-w-[140px]">
+                          {isOfficial ? (
+                            <div className="flex items-center justify-center min-h-[44px] text-xs font-black text-indigo-400">
+                              MEDIDA OFICIAL
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center min-h-[44px]">
+                              {/* OP on top */}
+                              <span className="text-[10px] text-gray-400 font-bold block leading-none mb-1">
+                                {col.op ? col.op : 'Sin OP'}
+                              </span>
+                              
+                              {/* Color and delete action */}
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="text-xs truncate max-w-[110px] text-white font-black">{col.color}</span>
+                                <button
+                                  onClick={() => removeColumn(col.id)}
+                                  className="text-red-400 hover:text-red-600 transition ml-1"
+                                  title="Remover columna"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {MEASUREMENT_KEYS.map(({ key, label }) => {
+                    const isBotaPie = key === 'botaPie';
+                    return (
+                      <tr key={key} className="hover:bg-gray-50/50 transition">
+                        <td className="p-4 border border-gray-100 bg-gray-50 text-center uppercase tracking-wider min-w-[150px] sticky left-0 z-10 border-r-2 border-r-gray-200">
+                          {isBotaPie ? (
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              <span className="font-black text-gray-700 text-xs">BOTA PIE</span>
+                              <div className="inline-flex items-center bg-white border border-blue-200 rounded-lg px-2 py-0.5 shadow-sm">
+                                <select
+                                  value={botaPieUnit}
+                                  onChange={(e) => setBotaPieUnit(e.target.value as 'cm' | 'pulg')}
+                                  className="text-[10px] font-black text-blue-700 bg-transparent outline-none cursor-pointer"
+                                >
+                                  <option value="pulg">pulg (")</option>
+                                  <option value="cm">cm</option>
+                                </select>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="font-black text-gray-700 text-xs">{label}</span>
+                          )}
+                        </td>
+                        {columns.map(col => (
+                          <td key={col.id} className="p-2.5 border border-gray-100">
+                            <input
+                              type="text"
+                              placeholder={isBotaPie ? (botaPieUnit === 'cm' ? '18.1 cm' : '16 3/4"') : '16 3/4"'}
+                              value={matrix[col.id]?.[key] || ''}
+                              onChange={(e) => handleCellChange(col.id, key, e.target.value)}
+                              onBlur={(e) => {
+                                if (isBotaPie) {
+                                  const val = e.target.value.trim();
+                                  if (val) {
+                                    if (botaPieUnit === 'cm') {
+                                      const parsed = parseCm(val);
+                                      if (parsed !== null && !val.includes('(')) {
+                                        const inches = parsed / 2.54;
+                                        const fraction = decToFractionInches(inches);
+                                        handleCellChange(col.id, key, `${parsed} cm (${fraction})`);
+                                      }
+                                    } else {
+                                      const parsed = parseInches(val);
+                                      if (parsed !== null && !val.includes('(')) {
+                                        const cm = parsed * 2.54;
+                                        const cleanIn = val.includes('"') ? val : `${val}"`;
+                                        handleCellChange(col.id, key, `${cleanIn} (${parseFloat(cm.toFixed(1)).toString().replace('.', ',')} cm)`);
+                                      }
+                                    }
+                                  }
+                                }
+                              }}
+                              className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-center text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Save bar */}
+            <div className="flex justify-end pt-4">
+              <button
+                onClick={saveAll}
+                disabled={isLoading}
+                className="flex items-center gap-2 bg-gray-900 text-white px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-black transition active:scale-95 shadow-lg shadow-gray-200 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" /> Guardar Medidas ({STAGES.find(s => s.id === activeStage)?.label})
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {registeredItems.length > 0 ? (
               <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-50 pb-4">
                   <div>
-                    <h3 className="text-xl font-black text-gray-900 uppercase">
-                      Modelos Registrados ({CATEGORY_TABS.find(t => t.id === activeTab)?.label})
-                    </h3>
+                    <h3 className="text-xl font-black text-gray-900 uppercase">Modelos Registrados</h3>
                     <p className="text-xs font-bold text-gray-400 mt-0.5">
-                      Listado de prendas en esta categoría que ya cuentan con control de medidas
+                      Listado de prendas que ya cuentan con control de medidas registrado.
                     </p>
                   </div>
+                  {/* Local Search input for registered models */}
                   <div className="relative w-full md:w-80">
                     <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Buscar modelo registrado..."
+                      placeholder="Buscar en lista..."
                       value={searchRegisteredText}
                       onChange={(e) => setSearchRegisteredText(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl font-bold text-sm outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
@@ -1119,59 +809,38 @@ export default function MeasurementsPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-gray-900 text-white text-[10px] font-black uppercase tracking-wider">
-                        <th className="p-4 border border-gray-800">Modelo / Prenda</th>
-                        <th className="p-4 border border-gray-800">SKU / Código</th>
-                        <th className="p-4 border border-gray-800">Etapas Registradas</th>
-                        <th className="p-4 border border-gray-800 text-right">Acción</th>
+                        <th className="p-4 border border-gray-800">Modelo / Nombre</th>
+                        <th className="p-4 border border-gray-800">SKU</th>
+                        <th className="p-4 border border-gray-800">OPs / Variantes</th>
+                        <th className="p-4 border border-gray-800 text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-bold text-gray-700 text-sm">
                       {filteredRegistered.length > 0 ? (
-                        filteredRegistered.map((item: any) => {
-                          const isSample = activeTab === 'MUESTRAS';
-                          const itemMeas = allMeasurements.filter(m => isSample ? m.sampleId === item.id : m.productId === item.id);
-                          const stagesCount = Array.from(new Set(itemMeas.map(m => m.stage)));
-                          return (
-                            <tr key={item.id} className="hover:bg-gray-50/50 transition">
-                              <td className="p-4 uppercase text-gray-900 font-black flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-xl bg-gray-100 overflow-hidden border border-gray-200 shrink-0 flex items-center justify-center">
-                                  {item.images && item.images.length > 0 ? (
-                                    <img src={getImageUrl(item.images[0])} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : item.imageUrl ? (
-                                    <img src={getImageUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Package className="w-4 h-4 text-indigo-400" />
-                                  )}
-                                </div>
-                                <span>{item.name}</span>
-                              </td>
-                              <td className="p-4 uppercase text-gray-500 font-mono text-xs">
-                                {item.sku || item.code || 'SIN SKU'}
-                              </td>
-                              <td className="p-4">
-                                <div className="flex gap-1.5 flex-wrap">
-                                  {stagesCount.map(st => (
-                                    <span key={st} className="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase border border-indigo-100">
-                                      {STAGES.find(s => s.id === st)?.label.split('(')[0] || st}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="p-4 text-right">
-                                <button
-                                  onClick={() => setSelectedItem(item)}
-                                  className="bg-indigo-600 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase transition active:scale-95 shadow-md shadow-indigo-100 flex items-center gap-1.5 ml-auto"
-                                >
-                                  Ver / Editar Medidas <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
+                        filteredRegistered.map((item: any) => (
+                          <tr key={item.id} className="hover:bg-gray-50/50 transition">
+                            <td className="p-4 uppercase text-gray-900 font-black">{item.name}</td>
+                            <td className="p-4 uppercase text-gray-500 font-mono text-xs">{item.sku || 'Sin SKU'}</td>
+                            <td className="p-4 max-w-xs truncate text-gray-500 uppercase">
+                              {inventoryType === 'MUESTRAS' 
+                                ? (item.op || 'Sin OP') 
+                                : Array.from(new Set((item.variants || []).map((v: any) => v.op).filter(Boolean))).join(', ') || 'Sin OP'
+                              }
+                            </td>
+                            <td className="p-4 text-right">
+                              <button
+                                onClick={() => setSelectedItem(item)}
+                                className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase transition active:scale-95 shadow-md shadow-gray-200"
+                              >
+                                Ver Detalles / Editar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
                       ) : (
                         <tr>
                           <td colSpan={4} className="p-8 text-center text-gray-400 italic">
-                            No hay modelos con medidas registradas en esta categoría aún. Utiliza el buscador superior para seleccionar un producto y registrar sus medidas.
+                            No se encontraron modelos con ese término de búsqueda.
                           </td>
                         </tr>
                       )}
@@ -1179,11 +848,15 @@ export default function MeasurementsPage() {
                   </table>
                 </div>
               </div>
+            ) : (
+              <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-12 text-center text-gray-400 flex flex-col items-center justify-center">
+                <Ruler className="w-16 h-16 text-gray-200 mb-4" />
+                <h3 className="text-lg font-black text-gray-700 uppercase">Ningún modelo seleccionado</h3>
+                <p className="text-sm mt-1 max-w-md">Escribe el nombre del modelo o SKU en la barra superior para comenzar a registrar las medidas.</p>
+              </div>
             )}
-
           </div>
         )}
-
       </div>
     </Layout>
   );
