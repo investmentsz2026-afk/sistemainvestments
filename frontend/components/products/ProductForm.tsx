@@ -32,6 +32,7 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Correas', label: '👔 Correas y Cinturones' },
     { value: 'Deportivo', label: '🏃 Ropa Deportiva' },
     { value: 'Formal', label: '🤵 Ropa Formal' },
+    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
   ],
   PROCESO: [
     { value: 'Jeans en Proceso', label: '👖 Jeans en Proceso' },
@@ -82,6 +83,7 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Otros Materiales', label: '🧱 Otros Materiales de Producción' },
   ],
   AVIOS: [
+    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
     { value: 'Correas', label: '👔 Correas' },
     { value: 'Botones y Broches', label: '🔘 Botones, Broches y Remaches' },
     { value: 'Remaches y Placas', label: '🏷️ Remaches Metálicos y Placas' },
@@ -95,6 +97,7 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Otros Avíos', label: '🧷 Otros Avíos de Confección' },
   ],
   OTROS: [
+    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
     { value: 'Limpieza y Mantenimiento', label: '🧹 Limpieza y Mantenimiento' },
     { value: 'Útiles de Oficina', label: '📎 Útiles de Oficina y Papelería' },
     { value: 'Embalaje y Despacho', label: '📦 Embalaje y Despacho' },
@@ -124,7 +127,10 @@ const getProductSchema = (isEditing: boolean) => z.object({
   sku: z.string().optional(),
   op: z.string().optional(),
   entalle: z.string().optional(),
-  weight: z.number().optional(),
+  weight: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
+    z.number().optional().nullable()
+  ),
   location: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
@@ -296,7 +302,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const avioSkuPreview = React.useMemo(() => {
     if (watchInventoryType !== 'AVIOS') return null;
     const desc = getAvioPrefix(watchName, watchCategory);
-    const corr = '0010';
+    let corr = '0010';
+    if (initialData?.sku) {
+      const match = initialData.sku.match(/^[A-Za-z]{2}(\d{4})/);
+      if (match) corr = match[1];
+    }
     const sizeStr = watchSizes.length > 0 && watchSizes[0] !== 'ESTÁNDAR' ? `T${watchSizes[0]}` : 'T01';
     const colStr = watchColors.length > 0 ? getAvioColorCode(watchColors[0]) : 'UN';
     const locStr = (watchLocation || 'A1').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -309,7 +319,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       location: locStr,
       full,
     };
-  }, [watchInventoryType, watchName, watchCategory, watchLocation, watchColors, watchSizes]);
+  }, [watchInventoryType, watchName, watchCategory, watchLocation, watchColors, watchSizes, initialData?.sku]);
 
   const [colorInput, setColorInput] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -506,19 +516,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       const validColors = (data.colors || []).filter(c => c && c.trim() && c.trim() !== 'ÚNICO');
       if (validColors.length === 0) {
         data.colors = ['ÚNICO'];
+        const avioSku = data.inventoryType === 'AVIOS' 
+          ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: 'UN', location: data.location || 'A1', existingSku: initialData?.sku })
+          : (data.sku || undefined);
+        if (data.inventoryType === 'AVIOS') {
+          data.sku = avioSku;
+        }
         data.variants = [{
           size: 'ESTÁNDAR',
           color: 'ÚNICO',
           stock: 0,
           initialStock: 0,
           location: data.location || undefined,
-          variantSku: data.inventoryType === 'AVIOS' 
-            ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: 'UN', location: data.location || 'A1' })
-            : (data.sku || undefined),
+          variantSku: avioSku,
         }];
       } else {
         data.colors = validColors;
         const existingVariants = data.variants || [];
+        const baseAvioSku = data.inventoryType === 'AVIOS'
+          ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: validColors[0], location: data.location || 'A1', existingSku: initialData?.sku })
+          : (data.sku || undefined);
+        if (data.inventoryType === 'AVIOS') {
+          data.sku = baseAvioSku;
+        }
         data.variants = validColors.map(color => {
           const existing = existingVariants.find((v: any) => v.color === color);
           return {
@@ -529,7 +549,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             initialStock: existing?.initialStock || 0,
             location: data.location || undefined,
             variantSku: data.inventoryType === 'AVIOS'
-              ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color, location: data.location || 'A1' })
+              ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color, location: data.location || 'A1', existingSku: existing?.variantSku || initialData?.sku })
               : (existing?.variantSku || undefined),
           };
         });
@@ -764,7 +784,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               <input
                 type="number"
                 step="any"
-                {...register('weight', { valueAsNumber: true })}
+                {...register('weight', {
+                  setValueAs: (v) => (v === '' || v === null || v === undefined || isNaN(Number(v)) ? undefined : Number(v)),
+                })}
                 className={`${inputBase} ${inputNormal}`}
                 placeholder="Ej: 0.5 (kg o g)"
                 min="0"

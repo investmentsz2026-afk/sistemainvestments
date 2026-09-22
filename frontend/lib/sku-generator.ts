@@ -35,6 +35,22 @@ export const AVIO_PREFIXES: Record<string, string> = {
   OJALILLOS: 'OJ',
   HANGER: 'HG',
   GANCHO: 'GH',
+  MERCHAN: 'MD',
+  MERCHANDISING: 'MD',
+  DESIGN: 'MD',
+  GORRA: 'GO',
+  GORRAS: 'GO',
+  TAZA: 'TZ',
+  TAZAS: 'TZ',
+  LLAVERO: 'LL',
+  LLAVEROS: 'LL',
+  BOLSO: 'BS',
+  BOLSOS: 'BS',
+  MOCHILA: 'MC',
+  MOCHILAS: 'MC',
+  TOMATODO: 'TT',
+  VASO: 'VS',
+  VASOS: 'VS',
 };
 
 export const COLOR_ABBR: Record<string, string> = {
@@ -121,12 +137,21 @@ export function generateAvioSKU(params: {
   color?: string;
   location?: string;
   correlative?: string | number;
+  existingSku?: string;
 }): string {
   const desc = getAvioPrefix(params.name, params.category);
   
   let corrStr = '';
   if (params.correlative !== undefined && params.correlative !== null && params.correlative !== '') {
     corrStr = String(params.correlative).padStart(4, '0').slice(-4);
+  } else if (params.existingSku) {
+    const match = params.existingSku.match(/^[A-Za-z]{2}(\d{4})/);
+    if (match) {
+      corrStr = match[1];
+    } else {
+      const digits = params.existingSku.replace(/\D/g, '');
+      corrStr = digits.length >= 4 ? digits.slice(0, 4) : '0010';
+    }
   } else {
     corrStr = '0010';
   }

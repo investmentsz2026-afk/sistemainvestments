@@ -287,6 +287,20 @@ export class ProductsService {
         });
       }
     } else if (updatedProduct.inventoryType === 'AVIOS' && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined)) {
+      const newBaseSku = generateAvioSKU({
+        name: updatedProduct.name,
+        category: updatedProduct.category,
+        size: updatedProduct.sizes?.[0] || 'ESTÁNDAR',
+        color: updatedProduct.colors?.[0] || 'ÚNICO',
+        location: updatedProduct.location || 'A1',
+        existingSku: product.sku,
+      });
+
+      await this.prisma.product.update({
+        where: { id },
+        data: { sku: newBaseSku },
+      });
+
       for (const variant of updatedProduct.variants) {
         const variantSku = generateAvioSKU({
           name: updatedProduct.name,
@@ -294,6 +308,7 @@ export class ProductsService {
           size: variant.size,
           color: variant.color,
           location: variant.location || updatedProduct.location || 'A1',
+          existingSku: variant.variantSku || product.sku,
         });
         await this.prisma.productVariant.update({
           where: { id: variant.id },
