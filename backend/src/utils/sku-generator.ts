@@ -142,8 +142,9 @@ export function generateAvioSKU(params: {
   const desc = getAvioPrefix(params.name, params.category);
   
   let corrStr = '';
-  if (params.correlative !== undefined && params.correlative !== null && params.correlative !== '') {
-    corrStr = String(params.correlative).padStart(4, '0').slice(-4);
+  if (params.correlative !== undefined && params.correlative !== null && String(params.correlative).trim() !== '') {
+    const digits = String(params.correlative).replace(/\D/g, '');
+    corrStr = digits.padStart(4, '0').slice(-4) || '0010';
   } else if (params.existingSku) {
     const match = params.existingSku.match(/^[A-Za-z]{2}(\d{4})/);
     if (match) {
@@ -157,11 +158,20 @@ export function generateAvioSKU(params: {
   }
 
   let sizePart = '';
-  const cleanSize = (params.size || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().trim();
-  if (cleanSize && cleanSize !== 'UNICO' && cleanSize !== 'ESTANDAR' && cleanSize !== 'STANDARD') {
-    sizePart = `T${cleanSize}`;
+  const rawSize = (params.size || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const cleanSize = rawSize.replace(/[^A-Z0-9]/g, '');
+  if (
+    cleanSize &&
+    cleanSize !== 'ESTANDAR' &&
+    cleanSize !== 'STANDARD' &&
+    cleanSize !== 'UNICO' &&
+    cleanSize !== 'UN' &&
+    cleanSize !== 'ST' &&
+    cleanSize !== '01'
+  ) {
+    sizePart = cleanSize.startsWith('T') ? cleanSize : `T${cleanSize}`;
   } else {
-    sizePart = 'T01';
+    sizePart = 'ST';
   }
 
   const colorPart = getAvioColorCode(params.color);

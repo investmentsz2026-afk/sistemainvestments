@@ -102,6 +102,10 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   location?: string;
+
+  @IsString()
+  @IsOptional()
+  correlative?: string;
 }
 
 export class UpdateProductDto {
@@ -116,6 +120,10 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   sku?: string;
+
+  @IsString()
+  @IsOptional()
+  correlative?: string;
 
   @IsString()
   @IsOptional()

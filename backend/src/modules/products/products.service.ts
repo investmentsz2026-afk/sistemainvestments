@@ -31,7 +31,7 @@ export class ProductsService {
           size: (createProductDto.sizes && createProductDto.sizes[0]) || '01',
           color: (createProductDto.colors && createProductDto.colors[0]) || 'UN',
           location: createProductDto.location || 'A1',
-          correlative: counter,
+          correlative: createProductDto.correlative || counter,
         });
       } else {
         sku = generateSKU(
@@ -275,6 +275,8 @@ export class ProductsService {
                 size: variant.size,
                 color: variant.color,
                 location: variant.location || updatedProduct.location || 'A1',
+                correlative: (productData as any).correlative,
+                existingSku: productData.sku,
               })
             : generateVariantSKU(
                 productData.sku,
@@ -286,13 +288,14 @@ export class ProductsService {
           data: { variantSku },
         });
       }
-    } else if (updatedProduct.inventoryType === 'AVIOS' && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined)) {
+    } else if (updatedProduct.inventoryType === 'AVIOS' && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined || (productData as any).correlative !== undefined)) {
       const newBaseSku = generateAvioSKU({
         name: updatedProduct.name,
         category: updatedProduct.category,
         size: updatedProduct.sizes?.[0] || 'ESTÁNDAR',
         color: updatedProduct.colors?.[0] || 'ÚNICO',
         location: updatedProduct.location || 'A1',
+        correlative: (productData as any).correlative,
         existingSku: product.sku,
       });
 
@@ -308,6 +311,7 @@ export class ProductsService {
           size: variant.size,
           color: variant.color,
           location: variant.location || updatedProduct.location || 'A1',
+          correlative: (productData as any).correlative,
           existingSku: variant.variantSku || product.sku,
         });
         await this.prisma.productVariant.update({

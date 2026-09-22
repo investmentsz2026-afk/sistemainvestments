@@ -132,6 +132,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
     z.number().optional().nullable()
   ),
   location: z.string().optional(),
+  correlative: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
   realPrice: z.number().min(0, 'El precio real debe ser mayor o igual a 0').optional().default(0.1),
@@ -243,6 +244,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       minStock: 5,
       weight: undefined,
       location: '',
+      correlative: initialData?.correlative || (initialData?.sku ? (initialData.sku.match(/^[A-Za-z]{2}(\d{4})/)?.[1] || '') : ''),
       sizes: [],
       colors: [],
       inventoryType: 'TERMINADOS',
@@ -255,6 +257,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   React.useEffect(() => {
     if (initialData) {
       const dataToReset = { ...initialData };
+      if (!dataToReset.correlative && initialData.sku) {
+        const match = initialData.sku.match(/^[A-Za-z]{2}(\d{4})/);
+        if (match) dataToReset.correlative = match[1];
+      }
       if (initialData.variants && initialData.variants.length > 0 && initialData.op) {
         const opVariants: Record<string, string[]> = {};
         initialData.variants.forEach((v: any) => {
@@ -266,6 +272,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           }
         });
         dataToReset.opVariants = opVariants;
+      }
+      if (['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(dataToReset.inventoryType)) {
+        if (!dataToReset.sizes || dataToReset.sizes.length === 0) {
+          const varSize = initialData.variants?.[0]?.size;
+          dataToReset.sizes = varSize ? [varSize] : ['ESTÁNDAR'];
+        }
       }
       reset(dataToReset);
     }
@@ -294,6 +306,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchColors = watch('colors') || [];
   const watchName = watch('name') || '';
   const watchLocation = watch('location') || '';
+  const watchCorrelative = watch('correlative') || '';
   const watchOp = watch('op');
   const watchOpVariants = watch('opVariants') || {};
   const watchImportedStockQuantities = watch('importedStockQuantities') || {};
@@ -303,11 +316,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     if (watchInventoryType !== 'AVIOS') return null;
     const desc = getAvioPrefix(watchName, watchCategory);
     let corr = '0010';
-    if (initialData?.sku) {
+    if (watchCorrelative && watchCorrelative.trim()) {
+      const digitsOnly = watchCorrelative.replace(/\D/g, '');
+      corr = digitsOnly.padStart(4, '0').slice(-4) || '0010';
+    } else if (initialData?.sku) {
       const match = initialData.sku.match(/^[A-Za-z]{2}(\d{4})/);
       if (match) corr = match[1];
     }
-    const sizeStr = watchSizes.length > 0 && watchSizes[0] !== 'ESTÁNDAR' ? `T${watchSizes[0]}` : 'T01';
+    const rawSize = (watchSizes.length > 0 && watchSizes[0]) ? watchSizes[0] : 'ESTÁNDAR';
+    const cleanSize = rawSize.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9]/g, "").trim();
+    let sizeStr = 'ST';
+    if (cleanSize && cleanSize !== 'ESTANDAR' && cleanSize !== 'STANDARD' && cleanSize !== 'UNICO' && cleanSize !== 'UN' && cleanSize !== 'ST' && cleanSize !== '01') {
+      sizeStr = cleanSize.startsWith('T') ? cleanSize : `T${cleanSize}`;
+    }
     const colStr = watchColors.length > 0 ? getAvioColorCode(watchColors[0]) : 'UN';
     const locStr = (watchLocation || 'A1').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     const full = `${desc}${corr}${sizeStr}${colStr}${locStr}`;
@@ -319,7 +340,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       location: locStr,
       full,
     };
-  }, [watchInventoryType, watchName, watchCategory, watchLocation, watchColors, watchSizes, initialData?.sku]);
+  }, [watchInventoryType, watchName, watchCategory, watchLocation, watchColors, watchSizes, watchCorrelative, initialData?.sku]);
 
   const [colorInput, setColorInput] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -512,18 +533,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     const isCorreas = (data.category || '').toLowerCase().includes('correa');
     const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType) && !isCorreas;
     if (isMat) {
-      data.sizes = ['ESTÁNDAR'];
+      const userSize = (data.sizes && data.sizes[0] && data.sizes[0].trim()) ? data.sizes[0].trim().toUpperCase() : 'ESTÁNDAR';
+      data.sizes = [userSize];
       const validColors = (data.colors || []).filter(c => c && c.trim() && c.trim() !== 'ÚNICO');
+      const userCorrelative = data.correlative && data.correlative.trim()
+        ? data.correlative.replace(/\D/g, '').padStart(4, '0').slice(-4)
+        : undefined;
+
       if (validColors.length === 0) {
         data.colors = ['ÚNICO'];
         const avioSku = data.inventoryType === 'AVIOS' 
-          ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: 'UN', location: data.location || 'A1', existingSku: initialData?.sku })
+          ? generateAvioSKU({
+              name: data.name,
+              category: data.category,
+              size: userSize,
+              color: 'UN',
+              location: data.location || 'A1',
+              correlative: userCorrelative,
+              existingSku: initialData?.sku
+            })
           : (data.sku || undefined);
         if (data.inventoryType === 'AVIOS') {
           data.sku = avioSku;
         }
         data.variants = [{
-          size: 'ESTÁNDAR',
+          size: userSize,
           color: 'ÚNICO',
           stock: 0,
           initialStock: 0,
@@ -534,7 +568,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         data.colors = validColors;
         const existingVariants = data.variants || [];
         const baseAvioSku = data.inventoryType === 'AVIOS'
-          ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: validColors[0], location: data.location || 'A1', existingSku: initialData?.sku })
+          ? generateAvioSKU({
+              name: data.name,
+              category: data.category,
+              size: userSize,
+              color: validColors[0],
+              location: data.location || 'A1',
+              correlative: userCorrelative,
+              existingSku: initialData?.sku
+            })
           : (data.sku || undefined);
         if (data.inventoryType === 'AVIOS') {
           data.sku = baseAvioSku;
@@ -543,13 +585,21 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           const existing = existingVariants.find((v: any) => v.color === color);
           return {
             id: existing?.id,
-            size: 'ESTÁNDAR',
+            size: userSize,
             color: color,
             stock: existing?.stock !== undefined ? existing.stock : (existing?.initialStock || 0),
             initialStock: existing?.initialStock || 0,
             location: data.location || undefined,
             variantSku: data.inventoryType === 'AVIOS'
-              ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color, location: data.location || 'A1', existingSku: existing?.variantSku || initialData?.sku })
+              ? generateAvioSKU({
+                  name: data.name,
+                  category: data.category,
+                  size: userSize,
+                  color,
+                  location: data.location || 'A1',
+                  correlative: userCorrelative,
+                  existingSku: existing?.variantSku || initialData?.sku
+                })
               : (existing?.variantSku || undefined),
           };
         });
@@ -797,21 +847,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
 
             {/* Ubicación en Almacén */}
-            <div className={watchInventoryType === 'AVIOS' ? 'md:col-span-2' : ''}>
+            <div className={watchInventoryType === 'AVIOS' ? 'md:col-span-1' : ''}>
               <label className={labelClass}>
                 <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                Ubicación en Almacén {watchInventoryType === 'AVIOS' ? <span className="text-amber-600 font-bold text-[10px]">(Utilizado en el SKU de Avíos)</span> : <span className="text-gray-400 text-[10px]">(Opcional)</span>}
+                Ubicación en Almacén {watchInventoryType === 'AVIOS' ? <span className="text-amber-600 font-bold text-[10px]">(Parte del SKU)</span> : <span className="text-gray-400 text-[10px]">(Opcional)</span>}
               </label>
               <input
                 type="text"
                 {...register('location')}
                 className={`${inputBase} uppercase font-bold tracking-wider ${errors.location ? inputError : inputNormal}`}
-                placeholder="Ej: A2, EST-01, ESTANTE-3"
+                placeholder="Ej: A1, A2, EST-01"
               />
               <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
-                <Info className="w-3 h-3" /> Código interno de ubicación donde se almacena este producto (ej: A2).
+                <Info className="w-3 h-3" /> Ubicación donde se almacena el avío o material.
               </p>
             </div>
+
+            {/* Correlativo de Avíos (Opcional - editable) */}
+            {watchInventoryType === 'AVIOS' && (
+              <div className="md:col-span-1">
+                <label className={labelClass}>
+                  <Hash className="w-3.5 h-3.5 text-blue-500" />
+                  Correlativo de Avío <span className="text-blue-600 font-bold text-[10px]">(4 dígitos - Opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={4}
+                  {...register('correlative')}
+                  className={`${inputBase} font-mono font-bold tracking-widest ${inputNormal}`}
+                  placeholder="Ej: 0010, 0025 (Auto si vacío)"
+                />
+                <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
+                  <Info className="w-3 h-3" /> Si se deja vacío, se generará o conservará automáticamente.
+                </p>
+              </div>
+            )}
 
             {/* Nomenclatura SKU Especial para Avíos */}
             {watchInventoryType === 'AVIOS' && avioSkuPreview && (
@@ -1266,7 +1336,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             </div>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-5">
+            {/* Talla / Medida Editable */}
+            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/70">
+              <label className="flex items-center gap-1.5 text-xs font-black text-amber-900 uppercase tracking-wider mb-1.5">
+                <Ruler className="w-3.5 h-3.5 text-amber-600" />
+                Talla / Medida del Producto o Avío
+              </label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={watchSizes && watchSizes.length > 0 ? watchSizes[0] : 'ESTÁNDAR'}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setValue('sizes', [val]);
+                  }}
+                  className={`${inputBase} uppercase font-bold tracking-wider ${inputNormal}`}
+                  placeholder="Ej: ESTÁNDAR, ST, 32, 28, M, 15MM..."
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-amber-800/90 flex items-center gap-1 font-medium">
+                <Info className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                Si es <strong>ESTÁNDAR</strong> (o lo dejas por defecto), en el SKU se generará automáticamente como <strong>ST</strong>. Si especificas otra medida (ej. 32, 28, M), se reflejará en el SKU y en las variantes.
+              </p>
+            </div>
+
             {/* Tags Container */}
             {watchColors.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
