@@ -24,6 +24,8 @@ export interface Product {
   variants: ProductVariant[];
   sizes?: string[];
   colors?: string[];
+  location?: string;
+  weight?: number;
   imageUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +38,8 @@ export interface ProductVariant {
   color: string;
   stock: number;
   variantSku: string;
+  location?: string;
+  weight?: number;
   op?: string;
   product?: Product;
 }

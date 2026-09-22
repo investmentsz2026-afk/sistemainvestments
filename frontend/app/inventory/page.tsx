@@ -439,8 +439,175 @@ export default function InventoryPage() {
       }
     }
 
+    // ----------------------------------------------------
+    // HOJA 2: DETALLE DE AVÍOS (Con Correlativo, Talla, Ubicación, Peso Kg)
+    // ----------------------------------------------------
+    const avioProducts = sortedProducts.filter(p => p.inventoryType === 'AVIOS');
+    const productsForAvioSheet = avioProducts.length > 0 ? avioProducts : sortedProducts;
+
+    const avioGroups: Record<string, GroupRow> = {};
+    const avioSizesSet = new Set<string>();
+
+    productsForAvioSheet.forEach(product => {
+      product.variants?.forEach((variant: any) => {
+        const op = product.op || '--';
+        const color = variant.color || 'Sin Color';
+        const sizeKey = variant.size || 'Única';
+        avioSizesSet.add(sizeKey);
+
+        const key = `${product.id}_${op}_${color}`;
+        if (!avioGroups[key]) {
+          avioGroups[key] = {
+            product,
+            op,
+            color,
+            stocks: {}
+          };
+        }
+        avioGroups[key].stocks[sizeKey] = (avioGroups[key].stocks[sizeKey] || 0) + (variant.stock || 0);
+      });
+    });
+
+    const sortedAvioSizes = Array.from(avioSizesSet).sort((a, b) => getSizeScore(a) - getSizeScore(b));
+
+    const extractCorrelative = (sku?: string) => {
+      if (sku) {
+        const match = sku.match(/^[A-Za-z]{2}(\d{4})/);
+        if (match) return match[1];
+        const digits = sku.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(0, 4);
+      }
+      return '';
+    };
+
+    const extractTalla = (product: any) => {
+      if (product.sizes && product.sizes.length === 1 && !['ESTÁNDAR', 'ESTANDAR', 'ÚNICO', 'UNICA', 'N/A', 'SIN TALLA'].includes(product.sizes[0].toUpperCase())) {
+        return product.sizes[0];
+      }
+      return '';
+    };
+
+    const excelRows2 = Object.values(avioGroups).map(g => {
+      const row: Record<string, any> = {
+        'Tipo de Inventario': translateInventoryType(g.product.inventoryType),
+        'Categoría': g.product.category || '--',
+        'OP': g.op,
+        'Producto': g.product.name,
+        'Color': g.color,
+        'CORRELATIVO': extractCorrelative(g.product.sku),
+        'TALLA': extractTalla(g.product),
+        'UBICACIÓN': g.product.location || '',
+        'PESO KG': g.product.weight !== undefined && g.product.weight !== null && g.product.weight !== 0 ? Number(g.product.weight) : ''
+      };
+
+      let rowStockTotal = 0;
+      sortedAvioSizes.forEach(size => {
+        const qty = g.stocks[size] || 0;
+        row[size] = Number(qty);
+        rowStockTotal += qty;
+      });
+
+      row['Stock Total'] = Number(rowStockTotal);
+      row['Stock Mínimo'] = Number(g.product.minStock || 0);
+      row['Costo / P. Compra'] = Number(g.product.purchasePrice || 0);
+      row['Precio de Venta'] = Number(g.product.sellingPrice || 0);
+      row['Valor Total'] = Number(rowStockTotal * (g.product.purchasePrice || 0));
+
+      return row;
+    });
+
+    const headersOrder2 = [
+      'Tipo de Inventario',
+      'Categoría',
+      'OP',
+      'Producto',
+      'Color',
+      'CORRELATIVO',
+      'TALLA',
+      'UBICACIÓN',
+      'PESO KG',
+      ...sortedAvioSizes,
+      'Stock Total',
+      'Stock Mínimo',
+      'Costo / P. Compra',
+      'Precio de Venta',
+      'Valor Total'
+    ];
+
+    const ws2 = XLSX.utils.json_to_sheet(excelRows2, { header: headersOrder2 });
+
+    const sizeCount2 = sortedAvioSizes.length;
+    const startCols2 = [
+      { wch: 18 }, // Tipo de Inventario
+      { wch: 16 }, // Categoría
+      { wch: 12 }, // OP
+      { wch: 32 }, // Producto
+      { wch: 14 }, // Color
+      { wch: 15 }, // CORRELATIVO
+      { wch: 10 }, // TALLA
+      { wch: 14 }, // UBICACIÓN
+      { wch: 12 }  // PESO KG
+    ];
+    const sizeCols2 = sortedAvioSizes.map(() => ({ wch: 8 }));
+    const tailCols2 = [
+      { wch: 14 }, // Stock Total
+      { wch: 14 }, // Stock Mínimo
+      { wch: 18 }, // Costo / P. Compra
+      { wch: 16 }, // Precio de Venta
+      { wch: 18 }  // Valor Total
+    ];
+    ws2['!cols'] = [...startCols2, ...sizeCols2, ...tailCols2];
+
+    const range2 = XLSX.utils.decode_range(ws2['!ref'] || 'A1:A1');
+    ws2['!autofilter'] = { ref: XLSX.utils.encode_range(range2) };
+
+    ws2['!views'] = [
+      {
+        state: 'frozen',
+        ySplit: 1,
+        xSplit: 0,
+        topLeftCell: 'A2',
+        activePane: 'bottomLeft'
+      }
+    ];
+
+    const colIdxStockTotal2 = 9 + sizeCount2;
+    const colIdxStockMinimo2 = 10 + sizeCount2;
+    const colIdxCosto2 = 11 + sizeCount2;
+    const colIdxPrecioVenta2 = 12 + sizeCount2;
+    const colIdxValorTotal2 = 13 + sizeCount2;
+
+    for (const cellAddress in ws2) {
+      if (cellAddress.startsWith('!')) continue;
+      const cell = ws2[cellAddress];
+      const decoded = XLSX.utils.decode_cell(cellAddress);
+      const colIndex = decoded.c;
+      const rowIndex = decoded.r;
+
+      if (rowIndex === 0) continue;
+
+      // Sizes columns
+      if (colIndex >= 9 && colIndex < 9 + sizeCount2) {
+        cell.t = 'n';
+        cell.z = '#,##0';
+      }
+
+      // Stock totals & minimum
+      if (colIndex === colIdxStockTotal2 || colIndex === colIdxStockMinimo2) {
+        cell.t = 'n';
+        cell.z = '#,##0';
+      }
+
+      // Cost & price currency formatting
+      if (colIndex === colIdxCosto2 || colIndex === colIdxPrecioVenta2 || colIndex === colIdxValorTotal2) {
+        cell.t = 'n';
+        cell.z = '"S/"#,##0.00';
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Avíos');
     XLSX.writeFile(wb, `INVENTARIO_${cleanLabel.toUpperCase()}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
     setShowExportModal(false);
   };
