@@ -17,6 +17,10 @@ export class CreateVariantDto {
   @IsString()
   @IsOptional()
   variantSku?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 }
 
 export class CreateProductDto {
@@ -90,6 +94,14 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @IsNumber()
+  @IsOptional()
+  weight?: number;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 }
 
 export class UpdateProductDto {
@@ -167,6 +179,14 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @IsNumber()
+  @IsOptional()
+  weight?: number;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 }
 
 export class UpdateVariantDto {
@@ -193,4 +213,8 @@ export class UpdateVariantDto {
   @IsString()
   @IsOptional()
   variantSku?: string;
+
+  @IsString()
+  @IsOptional()
+  location?: string;
 }

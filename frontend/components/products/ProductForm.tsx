@@ -5,9 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductBarcode } from './Barcode';
-import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight, Barcode, ClipboardCheck, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Save, Package, DollarSign, Layers, Tag, Palette, Ruler, Hash, Info, TrendingUp, AlertCircle, ChevronRight, Barcode, ClipboardCheck, X, Image as ImageIcon, Scale, MapPin, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
+import { getAvioPrefix, getAvioColorCode, generateAvioSKU } from '../../lib/sku-generator';
 
 const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace('/api', '');
 
@@ -123,6 +124,8 @@ const getProductSchema = (isEditing: boolean) => z.object({
   sku: z.string().optional(),
   op: z.string().optional(),
   entalle: z.string().optional(),
+  weight: z.number().optional(),
+  location: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
   realPrice: z.number().min(0, 'El precio real debe ser mayor o igual a 0').optional().default(0.1),
@@ -140,6 +143,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
     stock: z.number().optional(),
     initialStock: z.number().optional(),
     variantSku: z.string().optional(),
+    location: z.string().optional(),
   })).optional(),
 }).superRefine((data, ctx) => {
   const isCorreas = (data.category || '').toLowerCase().includes('correa');
@@ -231,6 +235,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       sellingPrice: 0,
       realPrice: 0,
       minStock: 5,
+      weight: undefined,
+      location: '',
       sizes: [],
       colors: [],
       inventoryType: 'TERMINADOS',
@@ -280,10 +286,30 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const watchSizes = watch('sizes') || [];
   const watchColors = watch('colors') || [];
+  const watchName = watch('name') || '';
+  const watchLocation = watch('location') || '';
   const watchOp = watch('op');
   const watchOpVariants = watch('opVariants') || {};
   const watchImportedStockQuantities = watch('importedStockQuantities') || {};
   const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
+
+  const avioSkuPreview = React.useMemo(() => {
+    if (watchInventoryType !== 'AVIOS') return null;
+    const desc = getAvioPrefix(watchName, watchCategory);
+    const corr = '0010';
+    const sizeStr = watchSizes.length > 0 && watchSizes[0] !== 'ESTÁNDAR' ? `T${watchSizes[0]}` : 'T01';
+    const colStr = watchColors.length > 0 ? getAvioColorCode(watchColors[0]) : 'UN';
+    const locStr = (watchLocation || 'A1').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const full = `${desc}${corr}${sizeStr}${colStr}${locStr}`;
+    return {
+      desc,
+      corr,
+      size: sizeStr,
+      color: colStr,
+      location: locStr,
+      full,
+    };
+  }, [watchInventoryType, watchName, watchCategory, watchLocation, watchColors, watchSizes]);
 
   const [colorInput, setColorInput] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
@@ -485,7 +511,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           color: 'ÚNICO',
           stock: 0,
           initialStock: 0,
-          variantSku: data.sku || undefined,
+          location: data.location || undefined,
+          variantSku: data.inventoryType === 'AVIOS' 
+            ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color: 'UN', location: data.location || 'A1' })
+            : (data.sku || undefined),
         }];
       } else {
         data.colors = validColors;
@@ -498,7 +527,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             color: color,
             stock: existing?.stock !== undefined ? existing.stock : (existing?.initialStock || 0),
             initialStock: existing?.initialStock || 0,
-            variantSku: existing?.variantSku || undefined,
+            location: data.location || undefined,
+            variantSku: data.inventoryType === 'AVIOS'
+              ? generateAvioSKU({ name: data.name, category: data.category, size: '01', color, location: data.location || 'A1' })
+              : (existing?.variantSku || undefined),
           };
         });
       }
@@ -722,6 +754,88 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 <Info className="w-3 h-3" /> Alerta cuando el stock baje de este número
               </p>
             </div>
+
+            {/* Peso (Opcional - especial para avíos o insumos) */}
+            <div>
+              <label className={labelClass}>
+                <Scale className="w-3.5 h-3.5 text-emerald-500" />
+                Peso (Opcional)
+              </label>
+              <input
+                type="number"
+                step="any"
+                {...register('weight', { valueAsNumber: true })}
+                className={`${inputBase} ${inputNormal}`}
+                placeholder="Ej: 0.5 (kg o g)"
+                min="0"
+              />
+              <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
+                <Info className="w-3 h-3" /> Peso referencial del avío o insumo (opcional).
+              </p>
+            </div>
+
+            {/* Ubicación en Almacén */}
+            <div className={watchInventoryType === 'AVIOS' ? 'md:col-span-2' : ''}>
+              <label className={labelClass}>
+                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                Ubicación en Almacén {watchInventoryType === 'AVIOS' ? <span className="text-amber-600 font-bold text-[10px]">(Utilizado en el SKU de Avíos)</span> : <span className="text-gray-400 text-[10px]">(Opcional)</span>}
+              </label>
+              <input
+                type="text"
+                {...register('location')}
+                className={`${inputBase} uppercase font-bold tracking-wider ${errors.location ? inputError : inputNormal}`}
+                placeholder="Ej: A2, EST-01, ESTANTE-3"
+              />
+              <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
+                <Info className="w-3 h-3" /> Código interno de ubicación donde se almacena este producto (ej: A2).
+              </p>
+            </div>
+
+            {/* Nomenclatura SKU Especial para Avíos */}
+            {watchInventoryType === 'AVIOS' && avioSkuPreview && (
+              <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-lg border border-indigo-500/30 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/40 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30 text-amber-400">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-widest text-indigo-200 flex items-center gap-2">
+                        Nomenclatura SKU de Avíos
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Auto-calculado</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-300">Formato: [DESCRIPCIÓN] + [CORRELATIVO] + [TALLA] + [COLOR] + [UBICACIÓN]</p>
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 bg-black/40 rounded-xl border border-amber-400/40 text-center font-mono font-black text-base tracking-widest text-amber-300 shadow-inner">
+                    {avioSkuPreview.full}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-2.5 flex flex-col justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-red-300">1. Descripción</span>
+                    <span className="text-sm font-black text-red-400 font-mono mt-0.5">{avioSkuPreview.desc}</span>
+                  </div>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-2.5 flex flex-col justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-blue-300">2. Correlativo</span>
+                    <span className="text-sm font-black text-blue-400 font-mono mt-0.5">{avioSkuPreview.corr}</span>
+                  </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex flex-col justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-300">3. Tallas</span>
+                    <span className="text-sm font-black text-emerald-400 font-mono mt-0.5">{avioSkuPreview.size}</span>
+                  </div>
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-2.5 flex flex-col justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-purple-300">4. Colores</span>
+                    <span className="text-sm font-black text-purple-400 font-mono mt-0.5">{avioSkuPreview.color}</span>
+                  </div>
+                  <div className="bg-amber-700/10 border border-amber-600/30 rounded-xl p-2.5 flex flex-col justify-center col-span-2 sm:col-span-1">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-300">5. Ubicación</span>
+                    <span className="text-sm font-black text-amber-400 font-mono mt-0.5">{avioSkuPreview.location}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Campo Entalle */}
             {['TERMINADOS', 'PROCESO', 'SEGUNDA', 'TALLAS ESPECIALES'].includes(watchInventoryType) && (

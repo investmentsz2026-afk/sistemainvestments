@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateProductDto, UpdateProductDto, CreateVariantDto } from './dto/product.dto';
-import { generateSKU, generateVariantSKU } from '../../utils/sku-generator';
+import { generateSKU, generateVariantSKU, generateAvioSKU } from '../../utils/sku-generator';
 
 @Injectable()
 export class ProductsService {
@@ -18,18 +18,29 @@ export class ProductsService {
     if (lastProduct) {
       const lastSKU = lastProduct.sku;
       const lastCounter = parseInt(lastSKU.slice(-4));
-      counter = lastCounter + 1;
+      counter = isNaN(lastCounter) ? 1 : lastCounter + 1;
     }
 
     // Generar SKU principal del producto si no se proporciona uno manual
     let sku = createProductDto.sku;
     if (!sku) {
-      sku = generateSKU(
-        createProductDto.category,
-        '00', // SKU base sin talla específica
-        '000', // SKU base sin color específico
-        counter
-      );
+      if (createProductDto.inventoryType === 'AVIOS') {
+        sku = generateAvioSKU({
+          name: createProductDto.name,
+          category: createProductDto.category,
+          size: (createProductDto.sizes && createProductDto.sizes[0]) || '01',
+          color: (createProductDto.colors && createProductDto.colors[0]) || 'UN',
+          location: createProductDto.location || 'A1',
+          correlative: counter,
+        });
+      } else {
+        sku = generateSKU(
+          createProductDto.category,
+          '00', // SKU base sin talla específica
+          '000', // SKU base sin color específico
+          counter
+        );
+      }
     }
 
     // Crear producto
@@ -47,6 +58,8 @@ export class ProductsService {
         sellingPrice: createProductDto.sellingPrice,
         realPrice: createProductDto.realPrice || 0.0,
         minStock: createProductDto.minStock || 5,
+        weight: createProductDto.weight !== undefined ? createProductDto.weight : null,
+        location: createProductDto.location !== undefined ? createProductDto.location : null,
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
         imageUrl: createProductDto.imageUrl,
@@ -118,7 +131,15 @@ export class ProductsService {
     // Generar SKU único para la variante si no se proporciona uno manual
     let variantSku = createVariantDto.variantSku;
     if (!variantSku) {
-      if (product.op) {
+      if (product.inventoryType === 'AVIOS') {
+        variantSku = generateAvioSKU({
+          name: product.name,
+          category: product.category,
+          size: createVariantDto.size,
+          color: createVariantDto.color,
+          location: createVariantDto.location || product.location || 'A1',
+        });
+      } else if (product.op) {
         variantSku = await this.generateUniqueSkuForOp(product.op);
       } else if (isOnlyVariant || (createVariantDto.color === 'ÚNICO' && createVariantDto.size === 'ESTÁNDAR')) {
         variantSku = product.sku;
@@ -138,6 +159,7 @@ export class ProductsService {
         color: createVariantDto.color,
         stock: createVariantDto.initialStock || 0,
         variantSku,
+        location: createVariantDto.location || product.location || null,
         op: product.op || undefined,
       },
     });
@@ -246,14 +268,39 @@ export class ProductsService {
       for (const variant of updatedProduct.variants) {
         const variantSku = isOnlyVariant 
           ? productData.sku 
-          : generateVariantSKU(
-            productData.sku,
-            variant.size,
-            variant.color
-          );
+          : (updatedProduct.inventoryType === 'AVIOS'
+            ? generateAvioSKU({
+                name: updatedProduct.name,
+                category: updatedProduct.category,
+                size: variant.size,
+                color: variant.color,
+                location: variant.location || updatedProduct.location || 'A1',
+              })
+            : generateVariantSKU(
+                productData.sku,
+                variant.size,
+                variant.color
+              ));
         await this.prisma.productVariant.update({
           where: { id: variant.id },
           data: { variantSku },
+        });
+      }
+    } else if (updatedProduct.inventoryType === 'AVIOS' && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined)) {
+      for (const variant of updatedProduct.variants) {
+        const variantSku = generateAvioSKU({
+          name: updatedProduct.name,
+          category: updatedProduct.category,
+          size: variant.size,
+          color: variant.color,
+          location: variant.location || updatedProduct.location || 'A1',
+        });
+        await this.prisma.productVariant.update({
+          where: { id: variant.id },
+          data: { 
+            variantSku,
+            location: variant.location || updatedProduct.location || undefined
+          },
         });
       }
     }

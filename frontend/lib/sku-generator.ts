@@ -1,4 +1,4 @@
-// backend/src/utils/sku-generator.ts
+// frontend/lib/sku-generator.ts
 
 export const AVIO_PREFIXES: Record<string, string> = {
   ETIQUETA: 'ET',
@@ -79,8 +79,8 @@ export const COLOR_ABBR: Record<string, string> = {
 };
 
 export function getAvioPrefix(name: string = '', category: string = ''): string {
-  const cleanName = name.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const cleanCat = category.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const cleanName = (name || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const cleanCat = (category || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   
   const words = `${cleanName} ${cleanCat}`.split(/\s+/);
   for (const w of words) {
@@ -98,7 +98,7 @@ export function getAvioPrefix(name: string = '', category: string = ''): string 
 
 export function getAvioColorCode(color: string = ''): string {
   if (!color) return 'UN';
-  const clean = color.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const clean = (color || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   if (clean === 'UNICO' || clean === 'ÚNICO' || clean === 'ESTANDAR' || clean === 'STANDARD') return 'UN';
   
   if (COLOR_ABBR[clean]) return COLOR_ABBR[clean];
@@ -128,7 +128,7 @@ export function generateAvioSKU(params: {
   if (params.correlative !== undefined && params.correlative !== null && params.correlative !== '') {
     corrStr = String(params.correlative).padStart(4, '0').slice(-4);
   } else {
-    corrStr = Math.floor(1000 + Math.random() * 9000).toString();
+    corrStr = '0010';
   }
 
   let sizePart = '';
@@ -147,31 +147,4 @@ export function generateAvioSKU(params: {
   }
 
   return `${desc}${corrStr}${sizePart}${colorPart}${locPart}`;
-}
-
-export function generateSKU(
-  category: string,
-  size: string,
-  color: string,
-  counter: number
-): string {
-  // Tomar primeras 3 letras de categoría
-  const catPart = category.substring(0, 3).toUpperCase().padEnd(3, 'X');
-  
-  // Formatear talla
-  const sizePart = size.replace(/[^a-zA-Z0-9]/g, '').substring(0, 2).toUpperCase().padEnd(2, '0');
-  
-  // Tomar primeras 3 letras del color
-  const colorPart = color.substring(0, 3).toUpperCase().padEnd(3, 'X');
-  
-  // Número secuencial con padding
-  const seqPart = counter.toString().padStart(4, '0');
-  
-  return `${catPart}${sizePart}${colorPart}${seqPart}`;
-}
-
-export function generateVariantSKU(productSKU: string, size: string, color: string): string {
-  const sizeCode = size.replace(/[^a-zA-Z0-9]/g, '').substring(0, 2).toUpperCase().padEnd(2, '0');
-  const colorCode = color.substring(0, 3).toUpperCase().padEnd(3, 'X');
-  return `${productSKU}-${sizeCode}-${colorCode}`;
 }
