@@ -32,7 +32,6 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Correas', label: '👔 Correas y Cinturones' },
     { value: 'Deportivo', label: '🏃 Ropa Deportiva' },
     { value: 'Formal', label: '🤵 Ropa Formal' },
-    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
   ],
   PROCESO: [
     { value: 'Jeans en Proceso', label: '👖 Jeans en Proceso' },
@@ -63,6 +62,18 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Camisas Plus Size', label: '👕 Camisas Plus Size' },
     { value: 'Bermudas Plus Size', label: '🩳 Bermudas Plus Size' },
   ],
+  MERCHAN_DESIGN: [
+    { value: 'Gorras', label: '🧢 Gorras y Viseras' },
+    { value: 'Tazas y Vasos', label: '☕ Tazas, Vasos y Tomatodos' },
+    { value: 'Llaveros y Pines', label: '🔑 Llaveros, Pines y Chapas' },
+    { value: 'Bolsos y Mochilas', label: '🎒 Bolsos, Mochilas y Tote Bags' },
+    { value: 'Polos Publicitarios', label: '👕 Polos y Camisetas Promocionales' },
+    { value: 'Casacas y Chalecos', label: '🧥 Casacas y Chalecos Publicitarios' },
+    { value: 'Papelería y Oficina', label: '📓 Cuadernos, Agendas y Lapiceros' },
+    { value: 'Stickers y Banners', label: '🏷️ Stickers, Banners y Letreros' },
+    { value: 'Artículos Publicitarios', label: '🎁 Artículos Publicitarios y Regalos' },
+    { value: 'Otros Merchan', label: '📦 Otros Merchan Design' },
+  ],
   MAQUINARIA: [
     { value: 'Accesorios de Costura', label: '⚙️ Accesorios de Costura / Guiadores' },
     { value: 'Máquinas de Coser', label: '🧵 Máquinas de Coser (Recta, Remalle, Recubridora)' },
@@ -83,7 +94,6 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Otros Materiales', label: '🧱 Otros Materiales de Producción' },
   ],
   AVIOS: [
-    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
     { value: 'Correas', label: '👔 Correas' },
     { value: 'Botones y Broches', label: '🔘 Botones, Broches y Remaches' },
     { value: 'Remaches y Placas', label: '🏷️ Remaches Metálicos y Placas' },
@@ -97,7 +107,6 @@ export const CATEGORIES_BY_INVENTORY_TYPE: Record<string, Array<{ value: string;
     { value: 'Otros Avíos', label: '🧷 Otros Avíos de Confección' },
   ],
   OTROS: [
-    { value: 'Merchan Design', label: '🎁 Merchan Design (Artículos Promocionales)' },
     { value: 'Limpieza y Mantenimiento', label: '🧹 Limpieza y Mantenimiento' },
     { value: 'Útiles de Oficina', label: '📎 Útiles de Oficina y Papelería' },
     { value: 'Embalaje y Despacho', label: '📦 Embalaje y Despacho' },
@@ -273,7 +282,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         });
         dataToReset.opVariants = opVariants;
       }
-      if (['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(dataToReset.inventoryType)) {
+      if (['MATERIALES', 'MAQUINARIA', 'AVIOS', 'MERCHAN_DESIGN', 'OTROS'].includes(dataToReset.inventoryType)) {
         if (!dataToReset.sizes || dataToReset.sizes.length === 0) {
           const varSize = initialData.variants?.[0]?.size;
           dataToReset.sizes = varSize ? [varSize] : ['ESTÁNDAR'];
@@ -290,7 +299,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const watchCategory = watch('category') || '';
   const isCorreas = watchCategory.toLowerCase().includes('correa');
 
-  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(watchInventoryType);
+  const isMaterialOrMachinery = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'MERCHAN_DESIGN', 'OTROS'].includes(watchInventoryType);
   const hasSizeAndColorVariants = !isMaterialOrMachinery || isCorreas;
   const showMaterialOptionalColors = isMaterialOrMachinery && !isCorreas;
 
@@ -313,7 +322,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   const showPrices = isMaterialOrMachinery || !!watchOp || !!watch('purchaseItemId');
 
   const avioSkuPreview = React.useMemo(() => {
-    if (watchInventoryType !== 'AVIOS') return null;
+    if (!['AVIOS', 'MERCHAN_DESIGN'].includes(watchInventoryType)) return null;
     const desc = getAvioPrefix(watchName, watchCategory);
     let corr = '0010';
     if (watchCorrelative && watchCorrelative.trim()) {
@@ -531,7 +540,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
   const handleFormSubmit = (data: ProductFormData) => {
     const isCorreas = (data.category || '').toLowerCase().includes('correa');
-    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'OTROS'].includes(data.inventoryType) && !isCorreas;
+    const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'MERCHAN_DESIGN', 'OTROS'].includes(data.inventoryType) && !isCorreas;
     if (isMat) {
       const userSize = (data.sizes && data.sizes[0] && data.sizes[0].trim()) ? data.sizes[0].trim().toUpperCase() : 'ESTÁNDAR';
       data.sizes = [userSize];
@@ -542,7 +551,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       if (validColors.length === 0) {
         data.colors = ['ÚNICO'];
-        const avioSku = data.inventoryType === 'AVIOS' 
+        const avioSku = ['AVIOS', 'MERCHAN_DESIGN'].includes(data.inventoryType)
           ? generateAvioSKU({
               name: data.name,
               category: data.category,
@@ -553,7 +562,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               existingSku: initialData?.sku
             })
           : (data.sku || undefined);
-        if (data.inventoryType === 'AVIOS') {
+        if (['AVIOS', 'MERCHAN_DESIGN'].includes(data.inventoryType)) {
           data.sku = avioSku;
         }
         data.variants = [{
@@ -567,7 +576,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       } else {
         data.colors = validColors;
         const existingVariants = data.variants || [];
-        const baseAvioSku = data.inventoryType === 'AVIOS'
+        const baseAvioSku = ['AVIOS', 'MERCHAN_DESIGN'].includes(data.inventoryType)
           ? generateAvioSKU({
               name: data.name,
               category: data.category,
@@ -578,7 +587,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               existingSku: initialData?.sku
             })
           : (data.sku || undefined);
-        if (data.inventoryType === 'AVIOS') {
+        if (['AVIOS', 'MERCHAN_DESIGN'].includes(data.inventoryType)) {
           data.sku = baseAvioSku;
         }
         data.variants = validColors.map(color => {
@@ -590,7 +599,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             stock: existing?.stock !== undefined ? existing.stock : (existing?.initialStock || 0),
             initialStock: existing?.initialStock || 0,
             location: data.location || undefined,
-            variantSku: data.inventoryType === 'AVIOS'
+            variantSku: ['AVIOS', 'MERCHAN_DESIGN'].includes(data.inventoryType)
               ? generateAvioSKU({
                   name: data.name,
                   category: data.category,
