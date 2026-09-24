@@ -80,6 +80,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           name: product.name,
           category: product.category,
           sku: product.sku,
+          location: product.location || '',
+          weight: product.weight !== undefined && product.weight !== null ? product.weight : undefined,
+          correlative: (product.sku ? (product.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || product.sku.replace(/\D/g, '').slice(0, 4) || '') : ''),
           op: product.op || '',
           unit: product.unit || 'UND',
           entalle: product.entalle || '',
@@ -97,7 +100,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             size: v.size,
             color: v.color,
             initialStock: v.stock,
-            variantSku: v.variantSku
+            variantSku: v.variantSku,
+            location: v.location || product.location || ''
           }))
         }}
         isLoading={isUpdating}

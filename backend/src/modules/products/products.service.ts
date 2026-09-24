@@ -229,7 +229,7 @@ export class ProductsService {
   async update(userId: string, id: string, updateProductDto: UpdateProductDto) {
     const product = await this.findOne(id);
 
-    const { variants, ...productData } = updateProductDto;
+    const { variants, correlative, ...productData } = updateProductDto;
 
     // Actualizar datos del producto
     const updatedProduct = await this.prisma.product.update({
@@ -277,7 +277,7 @@ export class ProductsService {
                 size: variant.size,
                 color: variant.color,
                 location: variant.location || updatedProduct.location || 'A1',
-                correlative: (productData as any).correlative,
+                correlative: correlative,
                 existingSku: productData.sku,
               })
             : generateVariantSKU(
@@ -287,17 +287,20 @@ export class ProductsService {
               ));
         await this.prisma.productVariant.update({
           where: { id: variant.id },
-          data: { variantSku },
+          data: { 
+            variantSku,
+            location: variant.location || productData.location || undefined
+          },
         });
       }
-    } else if (isAvioOrMerchan && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined || (productData as any).correlative !== undefined)) {
+    } else if (isAvioOrMerchan && (productData.location !== undefined || productData.name !== undefined || productData.category !== undefined || correlative !== undefined)) {
       const newBaseSku = generateAvioSKU({
         name: updatedProduct.name,
         category: updatedProduct.category,
         size: updatedProduct.sizes?.[0] || 'ESTÁNDAR',
         color: updatedProduct.colors?.[0] || 'ÚNICO',
         location: updatedProduct.location || 'A1',
-        correlative: (productData as any).correlative,
+        correlative: correlative,
         existingSku: product.sku,
       });
 
@@ -313,7 +316,7 @@ export class ProductsService {
           size: variant.size,
           color: variant.color,
           location: variant.location || updatedProduct.location || 'A1',
-          correlative: (productData as any).correlative,
+          correlative: correlative,
           existingSku: variant.variantSku || product.sku,
         });
         await this.prisma.productVariant.update({
@@ -341,6 +344,7 @@ export class ProductsService {
               color: variant.color,
               stock: stockValue !== undefined ? stockValue : undefined,
               variantSku: variant.variantSku || undefined,
+              location: variant.location || productData.location || undefined,
             },
           });
           variantIdsToKeep.push(variant.id);

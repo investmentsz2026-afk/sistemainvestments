@@ -252,8 +252,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       realPrice: 0,
       minStock: 5,
       weight: undefined,
-      location: '',
-      correlative: initialData?.correlative || (initialData?.sku ? (initialData.sku.match(/^[A-Za-z]{2}(\d{4})/)?.[1] || '') : ''),
+      location: initialData?.location || '',
+      correlative: initialData?.correlative || (initialData?.sku ? (initialData.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || initialData.sku.replace(/\D/g, '').slice(0, 4) || '') : ''),
       sizes: [],
       colors: [],
       inventoryType: 'TERMINADOS',
@@ -266,9 +266,17 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   React.useEffect(() => {
     if (initialData) {
       const dataToReset = { ...initialData };
+      if (!dataToReset.location && initialData.location) {
+        dataToReset.location = initialData.location;
+      }
       if (!dataToReset.correlative && initialData.sku) {
-        const match = initialData.sku.match(/^[A-Za-z]{2}(\d{4})/);
-        if (match) dataToReset.correlative = match[1];
+        const match = initialData.sku.match(/^[A-Za-z]+(\d{4})/);
+        if (match) {
+          dataToReset.correlative = match[1];
+        } else {
+          const digits = initialData.sku.replace(/\D/g, '');
+          if (digits.length >= 4) dataToReset.correlative = digits.slice(0, 4);
+        }
       }
       if (initialData.variants && initialData.variants.length > 0 && initialData.op) {
         const opVariants: Record<string, string[]> = {};

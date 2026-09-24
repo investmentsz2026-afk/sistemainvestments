@@ -438,6 +438,26 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <dt className="font-bold">Orden de Producción (OP)</dt>
               <dd className="font-black uppercase">{product.op || '--'}</dd>
             </div>
+            {product.location && (
+              <div className="flex justify-between text-emerald-700">
+                <dt className="font-bold">Ubicación en Almacén</dt>
+                <dd className="font-black uppercase">{product.location}</dd>
+              </div>
+            )}
+            {['AVIOS', 'MERCHAN_DESIGN'].includes(product.inventoryType) && (
+              <div className="flex justify-between text-blue-700">
+                <dt className="font-bold">Correlativo de Avío</dt>
+                <dd className="font-black font-mono">
+                  {product.sku ? (product.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || product.sku.replace(/\D/g, '').slice(0, 4) || '--') : '--'}
+                </dd>
+              </div>
+            )}
+            {product.weight !== null && product.weight !== undefined && (
+              <div className="flex justify-between">
+                <dt className="text-gray-600">Peso referencial</dt>
+                <dd className="font-medium text-gray-900">{product.weight} kg</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-gray-600">Stock mínimo</dt>
               <dd className="font-medium text-gray-900">{product.minStock} unidades</dd>
