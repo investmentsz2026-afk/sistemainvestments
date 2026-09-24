@@ -137,10 +137,19 @@ export default function SuppliersPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        const payload = {
+            ...formData,
+            email: formData.email?.trim() || null,
+            phone: formData.phone?.trim() || null,
+            contactName: formData.contactName?.trim() || null,
+            address: formData.address?.trim() || null,
+            notes: formData.notes?.trim() || null,
+        };
+
         try {
             const response = editingId
-                ? await api.patch(`/suppliers/${editingId}`, formData)
-                : await api.post('/suppliers', formData);
+                ? await api.patch(`/suppliers/${editingId}`, payload)
+                : await api.post('/suppliers', payload);
 
             if (response.data.success) {
                 showToast(editingId ? 'Proveedor actualizado' : 'Proveedor registrado', 'success');
@@ -397,19 +406,23 @@ export default function SuppliersPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">Correo Electrónico</label>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Correo Electrónico <span className="text-gray-400 font-normal text-xs">(Opcional)</span>
+                                        </label>
                                         <div className="relative">
                                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                             <input type="email" className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                                placeholder="correo@empresa.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                                                placeholder="correo@empresa.com (opcional)" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">Teléfono / Celular</label>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Teléfono / Celular <span className="text-gray-400 font-normal text-xs">(Opcional)</span>
+                                        </label>
                                         <div className="relative">
                                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                             <input type="text" className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                                placeholder="+51 987 654 321" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                                                placeholder="+51 987 654 321 (opcional)" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                                         </div>
                                     </div>
                                 </div>

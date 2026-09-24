@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsBoolean, ValidateIf } from 'class-validator';
 
 export class CreateSupplierDto {
     @IsString()
@@ -15,7 +15,8 @@ export class CreateSupplierDto {
     contactName?: string;
 
     @IsOptional()
-    @IsEmail()
+    @ValidateIf((o) => o.email !== '' && o.email !== null && o.email !== undefined)
+    @IsEmail({}, { message: 'El correo electrónico no es válido' })
     email?: string;
 
     @IsOptional()

@@ -16,8 +16,14 @@ export class SuppliersService {
             throw new BadRequestException('El proveedor con este documento ya existe.');
         }
 
+        const data = {
+            ...createSupplierDto,
+            email: createSupplierDto.email?.trim() || null,
+            phone: createSupplierDto.phone?.trim() || null,
+        };
+
         return this.prisma.supplier.create({
-            data: createSupplierDto,
+            data,
         });
     }
 
@@ -46,9 +52,19 @@ export class SuppliersService {
             if (conflict) throw new BadRequestException('Otro proveedor ya usa este documento.');
         }
 
+        const data: any = {
+            ...updateSupplierDto,
+        };
+        if (updateSupplierDto.email !== undefined) {
+            data.email = updateSupplierDto.email?.trim() || null;
+        }
+        if (updateSupplierDto.phone !== undefined) {
+            data.phone = updateSupplierDto.phone?.trim() || null;
+        }
+
         return this.prisma.supplier.update({
             where: { id },
-            data: updateSupplierDto,
+            data,
         });
     }
 
