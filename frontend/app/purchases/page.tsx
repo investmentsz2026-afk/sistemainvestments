@@ -46,7 +46,60 @@ const CATEGORIES = [
     { id: 'Servicio', label: 'Servicio / Mano de Obra', icon: Wrench, color: 'bg-indigo-100 text-indigo-700', unitHint: 'Servicio' },
 ];
 
-const emptyItem = { name: '', description: '', category: 'Materiales', unit: 'Metros', quantity: 1, price: 0 };
+function parsePrice(val: any): number {
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (!val || typeof val !== 'string') return 0;
+    const str = val.trim();
+    if (!str) return 0;
+    const clean = str.replace(/[^0-9.,]/g, '');
+    if (!clean) return 0;
+
+    const hasComma = clean.includes(',');
+    const hasDot = clean.includes('.');
+
+    if (hasComma && hasDot) {
+        const lastComma = clean.lastIndexOf(',');
+        const lastDot = clean.lastIndexOf('.');
+        if (lastDot > lastComma) {
+            const parsed = parseFloat(clean.replace(/,/g, ''));
+            return isNaN(parsed) ? 0 : parsed;
+        } else {
+            const parsed = parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+            return isNaN(parsed) ? 0 : parsed;
+        }
+    }
+
+    if (hasComma) {
+        const parts = clean.split(',');
+        if (parts.length > 2) {
+            const decimals = parts.pop() || '';
+            const integers = parts.join('');
+            const parsed = parseFloat(decimals ? `${integers}.${decimals}` : integers);
+            return isNaN(parsed) ? 0 : parsed;
+        } else if (parts.length === 2) {
+            const parsed = parseFloat(clean.replace(',', '.'));
+            return isNaN(parsed) ? 0 : parsed;
+        }
+    }
+
+    if (hasDot) {
+        const parts = clean.split('.');
+        if (parts.length > 2) {
+            const decimals = parts.pop() || '';
+            const integers = parts.join('');
+            const parsed = parseFloat(decimals ? `${integers}.${decimals}` : integers);
+            return isNaN(parsed) ? 0 : parsed;
+        } else if (parts.length === 2) {
+            const parsed = parseFloat(clean);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+    }
+
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+const emptyItem = { name: '', description: '', category: 'Materiales', unit: 'Metros', quantity: 1, price: '' };
 const ITEMS_PER_PAGE = 10;
 
 export default function PurchasesPage() {
@@ -158,8 +211,15 @@ export default function PurchasesPage() {
         e.preventDefault();
         if (formData.items.length === 0 || !formData.items[0].name) return showToast('Completa al menos un ítem', 'error');
 
+        const sanitizedItems = formData.items.map(it => ({
+            ...it,
+            quantity: parseFloat(it.quantity) || 0,
+            price: parsePrice(it.price)
+        }));
+
         const payload = {
             ...formData,
+            items: sanitizedItems,
             type: moduleType
         };
 
@@ -583,8 +643,8 @@ export default function PurchasesPage() {
                                                             </td>
                                                             <td className="px-4 py-3">{getCategoryBadge(item.category)}</td>
                                                             <td className="px-4 py-3 text-right font-bold text-gray-900">{item.quantity} <span className="text-xs text-gray-400">{item.unit}</span></td>
-                                                            <td className="px-4 py-3 text-right text-gray-700">S/ {item.price.toFixed(2)}</td>
-                                                            <td className="px-4 py-3 text-right font-bold text-gray-900">S/ {(item.quantity * item.price).toFixed(2)}</td>
+                                                            <td className="px-4 py-3 text-right text-gray-700">S/ {typeof item.price === 'number' && item.price % 1 !== 0 && item.price.toString().split('.')[1]?.length > 2 ? item.price : Number(item.price || 0).toFixed(2)}</td>
+                                                            <td className="px-4 py-3 text-right font-bold text-gray-900">S/ {((item.quantity || 0) * (item.price || 0)).toFixed(2)}</td>
                                                         </tr>
                                                         {item.qualityControl && (
                                                             <tr className="bg-gray-50/30">
@@ -750,15 +810,20 @@ export default function PurchasesPage() {
                                                 <div className="col-span-4 sm:col-span-2">
                                                     <label className="text-[10px] uppercase font-black text-gray-400 mb-1 block">Costo Unit.</label>
                                                     <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">S/ </span>
-                                                        <input required type="number" step="0.01" min="0"
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold pointer-events-none">S/ </span>
+                                                        <input required type="text" inputMode="decimal" placeholder="0.00"
                                                             className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-sm"
-                                                            value={item.price} onChange={e => updateItem(idx, 'price', parseFloat(e.target.value) || 0)} />
+                                                            value={item.price ?? ''}
+                                                            onChange={e => {
+                                                                const raw = e.target.value;
+                                                                const val = raw.replace(/[^0-9.,]/g, '');
+                                                                updateItem(idx, 'price', val);
+                                                            }} />
                                                     </div>
                                                 </div>
                                                 <div className="col-span-12 sm:col-span-1 flex flex-col justify-end items-end pb-1">
                                                     <p className="text-[10px] text-gray-400 font-bold">Subtotal</p>
-                                                    <p className="font-bold text-gray-900 text-sm">S/ {(item.price * item.quantity).toFixed(2)}</p>
+                                                    <p className="font-bold text-gray-900 text-sm">S/ {(parsePrice(item.price) * (parseFloat(item.quantity) || 0)).toFixed(2)}</p>
                                                 </div>
                                             </div>
                                             <div className="mt-2">
@@ -772,7 +837,7 @@ export default function PurchasesPage() {
                                 <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
                                     <div className="bg-gray-50 px-6 py-4 rounded-2xl border border-gray-100 text-center md:text-left">
                                         <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total de la Factura / Honorarios</p>
-                                        <p className="text-3xl font-black text-gray-900">S/ {formData.items.reduce((sum, i) => sum + (i.price * i.quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                        <p className="text-3xl font-black text-gray-900">S/ {formData.items.reduce((sum, i) => sum + (parsePrice(i.price) * (parseFloat(i.quantity) || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                     </div>
                                     <button type="submit"
                                         className={`w-full md:w-auto px-14 py-4 text-white rounded-2xl font-black shadow-xl transition active:scale-95 flex items-center justify-center gap-3 ${moduleType === 'PURCHASE' ? 'bg-emerald-600 shadow-emerald-500/40 hover:bg-emerald-700' : 'bg-indigo-600 shadow-indigo-500/40 hover:bg-indigo-700'}`}>
