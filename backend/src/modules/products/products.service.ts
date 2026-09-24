@@ -24,7 +24,7 @@ export class ProductsService {
     // Generar SKU principal del producto si no se proporciona uno manual
     let sku = createProductDto.sku;
     if (!sku) {
-      if (createProductDto.inventoryType === 'AVIOS' || createProductDto.inventoryType === 'MERCHAN_DESIGN') {
+      if (createProductDto.inventoryType === 'AVIOS' || createProductDto.inventoryType === 'MERCHAN_DESIGN' || createProductDto.inventoryType === 'MATERIALES') {
         sku = generateAvioSKU({
           name: createProductDto.name,
           category: createProductDto.category,
@@ -131,7 +131,7 @@ export class ProductsService {
     // Generar SKU único para la variante si no se proporciona uno manual
     let variantSku = createVariantDto.variantSku;
     if (!variantSku) {
-      if (product.inventoryType === 'AVIOS') {
+      if (product.inventoryType === 'AVIOS' || product.inventoryType === 'MERCHAN_DESIGN' || product.inventoryType === 'MATERIALES') {
         variantSku = generateAvioSKU({
           name: product.name,
           category: product.category,
@@ -262,7 +262,7 @@ export class ProductsService {
       });
     }
 
-    const isAvioOrMerchan = updatedProduct.inventoryType === 'AVIOS' || updatedProduct.inventoryType === 'MERCHAN_DESIGN';
+    const isAvioOrMerchan = updatedProduct.inventoryType === 'AVIOS' || updatedProduct.inventoryType === 'MERCHAN_DESIGN' || updatedProduct.inventoryType === 'MATERIALES';
 
     // Si el SKU cambió, actualizar todos los variantSku de sus variantes
     if (productData.sku && productData.sku !== product.sku) {

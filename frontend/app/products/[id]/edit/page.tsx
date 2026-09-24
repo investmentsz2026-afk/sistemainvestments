@@ -82,7 +82,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           sku: product.sku,
           location: product.location || '',
           weight: product.weight !== undefined && product.weight !== null ? product.weight : undefined,
-          correlative: (product.sku ? (product.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || product.sku.replace(/\D/g, '').slice(0, 4) || '') : ''),
+          correlative: (product.sku ? (product.sku.match(/^[A-Za-z]{2}(\d{4})/)?.[1] || (product.sku.replace(/\D/g, '').length >= 4 ? product.sku.replace(/\D/g, '').slice(-4) : product.sku.replace(/\D/g, '').padStart(4, '0') || '') || '') : ''),
           op: product.op || '',
           unit: product.unit || 'UND',
           entalle: product.entalle || '',

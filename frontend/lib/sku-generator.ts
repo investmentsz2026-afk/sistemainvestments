@@ -73,6 +73,54 @@ export const AVIO_PREFIXES: Record<string, string> = {
   CHALECOS: 'CH',
   REGALO: 'RG',
   REGALOS: 'RG',
+  // Materiales y Telas
+  TELA: 'TL',
+  TELAS: 'TL',
+  DENIM: 'DN',
+  DRILL: 'DR',
+  ALGODON: 'AL',
+  PIMA: 'PM',
+  LINO: 'LN',
+  POPELINA: 'PP',
+  FRANELA: 'FN',
+  CHALIS: 'CH',
+  RIB: 'RB',
+  TERRY: 'TR',
+  FRENCH: 'FT',
+  POLIESTER: 'PE',
+  VISCOSA: 'VS',
+  SEDA: 'SD',
+  GABARDINA: 'GB',
+  NYLON: 'NY',
+  TASLAN: 'TS',
+  POLAR: 'PO',
+  SPANDEX: 'SP',
+  LYCRA: 'LY',
+  ROLLO: 'RL',
+  ROLLOS: 'RL',
+  STIKER: 'SK',
+  STIKERS: 'SK',
+  HILAZA: 'HZ',
+  HILAZAS: 'HZ',
+  CONO: 'CN',
+  CONOS: 'CN',
+  PELLON: 'PL',
+  QUIMICO: 'QM',
+  QUIMICOS: 'QM',
+  TINTE: 'TT',
+  TINTES: 'TT',
+  LAVANDERIA: 'LV',
+  SUAVIZANTE: 'SV',
+  SILICONA: 'SL',
+  CAJA: 'CJ',
+  CAJAS: 'CJ',
+  PLASTICO: 'PT',
+  PLASTICOS: 'PT',
+  FILM: 'FL',
+  INSUMO: 'IN',
+  INSUMOS: 'IN',
+  MATERIAL: 'MT',
+  MATERIALES: 'MT',
 };
 
 export const COLOR_ABBR: Record<string, string> = {
@@ -131,7 +179,7 @@ export function getAvioPrefix(name: string = '', category: string = ''): string 
   const catLetters = cleanCat.replace(/[^A-Z]/g, '');
   if (catLetters.length >= 2) return catLetters.substring(0, 2);
 
-  return 'AV';
+  return 'MT';
 }
 
 export function getAvioColorCode(color: string = ''): string {
@@ -168,12 +216,12 @@ export function generateAvioSKU(params: {
     const digits = String(params.correlative).replace(/\D/g, '');
     corrStr = digits.padStart(4, '0').slice(-4) || '0010';
   } else if (params.existingSku) {
-    const match = params.existingSku.match(/^[A-Za-z]{2}(\d{4})/);
-    if (match) {
-      corrStr = match[1];
+    const avioMatch = params.existingSku.match(/^[A-Za-z]{2}(\d{4})/);
+    if (avioMatch) {
+      corrStr = avioMatch[1];
     } else {
       const digits = params.existingSku.replace(/\D/g, '');
-      corrStr = digits.length >= 4 ? digits.slice(0, 4) : '0010';
+      corrStr = digits.length >= 4 ? digits.slice(-4) : digits.padStart(4, '0') || '0010';
     }
   } else {
     corrStr = '0010';

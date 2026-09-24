@@ -475,7 +475,7 @@ export default function InventoryPage() {
         const match = sku.match(/^[A-Za-z]{2}(\d{4})/);
         if (match) return match[1];
         const digits = sku.replace(/\D/g, '');
-        if (digits.length >= 4) return digits.slice(0, 4);
+        if (digits.length >= 4) return digits.slice(-4);
       }
       return '';
     };

@@ -444,11 +444,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <dd className="font-black uppercase">{product.location}</dd>
               </div>
             )}
-            {['AVIOS', 'MERCHAN_DESIGN'].includes(product.inventoryType) && (
+            {['AVIOS', 'MERCHAN_DESIGN', 'MATERIALES'].includes(product.inventoryType) && (
               <div className="flex justify-between text-blue-700">
-                <dt className="font-bold">Correlativo de Avío</dt>
+                <dt className="font-bold">Correlativo de {product.inventoryType === 'MATERIALES' ? 'Material' : 'Avío'}</dt>
                 <dd className="font-black font-mono">
-                  {product.sku ? (product.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || product.sku.replace(/\D/g, '').slice(0, 4) || '--') : '--'}
+                  {product.sku ? (product.sku.match(/^[A-Za-z]{2}(\d{4})/)?.[1] || (product.sku.replace(/\D/g, '').length >= 4 ? product.sku.replace(/\D/g, '').slice(-4) : product.sku.replace(/\D/g, '').padStart(4, '0') || '--')) : '--'}
                 </dd>
               </div>
             )}
