@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import SaleDetailsModal from '../../components/sales/SaleDetailsModal';
 import SalePaymentsModal from '../../components/sales/SalePaymentsModal';
+import ClientAccountStatementModal from '../../components/sales/ClientAccountStatementModal';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -52,6 +53,8 @@ export default function SalesPage() {
     const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+    const [isAccountStatementOpen, setIsAccountStatementOpen] = useState(false);
+    const [accountStatementClientId, setAccountStatementClientId] = useState<string | null>(null);
 
     const openDetails = (id: string) => {
         setSelectedSaleId(id);
@@ -61,6 +64,11 @@ export default function SalesPage() {
     const openPayments = (id: string) => {
         setSelectedSaleId(id);
         setIsPaymentsModalOpen(true);
+    };
+
+    const openAccountStatement = (clientId?: string) => {
+        setAccountStatementClientId(clientId || null);
+        setIsAccountStatementOpen(true);
     };
 
     useEffect(() => {
@@ -288,7 +296,16 @@ export default function SalesPage() {
                         <p className="text-gray-500 font-medium text-lg mt-1">Historial de transacciones y facturación.</p>
                     </div>
                     {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || user?.role === 'VENDEDOR_LIMA' || user?.role === 'VENDEDOR_ORIENTE') && (
-                        <div className="flex gap-4">
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                            {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                                <button 
+                                    onClick={() => openAccountStatement()}
+                                    className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 rounded-2xl font-bold shadow-xl shadow-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition active:scale-95"
+                                    title="Consultar y descargar estado de cuenta de clientes"
+                                >
+                                    <FileSpreadsheet className="w-5 h-5" /> Estado de Cuenta
+                                </button>
+                            )}
                             <button 
                                 onClick={async () => {
                                     try {
@@ -538,7 +555,21 @@ export default function SalesPage() {
                                                     <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center font-black text-gray-400 text-[10px]">
                                                         {sale.client?.name?.charAt(0) || 'C'}
                                                     </div>
-                                                    <span className="font-bold text-gray-900 text-xs">{sale.client?.name || 'Cliente Varios'}</span>
+                                                    {(user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && sale.client?.id ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openAccountStatement(sale.client.id);
+                                                            }}
+                                                            className="font-bold text-gray-900 text-xs hover:text-emerald-700 hover:underline text-left transition"
+                                                            title="Ver estado de cuenta de este cliente"
+                                                        >
+                                                            {sale.client?.name || 'Cliente Varios'}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="font-bold text-gray-900 text-xs">{sale.client?.name || 'Cliente Varios'}</span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4">
@@ -660,6 +691,16 @@ export default function SalesPage() {
                     onUpdate={fetchSales}
                 />
             )}
+
+            <ClientAccountStatementModal
+                isOpen={isAccountStatementOpen}
+                onClose={() => {
+                    setIsAccountStatementOpen(false);
+                    setAccountStatementClientId(null);
+                }}
+                initialClientId={accountStatementClientId}
+                sales={sales}
+            />
         </Layout>
     );
 }
