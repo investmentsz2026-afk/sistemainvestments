@@ -7,28 +7,20 @@ import {
     Search,
     User,
     Download,
-    Share2,
     Printer,
     FileSpreadsheet,
-    FileText,
     CheckCircle2,
     AlertCircle,
-    Clock,
     ShoppingBag,
     DollarSign,
     Phone,
     MapPin,
-    Mail,
-    ChevronDown,
-    ChevronUp,
     Copy,
     Check,
-    CreditCard,
-    ArrowUpRight,
-    Building2,
-    Calendar,
     Receipt,
-    RefreshCw
+    RefreshCw,
+    Calendar,
+    Filter
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { toast } from 'react-hot-toast';
@@ -66,8 +58,11 @@ export default function ClientAccountStatementModal({
     const [isLoadingSales, setIsLoadingSales] = useState(false);
     const [isExportingImage, setIsExportingImage] = useState(false);
     const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
-    const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+
+    // Period filter state: Semester / Annual / All
+    const currentYear = new Date().getFullYear();
+    const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+    const [periodType, setPeriodType] = useState<'1S' | '2S' | 'ANUAL' | 'TODOS'>('ANUAL');
 
     const statementCardRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +71,6 @@ export default function ClientAccountStatementModal({
         if (isOpen) {
             fetchClients();
         } else {
-            // Reset when closing
             setClientSearch('');
             if (!initialClientId) {
                 setSelectedClient(null);
@@ -102,7 +96,6 @@ export default function ClientAccountStatementModal({
             setClients(resp.data || []);
         } catch (error) {
             console.error('Error fetching clients for account statement:', error);
-            // Fallback: extract unique clients from preloaded sales if available
             if (preloadedSales && preloadedSales.length > 0) {
                 const uniqueClientsMap = new Map();
                 preloadedSales.forEach(s => {
@@ -123,10 +116,21 @@ export default function ClientAccountStatementModal({
         setIsLoadingSales(true);
         try {
             const resp = await api.get('/sales', { params: { clientId: client.id } });
-            setClientSales(resp.data || []);
+            const salesData = resp.data || [];
+            setClientSales(salesData);
+
+            // Auto-select latest year with sales if available
+            if (salesData.length > 0) {
+                const years = salesData
+                    .map((s: any) => new Date(s.createdAt).getFullYear())
+                    .filter((y: number) => !isNaN(y));
+                if (years.length > 0) {
+                    const latest = Math.max(...years);
+                    setSelectedYear(latest);
+                }
+            }
         } catch (error) {
             console.error('Error fetching sales for client:', error);
-            // Fallback to preloaded sales
             if (preloadedSales) {
                 const filtered = preloadedSales.filter(s => s.clientId === client.id || s.client?.id === client.id);
                 setClientSales(filtered);
@@ -150,23 +154,54 @@ export default function ClientAccountStatementModal({
         ).slice(0, 20);
     }, [clients, clientSearch]);
 
-    // Financial Metrics for Selected Client
-    const metrics = useMemo(() => {
-        if (!selectedClient) {
-            return {
-                totalCount: 0,
-                activeCount: 0,
-                cancelledCount: 0,
-                totalAmount: 0,
-                totalPaid: 0,
-                totalBalance: 0,
-                paidCount: 0,
-                pendingCount: 0
-            };
-        }
+    // Available years from sales
+    const availableYears = useMemo(() => {
+        const yearsSet = new Set<number>();
+        yearsSet.add(currentYear);
+        clientSales.forEach(s => {
+            if (s.createdAt) {
+                const y = new Date(s.createdAt).getFullYear();
+                if (!isNaN(y)) yearsSet.add(y);
+            }
+        });
+        return Array.from(yearsSet).sort((a, b) => b - a);
+    }, [clientSales, currentYear]);
 
-        const activeSales = clientSales.filter(s => s.status !== 'ANULADO');
-        const cancelledSales = clientSales.filter(s => s.status === 'ANULADO');
+    // Period sales filtered by selected Year and Period (1S, 2S, ANUAL, TODOS)
+    const periodSales = useMemo(() => {
+        return clientSales.filter(sale => {
+            if (!sale.createdAt) return false;
+            const d = new Date(sale.createdAt);
+            const y = d.getFullYear();
+            const m = d.getMonth(); // 0: Jan, 5: Jun, 6: Jul, 11: Dec
+
+            if (periodType === 'TODOS') return true;
+            if (y !== selectedYear) return false;
+
+            if (periodType === '1S') {
+                return m >= 0 && m <= 5; // 1er Semestre: Ene - Jun
+            }
+            if (periodType === '2S') {
+                return m >= 6 && m <= 11; // 2do Semestre: Jul - Dic
+            }
+            if (periodType === 'ANUAL') {
+                return true; // Todo el año seleccionado
+            }
+            return true;
+        });
+    }, [clientSales, selectedYear, periodType]);
+
+    // Text label for the active period
+    const periodLabel = useMemo(() => {
+        if (periodType === '1S') return `1er Semestre ${selectedYear} (Ene - Jun)`;
+        if (periodType === '2S') return `2do Semestre ${selectedYear} (Jul - Dic)`;
+        if (periodType === 'ANUAL') return `Año ${selectedYear}`;
+        return 'Histórico Completo';
+    }, [periodType, selectedYear]);
+
+    // Metrics for the filtered period
+    const metrics = useMemo(() => {
+        const activeSales = periodSales.filter(s => s.status !== 'ANULADO');
 
         let totalAmount = 0;
         let totalPaid = 0;
@@ -192,31 +227,14 @@ export default function ClientAccountStatementModal({
         const totalBalance = Math.max(0, totalAmount - totalPaid);
 
         return {
-            totalCount: clientSales.length,
             activeCount: activeSales.length,
-            cancelledCount: cancelledSales.length,
             totalAmount,
             totalPaid,
             totalBalance,
             paidCount,
             pendingCount
         };
-    }, [selectedClient, clientSales]);
-
-    // Filtered sales according to active tab
-    const displaySales = useMemo(() => {
-        return clientSales.filter(sale => {
-            if (sale.status === 'ANULADO') return statusFilter === 'ALL';
-            const paid = (sale.payments || [])
-                .filter((p: any) => p.status === 'APROBADO')
-                .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-            const isFullyPaid = paid >= (Number(sale.totalAmount) || 0) - 0.01;
-
-            if (statusFilter === 'PAID') return isFullyPaid;
-            if (statusFilter === 'PENDING') return !isFullyPaid;
-            return true;
-        });
-    }, [clientSales, statusFilter]);
+    }, [periodSales]);
 
     // Download Statement as PNG Image using html2canvas
     const handleDownloadImage = async () => {
@@ -226,15 +244,14 @@ export default function ClientAccountStatementModal({
         }
 
         setIsExportingImage(true);
-        const loadingToast = toast.loading('Generando imagen en alta resolución...');
+        const loadingToast = toast.loading('Generando imagen compacta en alta resolución...');
 
         try {
             const html2canvas = (await import('html2canvas')).default;
             const element = statementCardRef.current;
 
-            // Render high-res image
             const canvas = await html2canvas(element, {
-                scale: 2.5, // Crisp 2.5x resolution for retina and mobile viewing
+                scale: 2.2, // High resolution for mobile
                 useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false,
@@ -246,13 +263,20 @@ export default function ClientAccountStatementModal({
             const cleanClient = selectedClient.name
                 .replace(/[^a-zA-Z0-9]/g, '_')
                 .replace(/__+/g, '_')
-                .substring(0, 25);
-            const dateStr = new Date().toISOString().split('T')[0];
-            link.download = `Estado_Cuenta_${cleanClient}_${dateStr}.png`;
+                .substring(0, 20);
+            const periodTag = periodType === '1S'
+                ? `1er_Semestre_${selectedYear}`
+                : periodType === '2S'
+                    ? `2do_Semestre_${selectedYear}`
+                    : periodType === 'ANUAL'
+                        ? `Anual_${selectedYear}`
+                        : 'Historico';
+
+            link.download = `Estado_Cuenta_${cleanClient}_${periodTag}.png`;
             link.href = imgData;
             link.click();
 
-            toast.success('¡Estado de cuenta descargado como imagen!', { id: loadingToast });
+            toast.success('¡Imagen descargada con éxito!', { id: loadingToast });
         } catch (error) {
             console.error('Error al generar imagen de estado de cuenta:', error);
             toast.error('No se pudo generar la imagen', { id: loadingToast });
@@ -265,7 +289,7 @@ export default function ClientAccountStatementModal({
     const handleCopyWhatsApp = () => {
         if (!selectedClient) return;
 
-        const activeSales = clientSales.filter(s => s.status !== 'ANULADO');
+        const activeSales = periodSales.filter(s => s.status !== 'ANULADO');
         const emissionDate = new Date().toLocaleDateString('es-PE', {
             day: '2-digit',
             month: '2-digit',
@@ -274,34 +298,33 @@ export default function ClientAccountStatementModal({
 
         const lines = [
             `📄 *ESTADO DE CUENTA - INVESTMENTS Z&G S.A.*`,
+            `🗓️ *Periodo:* ${periodLabel}`,
             `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
             `👤 *Cliente:* ${selectedClient.name}`,
             `🆔 *${selectedClient.documentType || 'DOC'}:* ${selectedClient.documentNumber || 'S/N'}`,
-            selectedClient.phone ? `📞 *Teléfono:* ${selectedClient.phone}` : null,
-            selectedClient.address ? `📍 *Dirección:* ${selectedClient.address}` : null,
-            `📅 *Fecha de Emisión:* ${emissionDate}`,
+            selectedClient.phone ? `📞 *Tel:* ${selectedClient.phone}` : null,
+            `📅 *Emisión:* ${emissionDate}`,
             `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-            `📊 *RESUMEN DE CUENTA:*`,
-            `• Compras Realizadas: ${metrics.activeCount} comprobante(s)`,
-            `• Monto Total Facturado: S/ ${metrics.totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
-            `• Total Abonado / Pagado: S/ ${metrics.totalPaid.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+            `📊 *RESUMEN DEL PERIODO:*`,
+            `• Compras: ${metrics.activeCount} comprobante(s)`,
+            `• Total Facturado: S/ ${metrics.totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
+            `• Total Pagado: S/ ${metrics.totalPaid.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
             metrics.totalBalance > 0
-                ? `🔴 *SALDO PENDIENTE POR PAGAR: S/ ${metrics.totalBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}*`
-                : `🟢 *ESTADO: AL DÍA (TOTALMENTE CANCELADO - SIN DEUDA)*`,
+                ? `🔴 *SALDO PENDIENTE: S/ ${metrics.totalBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}*`
+                : `🟢 *ESTADO: AL DÍA (TOTALMENTE CANCELADO)*`,
             `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-            `📋 *DETALLE DE COMPROBANTES:*`,
+            `📋 *DETALLE:*`,
             ...activeSales.map((s, idx) => {
                 const paid = (s.payments || [])
                     .filter((p: any) => p.status === 'APROBADO')
                     .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
                 const bal = Math.max(0, (Number(s.totalAmount) || 0) - paid);
                 const sDate = formatDate(s.createdAt);
-                const doc = s.invoiceNumber ? `Doc: ${s.invoiceNumber}` : `Venta #${s.id.slice(-6).toUpperCase()}`;
-                const statusTag = bal <= 0.01 ? 'CANCELADO' : paid > 0 ? `PARCIAL (Debe S/ ${bal.toFixed(2)})` : 'PENDIENTE';
-                return `${idx + 1}. ${doc} (${sDate}) | Total: S/ ${s.totalAmount.toFixed(2)} | Pagado: S/ ${paid.toFixed(2)} [${statusTag}]`;
+                const doc = s.invoiceNumber ? s.invoiceNumber : `#${s.id.slice(-6).toUpperCase()}`;
+                const statusTag = bal <= 0.01 ? 'CANCELADO' : paid > 0 ? `PARCIAL (Resta S/ ${bal.toFixed(2)})` : 'PENDIENTE';
+                return `${idx + 1}. ${sDate} | ${doc} | Total: S/ ${s.totalAmount.toFixed(2)} | Pagado: S/ ${paid.toFixed(2)} | Saldo: S/ ${bal.toFixed(2)} [${statusTag}]`;
             }),
-            `\n_Cualquier consulta o coordinación de pagos, comunicarse con el área comercial de Investments Z&G._`
+            `\n_Para cualquier consulta comunicarse con el área comercial de Investments Z&G._`
         ].filter(Boolean).join('\n');
 
         navigator.clipboard.writeText(lines);
@@ -310,16 +333,11 @@ export default function ClientAccountStatementModal({
         setTimeout(() => setCopiedWhatsApp(false), 2500);
     };
 
-    // Print functionality
-    const handlePrint = () => {
-        window.print();
-    };
-
     if (!isOpen) return null;
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-gray-900/60 backdrop-blur-sm overflow-y-auto">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -332,104 +350,82 @@ export default function ClientAccountStatementModal({
                     initial={{ scale: 0.95, opacity: 0, y: 15 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     exit={{ scale: 0.95, opacity: 0, y: 15 }}
-                    className="relative w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden my-auto border border-gray-100 flex flex-col max-h-[92vh] z-10"
+                    className="relative w-full max-w-4xl bg-white rounded-[2rem] shadow-2xl overflow-hidden my-auto border border-gray-100 flex flex-col max-h-[92vh] z-10"
                 >
                     {/* MODAL TOP HEADER */}
-                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shrink-0 relative border-b border-indigo-900/50">
+                    <div className="bg-slate-900 p-5 sm:p-6 text-white shrink-0 relative border-b border-slate-800">
                         <button
                             onClick={onClose}
-                            className="absolute top-6 right-6 p-2 text-white/50 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition active:scale-95"
+                            className="absolute top-5 right-5 p-2 text-white/50 hover:text-white rounded-full bg-white/5 hover:bg-white/10 transition active:scale-95"
                             title="Cerrar modal"
                         >
-                            <X className="w-6 h-6" />
+                            <X className="w-5 h-5" />
                         </button>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pr-12">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
-                                    <FileSpreadsheet className="w-7 h-7" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md">
+                                    <FileSpreadsheet className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">
-                                            Estado de Cuenta
-                                        </h2>
-                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                                        Estado de Cuenta
+                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                             Clientes
                                         </span>
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-indigo-200/80 font-medium mt-0.5">
-                                        Historial consolidado de compras, facturas, abonos y saldos pendientes.
+                                    </h2>
+                                    <p className="text-xs text-slate-300">
+                                        Filtra por semestre o año y descarga la imagen optimizada para enviar al cliente.
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Action Buttons (when client is selected) */}
                             {selectedClient && (
-                                <div className="flex flex-wrap items-center gap-2.5">
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={handleDownloadImage}
-                                        disabled={isExportingImage || clientSales.length === 0}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
-                                        title="Descargar este estado de cuenta en formato de imagen PNG para enviar al cliente"
+                                        disabled={isExportingImage || periodSales.length === 0}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition active:scale-95 disabled:opacity-50"
+                                        title="Descargar este estado de cuenta en imagen PNG"
                                     >
-                                        <Download className="w-4 h-4" />
+                                        <Download className="w-3.5 h-3.5" />
                                         <span>{isExportingImage ? 'Generando...' : 'Descargar Imagen'}</span>
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={handleCopyWhatsApp}
-                                        disabled={clientSales.length === 0}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/30 transition active:scale-95 disabled:opacity-50"
-                                        title="Copiar resumen para enviar por WhatsApp"
+                                        disabled={periodSales.length === 0}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md transition active:scale-95 disabled:opacity-50"
+                                        title="Copiar texto para WhatsApp"
                                     >
-                                        {copiedWhatsApp ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                                        {copiedWhatsApp ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
                                         <span>{copiedWhatsApp ? '¡Copiado!' : 'WhatsApp'}</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handlePrint}
-                                        disabled={clientSales.length === 0}
-                                        className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition active:scale-95"
-                                        title="Imprimir"
-                                    >
-                                        <Printer className="w-4 h-4" />
                                     </button>
                                 </div>
                             )}
                         </div>
 
                         {/* CLIENT SEARCH BAR & SELECTOR */}
-                        <div className="mt-6 pt-5 border-t border-indigo-900/60">
+                        <div className="mt-4 pt-3 border-t border-slate-800">
                             {selectedClient ? (
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/15">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/30 flex items-center justify-center font-black text-indigo-300 text-lg border border-indigo-400/30">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-sm">
                                             {selectedClient.name.charAt(0).toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <h3 className="font-black text-white text-base tracking-tight uppercase">
+                                                <h3 className="font-bold text-white text-sm uppercase">
                                                     {selectedClient.name}
                                                 </h3>
-                                                <span className="text-[10px] font-black font-mono px-2 py-0.5 rounded-md bg-white/20 text-white">
-                                                    {selectedClient.documentType}: {selectedClient.documentNumber || 'S/N'}
+                                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                                                    {selectedClient.documentType || 'DOC'}: {selectedClient.documentNumber || 'S/N'}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-indigo-200/70 flex items-center gap-3 mt-0.5">
-                                                {selectedClient.phone && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Phone className="w-3 h-3 text-indigo-400" /> {selectedClient.phone}
-                                                    </span>
-                                                )}
-                                                {selectedClient.zone && (
-                                                    <span className="flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3 text-amber-400" /> Zona: {selectedClient.zone}
-                                                    </span>
-                                                )}
+                                            <p className="text-[11px] text-slate-400">
+                                                {selectedClient.phone ? `Tel: ${selectedClient.phone} • ` : ''}Zona: {selectedClient.zone || 'OFICINA'}
                                             </p>
                                         </div>
                                     </div>
@@ -441,42 +437,42 @@ export default function ClientAccountStatementModal({
                                             setClientSales([]);
                                             setClientSearch('');
                                         }}
-                                        className="self-end sm:self-center px-4 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition active:scale-95 flex items-center gap-1.5"
+                                        className="self-end sm:self-center px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition active:scale-95 flex items-center gap-1"
                                     >
-                                        <Search className="w-3.5 h-3.5" /> Cambiar Cliente
+                                        <Search className="w-3 h-3" /> Cambiar Cliente
                                     </button>
                                 </div>
                             ) : (
                                 <div className="relative">
                                     <div className="relative">
-                                        <Search className="w-5 h-5 text-indigo-300 absolute left-4 top-1/2 -translate-y-1/2" />
+                                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                                         <input
                                             type="text"
                                             value={clientSearch}
                                             onChange={(e) => setClientSearch(e.target.value)}
                                             placeholder="Buscar cliente por Nombre, Razón Social, RUC o DNI..."
-                                            className="w-full pl-12 pr-4 py-3.5 bg-white/10 text-white placeholder-indigo-200/50 rounded-2xl border border-white/20 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-sm font-medium transition"
+                                            className="w-full pl-10 pr-4 py-2.5 bg-slate-800 text-white placeholder-slate-400 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-xs font-medium transition"
                                             autoFocus
                                         />
                                         {clientSearch && (
                                             <button
                                                 onClick={() => setClientSearch('')}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                                             >
-                                                <X className="w-4 h-4" />
+                                                <X className="w-3.5 h-3.5" />
                                             </button>
                                         )}
                                     </div>
 
                                     {/* Auto-suggest dropdown */}
-                                    <div className="absolute left-0 right-0 top-full mt-2 bg-white text-gray-900 rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-20 max-h-72 overflow-y-auto">
+                                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white text-gray-900 rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 max-h-60 overflow-y-auto">
                                         {isLoadingClients ? (
-                                            <div className="p-6 text-center text-gray-400 font-bold text-xs uppercase tracking-wider">
-                                                Cargando catálogo de clientes...
+                                            <div className="p-4 text-center text-gray-400 font-bold text-xs uppercase tracking-wider">
+                                                Cargando clientes...
                                             </div>
                                         ) : filteredClients.length === 0 ? (
-                                            <div className="p-6 text-center text-gray-400 font-medium text-sm">
-                                                No se encontraron clientes con el término &quot;{clientSearch}&quot;
+                                            <div className="p-4 text-center text-gray-400 font-medium text-xs">
+                                                No se encontraron clientes con &quot;{clientSearch}&quot;
                                             </div>
                                         ) : (
                                             <div className="divide-y divide-gray-100">
@@ -485,23 +481,23 @@ export default function ClientAccountStatementModal({
                                                         key={client.id}
                                                         type="button"
                                                         onClick={() => handleSelectClient(client)}
-                                                        className="w-full p-4 text-left hover:bg-indigo-50/70 transition flex items-center justify-between group"
+                                                        className="w-full p-3 text-left hover:bg-emerald-50/60 transition flex items-center justify-between group"
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-gray-100 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center font-bold text-sm text-gray-700 transition">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-7 h-7 rounded-lg bg-gray-100 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center font-bold text-xs text-gray-700 transition">
                                                                 {client.name.charAt(0).toUpperCase()}
                                                             </div>
                                                             <div>
-                                                                <h4 className="font-bold text-gray-900 text-sm group-hover:text-indigo-600 transition">
+                                                                <h4 className="font-bold text-gray-900 text-xs group-hover:text-emerald-700 transition">
                                                                     {client.name}
                                                                 </h4>
-                                                                <p className="text-xs text-gray-400 font-mono">
+                                                                <p className="text-[10px] text-gray-400 font-mono">
                                                                     {client.documentType}: {client.documentNumber || 'S/N'} {client.phone ? `• Tel: ${client.phone}` : ''}
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg group-hover:bg-indigo-100 group-hover:text-indigo-700 transition">
-                                                            Seleccionar →
+                                                        <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                                                            Elegir →
                                                         </span>
                                                     </button>
                                                 ))}
@@ -514,271 +510,204 @@ export default function ClientAccountStatementModal({
                     </div>
 
                     {/* MODAL BODY */}
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50/50 space-y-6">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 space-y-4">
                         {!selectedClient ? (
-                            /* Empty state: prompt to select client */
-                            <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-gray-200 max-w-lg mx-auto my-12 space-y-4">
-                                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-                                    <User className="w-8 h-8" />
+                            <div className="bg-white rounded-2xl p-10 text-center border-2 border-dashed border-gray-200 max-w-sm mx-auto my-10 space-y-3">
+                                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
+                                    <User className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-xl font-black text-gray-900 uppercase">
+                                <h3 className="text-base font-black text-gray-900 uppercase">
                                     Selecciona un Cliente
                                 </h3>
-                                <p className="text-sm text-gray-500 font-medium">
-                                    Usa el buscador superior para seleccionar al cliente y visualizar su estado de cuenta consolidado, facturas y saldos pendientes.
+                                <p className="text-xs text-gray-500 font-medium">
+                                    Usa el buscador para elegir el cliente y ver su estado de cuenta semestral o anual.
                                 </p>
                             </div>
                         ) : isLoadingSales ? (
-                            /* Loading sales */
-                            <div className="bg-white rounded-3xl p-16 text-center border border-gray-100 shadow-sm space-y-3">
-                                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
-                                    Consultando ventas y cobranzas del cliente...
+                            <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm space-y-2">
+                                <RefreshCw className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
+                                <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                    Cargando historial de ventas...
                                 </h4>
                             </div>
                         ) : (
-                            /* ── THE PRINTABLE / EXPORTABLE ACCOUNT STATEMENT CARD ── */
-                            <div className="space-y-6">
-                                {/* The main card that gets captured into image */}
+                            <div className="space-y-4">
+                                {/* ── FILTROS DE PERIODO (SEMESTRAL / ANUAL) ── */}
+                                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                                        <span className="text-xs font-black uppercase text-gray-700 tracking-wider">
+                                            Año:
+                                        </span>
+                                        <select
+                                            value={selectedYear}
+                                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                            className="bg-gray-100 border border-gray-300 text-gray-900 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        >
+                                            {availableYears.map(y => (
+                                                <option key={y} value={y}>{y}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Period Tabs */}
+                                    <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPeriodType('1S')}
+                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition ${periodType === '1S' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                        >
+                                            1er Semestre (Ene - Jun)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPeriodType('2S')}
+                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition ${periodType === '2S' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                        >
+                                            2do Semestre (Jul - Dic)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPeriodType('ANUAL')}
+                                            className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition ${periodType === 'ANUAL' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                                        >
+                                            Anual {selectedYear}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPeriodType('TODOS')}
+                                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition ${periodType === 'TODOS' ? 'bg-slate-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                            title="Ver todas las ventas históricas"
+                                        >
+                                            Todo
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* ── THE COMPACT PRINTABLE / EXPORTABLE ACCOUNT STATEMENT CARD ── */}
                                 <div
                                     id="account-statement-printable"
                                     ref={statementCardRef}
-                                    className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm space-y-6 text-gray-900"
+                                    className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200 shadow-sm space-y-4 text-gray-900"
                                 >
-                                    {/* Statement Header */}
-                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-gray-100 pb-6">
-                                        <div className="space-y-1">
+                                    {/* 1. Sleek Header */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base font-black tracking-tight text-gray-900">
+                                                INVESTMENTS Z&amp;G S.A.
+                                            </span>
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                RUC: 20608552391
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 sm:text-right">
+                                            <span className="text-[11px] font-black uppercase tracking-wide text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                                                ESTADO DE CUENTA: {periodLabel}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                                {new Date().toLocaleDateString('es-PE')}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Compact Client Strip + Mini KPI Badges (Minimal vertical height) */}
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                                        {/* Client Info */}
+                                        <div className="space-y-0.5">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-lg font-black tracking-tight text-gray-900">
-                                                    INVESTMENTS Z&amp;G S.A.
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase">Cliente:</span>
+                                                <h4 className="font-black text-gray-900 uppercase text-xs">
+                                                    {selectedClient.name}
+                                                </h4>
+                                            </div>
+                                            <p className="text-[11px] text-gray-600 flex flex-wrap items-center gap-3">
+                                                <span><strong>{selectedClient.documentType || 'DOC'}:</strong> {selectedClient.documentNumber || 'S/N'}</span>
+                                                <span><strong>Zona:</strong> {selectedClient.zone || 'OFICINA'}</span>
+                                                {selectedClient.phone && <span><strong>Tel:</strong> {selectedClient.phone}</span>}
+                                            </p>
+                                        </div>
+
+                                        {/* 4 Small Horizontal Metric Pills */}
+                                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                            <div className="bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
+                                                <span className="text-[9px] font-black uppercase text-gray-400 block leading-tight">Compras</span>
+                                                <span className="text-xs font-black text-gray-900">{metrics.activeCount}</span>
+                                            </div>
+
+                                            <div className="bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
+                                                <span className="text-[9px] font-black uppercase text-blue-600 block leading-tight">Facturado</span>
+                                                <span className="text-xs font-black font-mono text-blue-900">{formatCurrency(metrics.totalAmount)}</span>
+                                            </div>
+
+                                            <div className="bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
+                                                <span className="text-[9px] font-black uppercase text-emerald-600 block leading-tight">Pagado</span>
+                                                <span className="text-xs font-black font-mono text-emerald-900">{formatCurrency(metrics.totalPaid)}</span>
+                                            </div>
+
+                                            <div className={`px-2.5 py-1.5 rounded-lg border shadow-2xs text-center ${metrics.totalBalance > 0.01 ? 'bg-rose-50 border-rose-300' : 'bg-emerald-50 border-emerald-300'}`}>
+                                                <span className={`text-[9px] font-black uppercase block leading-tight ${metrics.totalBalance > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>Saldo</span>
+                                                <span className={`text-xs font-black font-mono ${metrics.totalBalance > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                                    {formatCurrency(metrics.totalBalance)}
                                                 </span>
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                                    RUC: 20608552391
-                                                </span>
                                             </div>
-                                            <p className="text-xs text-gray-500">
-                                                Sistema de Facturación y Control Comercial
-                                            </p>
-                                        </div>
-
-                                        <div className="sm:text-right">
-                                            <span className="inline-block text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                                                Estado de Cuenta Oficial
-                                            </span>
-                                            <p className="text-[11px] text-gray-400 mt-1 font-medium">
-                                                Fecha de Emisión: <strong>{new Date().toLocaleDateString('es-PE')} {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</strong>
-                                            </p>
                                         </div>
                                     </div>
 
-                                    {/* Client Details Box */}
-                                    <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 p-5 rounded-2xl border border-slate-200/80 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
-                                                Cliente / Razón Social
-                                            </span>
-                                            <h4 className="text-base font-black text-gray-900 mt-0.5 uppercase">
-                                                {selectedClient.name}
-                                            </h4>
-                                            <span className="text-xs font-bold text-indigo-700 font-mono">
-                                                {selectedClient.documentType || 'DOC'}: {selectedClient.documentNumber || 'S/N'}
-                                            </span>
-                                        </div>
-
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
-                                                Contacto
-                                            </span>
-                                            <p className="text-xs font-bold text-gray-800 mt-0.5">
-                                                Teléfono: {selectedClient.phone || 'No registrado'}
-                                            </p>
-                                            <p className="text-xs text-gray-600 truncate">
-                                                Email: {selectedClient.email || 'No registrado'}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
-                                                Ubicación y Zona
-                                            </span>
-                                            <p className="text-xs font-bold text-gray-800 mt-0.5">
-                                                Zona: <span className="uppercase text-indigo-700">{selectedClient.zone || 'OFICINA'}</span>
-                                            </p>
-                                            <p className="text-xs text-gray-600 truncate">
-                                                Dirección: {selectedClient.address || 'No registrada'}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* KPI Summary Cards */}
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                                        <div className="bg-slate-50 border border-slate-200/70 p-4 rounded-2xl">
-                                            <div className="flex items-center justify-between text-gray-400 mb-1">
-                                                <span className="text-[10px] font-black uppercase tracking-wider">Total Compras</span>
-                                                <ShoppingBag className="w-4 h-4 text-slate-500" />
-                                            </div>
-                                            <div className="text-2xl font-black text-gray-900">
-                                                {metrics.activeCount}
-                                            </div>
-                                            <span className="text-[10px] text-gray-500 font-medium">
-                                                {metrics.paidCount} canceladas • {metrics.pendingCount} pendientes
-                                            </span>
-                                        </div>
-
-                                        <div className="bg-blue-50/60 border border-blue-200/70 p-4 rounded-2xl">
-                                            <div className="flex items-center justify-between text-blue-600 mb-1">
-                                                <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
-                                                <Receipt className="w-4 h-4" />
-                                            </div>
-                                            <div className="text-2xl font-black text-blue-900 font-mono">
-                                                {formatCurrency(metrics.totalAmount)}
-                                            </div>
-                                            <span className="text-[10px] text-blue-700 font-medium">
-                                                Suma de todas sus compras
-                                            </span>
-                                        </div>
-
-                                        <div className="bg-emerald-50/60 border border-emerald-200/70 p-4 rounded-2xl">
-                                            <div className="flex items-center justify-between text-emerald-600 mb-1">
-                                                <span className="text-[10px] font-black uppercase tracking-wider">Total Pagado</span>
-                                                <CheckCircle2 className="w-4 h-4" />
-                                            </div>
-                                            <div className="text-2xl font-black text-emerald-900 font-mono">
-                                                {formatCurrency(metrics.totalPaid)}
-                                            </div>
-                                            <span className="text-[10px] text-emerald-700 font-medium">
-                                                Abonos y pagos conciliados
-                                            </span>
-                                        </div>
-
-                                        <div className={`p-4 rounded-2xl border ${metrics.totalBalance > 0.01 ? 'bg-rose-50 border-rose-300' : 'bg-emerald-50 border-emerald-300'}`}>
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className={`text-[10px] font-black uppercase tracking-wider ${metrics.totalBalance > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                                    Saldo Pendiente
-                                                </span>
-                                                <DollarSign className={`w-4 h-4 ${metrics.totalBalance > 0.01 ? 'text-rose-600' : 'text-emerald-600'}`} />
-                                            </div>
-                                            <div className={`text-2xl font-black font-mono ${metrics.totalBalance > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                                                {formatCurrency(metrics.totalBalance)}
-                                            </div>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${metrics.totalBalance > 0.01 ? 'text-rose-800' : 'text-emerald-800'}`}>
-                                                {metrics.totalBalance > 0.01 ? '⚠ Por pagar' : '✓ Al día (Sin deuda)'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Status Alert Banner */}
-                                    <div className={`p-4 rounded-2xl flex items-center justify-between border ${metrics.totalBalance > 0.01 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
-                                        <div className="flex items-center gap-3">
-                                            {metrics.totalBalance > 0.01 ? (
-                                                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                                            ) : (
-                                                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                                            )}
-                                            <div>
-                                                <h5 className="font-black text-xs uppercase tracking-wide">
-                                                    {metrics.totalBalance > 0.01
-                                                        ? `El cliente registra un saldo pendiente de ${formatCurrency(metrics.totalBalance)}`
-                                                        : 'El cliente se encuentra completamente al día en todos sus pagos'}
-                                                </h5>
-                                                <p className="text-[11px] opacity-80">
-                                                    {metrics.totalBalance > 0.01
-                                                        ? `De un total de ${metrics.activeCount} compras facturadas, adeuda saldo en ${metrics.pendingCount} comprobante(s).`
-                                                        : `Ha cancelado la totalidad de sus compras por un monto de ${formatCurrency(metrics.totalAmount)}.`}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right font-mono font-black text-sm">
-                                            {metrics.totalAmount > 0 ? `${Math.round((metrics.totalPaid / metrics.totalAmount) * 100)}% Cubierto` : '100%'}
-                                        </div>
-                                    </div>
-
-                                    {/* Invoices Breakdown Table */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-xs font-black uppercase tracking-wider text-gray-500">
-                                                Historial de Facturas y Comprobantes
-                                            </h4>
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                                {displaySales.length} comprobante(s)
-                                            </span>
-                                        </div>
-
-                                        {clientSales.length === 0 ? (
-                                            <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 text-gray-400 font-bold text-xs uppercase tracking-widest">
-                                                Este cliente aún no registra compras ni ventas en el sistema.
+                                    {/* 3. Streamlined Table (Fecha, Comprobante, Total Venta, Pagado, Saldo) */}
+                                    <div className="space-y-1.5">
+                                        {periodSales.length === 0 ? (
+                                            <div className="p-6 text-center bg-gray-50 rounded-xl border border-gray-100 text-gray-400 font-bold text-xs uppercase tracking-wider">
+                                                No registra ventas en este periodo ({periodLabel}).
                                             </div>
                                         ) : (
-                                            <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                                            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                                                 <table className="w-full text-left border-collapse">
                                                     <thead>
-                                                        <tr className="bg-slate-100/80 text-[10px] font-black text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                                                            <th className="py-3 px-4">Fecha</th>
-                                                            <th className="py-3 px-4">Comprobante</th>
-                                                            <th className="py-3 px-4">Condición</th>
-                                                            <th className="py-3 px-4 text-right">Total Venta</th>
-                                                            <th className="py-3 px-4 text-right">Pagado</th>
-                                                            <th className="py-3 px-4 text-right">Saldo</th>
-                                                            <th className="py-3 px-4 text-center">Estado</th>
+                                                        <tr className="bg-slate-100 text-[10px] font-black text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                                            <th className="py-2.5 px-3">Fecha</th>
+                                                            <th className="py-2.5 px-3">Comprobante</th>
+                                                            <th className="py-2.5 px-3 text-right">Total Venta</th>
+                                                            <th className="py-2.5 px-3 text-right">Pagado</th>
+                                                            <th className="py-2.5 px-3 text-right">Saldo</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-100 text-xs">
-                                                        {displaySales.map((sale, idx) => {
+                                                        {periodSales.map((sale, idx) => {
                                                             const isCancelled = sale.status === 'ANULADO';
                                                             const totalPaid = (sale.payments || [])
                                                                 .filter((p: any) => p.status === 'APROBADO')
                                                                 .reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
                                                             const balance = isCancelled ? 0 : Math.max(0, (Number(sale.totalAmount) || 0) - totalPaid);
-                                                            const isFullyPaid = !isCancelled && balance <= 0.01;
-                                                            const isPartial = !isCancelled && totalPaid > 0 && !isFullyPaid;
-                                                            const hasPayments = (sale.payments || []).length > 0;
-                                                            const isExpanded = expandedSaleId === sale.id;
 
                                                             return (
                                                                 <tr
                                                                     key={sale.id}
-                                                                    className={`hover:bg-slate-50 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'}`}
+                                                                    className={`hover:bg-slate-50 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}`}
                                                                 >
-                                                                    <td className="py-3 px-4 font-bold text-gray-700 whitespace-nowrap">
+                                                                    <td className="py-2 px-3 font-bold text-gray-700 whitespace-nowrap text-[11px]">
                                                                         {formatDate(sale.createdAt)}
                                                                     </td>
-                                                                    <td className="py-3 px-4 font-mono font-black text-gray-900">
+                                                                    <td className="py-2 px-3 font-mono font-bold text-gray-900 text-xs">
                                                                         {sale.invoiceNumber ? (
-                                                                            <span className="text-indigo-600">{sale.invoiceNumber}</span>
+                                                                            <span className="text-indigo-700">{sale.invoiceNumber}</span>
                                                                         ) : (
                                                                             <span className="text-gray-500">#{sale.id.slice(-6).toUpperCase()}</span>
                                                                         )}
-                                                                    </td>
-                                                                    <td className="py-3 px-4 uppercase text-[11px] font-bold text-gray-500">
-                                                                        {sale.paymentMethod || 'CONTADO'}
-                                                                    </td>
-                                                                    <td className={`py-3 px-4 text-right font-mono font-bold ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                                                                        {formatCurrency(sale.totalAmount)}
-                                                                    </td>
-                                                                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">
-                                                                        {formatCurrency(totalPaid)}
-                                                                    </td>
-                                                                    <td className={`py-3 px-4 text-right font-mono font-black ${balance > 0.01 ? 'text-rose-600' : 'text-gray-400'}`}>
-                                                                        {formatCurrency(balance)}
-                                                                    </td>
-                                                                    <td className="py-3 px-4 text-center">
-                                                                        {isCancelled ? (
-                                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-gray-100 text-gray-500 border border-gray-200">
+                                                                        {isCancelled && (
+                                                                            <span className="ml-1.5 text-[9px] font-black uppercase text-gray-400 bg-gray-100 px-1 py-0.5 rounded">
                                                                                 Anulado
                                                                             </span>
-                                                                        ) : isFullyPaid ? (
-                                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                                                Cancelado
-                                                                            </span>
-                                                                        ) : isPartial ? (
-                                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                                                                Parcial
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
-                                                                                Pendiente
-                                                                            </span>
                                                                         )}
+                                                                    </td>
+                                                                    <td className={`py-2 px-3 text-right font-mono font-bold ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                                                                        {formatCurrency(sale.totalAmount)}
+                                                                    </td>
+                                                                    <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
+                                                                        {formatCurrency(totalPaid)}
+                                                                    </td>
+                                                                    <td className={`py-2 px-3 text-right font-mono font-black ${balance > 0.01 ? 'text-rose-600' : 'text-gray-400'}`}>
+                                                                        {formatCurrency(balance)}
                                                                     </td>
                                                                 </tr>
                                                             );
@@ -786,22 +715,17 @@ export default function ClientAccountStatementModal({
                                                     </tbody>
                                                     <tfoot>
                                                         <tr className="bg-slate-100 font-black text-xs border-t-2 border-slate-300">
-                                                            <td colSpan={3} className="py-3 px-4 uppercase text-gray-700 tracking-wider">
-                                                                TOTAL GENERAL CONSOLIDADO
+                                                            <td colSpan={2} className="py-2.5 px-3 uppercase text-gray-800 tracking-wider">
+                                                                TOTAL ({periodLabel})
                                                             </td>
-                                                            <td className="py-3 px-4 text-right font-mono text-blue-900">
+                                                            <td className="py-2.5 px-3 text-right font-mono text-blue-900">
                                                                 {formatCurrency(metrics.totalAmount)}
                                                             </td>
-                                                            <td className="py-3 px-4 text-right font-mono text-emerald-800">
+                                                            <td className="py-2.5 px-3 text-right font-mono text-emerald-800">
                                                                 {formatCurrency(metrics.totalPaid)}
                                                             </td>
-                                                            <td className="py-3 px-4 text-right font-mono text-rose-700">
+                                                            <td className={`py-2.5 px-3 text-right font-mono ${metrics.totalBalance > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>
                                                                 {formatCurrency(metrics.totalBalance)}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-center">
-                                                                <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${metrics.totalBalance > 0.01 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                                    {metrics.totalBalance > 0.01 ? 'Con Saldo' : 'Al Día'}
-                                                                </span>
                                                             </td>
                                                         </tr>
                                                     </tfoot>
@@ -810,13 +734,13 @@ export default function ClientAccountStatementModal({
                                         )}
                                     </div>
 
-                                    {/* Statement Footer Note */}
-                                    <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-gray-400 gap-2">
+                                    {/* 4. Compact Footer Note */}
+                                    <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between text-[10px] text-gray-400 gap-1">
                                         <p>
-                                            * Documento oficial de control de cobranzas y cuentas comerciales de Investments Z&amp;G S.A.
+                                            * Documento oficial de cobranzas y cuentas comerciales • Investments Z&amp;G S.A.
                                         </p>
-                                        <p className="font-mono font-bold text-gray-500">
-                                            Investments Z&amp;G S.A. • RUC: 20608552391
+                                        <p className="font-mono text-gray-400">
+                                            RUC: 20608552391
                                         </p>
                                     </div>
                                 </div>
@@ -825,35 +749,35 @@ export default function ClientAccountStatementModal({
                     </div>
 
                     {/* MODAL FOOTER */}
-                    <div className="p-4 sm:p-5 bg-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                    <div className="p-3.5 sm:p-4 bg-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
                         <div className="text-xs text-gray-500 font-medium">
                             {selectedClient ? (
                                 <span>
-                                    Mostrando compras y estado de <strong>{selectedClient.name}</strong> ({clientSales.length} ventas)
+                                    Mostrando <strong>{periodSales.length} ventas</strong> para <strong>{selectedClient.name}</strong> ({periodLabel})
                                 </span>
                             ) : (
-                                <span>Selecciona un cliente para ver su estado de cuenta</span>
+                                <span>Selecciona un cliente para generar el estado de cuenta</span>
                             )}
                         </div>
 
-                        <div className="flex items-center justify-end gap-3">
+                        <div className="flex items-center justify-end gap-2.5">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition active:scale-95"
+                                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition active:scale-95"
                             >
                                 Cerrar
                             </button>
 
-                            {selectedClient && clientSales.length > 0 && (
+                            {selectedClient && periodSales.length > 0 && (
                                 <button
                                     type="button"
                                     onClick={handleDownloadImage}
                                     disabled={isExportingImage}
-                                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
                                 >
-                                    <Download className="w-4 h-4" />
-                                    <span>{isExportingImage ? 'Generando...' : 'Descargar como Imagen'}</span>
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>{isExportingImage ? 'Generando...' : 'Descargar Imagen'}</span>
                                 </button>
                             )}
                         </div>
