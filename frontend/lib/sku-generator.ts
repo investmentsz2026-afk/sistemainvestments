@@ -253,3 +253,26 @@ export function generateAvioSKU(params: {
 
   return `${desc}${corrStr}${sizePart}${colorPart}${locPart}`;
 }
+
+export function generateOpGarmentSku(opNumber: string, usedSkus?: Set<string>): string {
+  const cleanOp = (opNumber || '').replace(/\D/g, '');
+  const opDigits = cleanOp || '0000';
+  const prefix = '775';
+  
+  let attempts = 0;
+  while (attempts < 1000) {
+    const neededRandom = Math.max(0, 12 - prefix.length - opDigits.length);
+    let randomPart = '';
+    for (let i = 0; i < neededRandom; i++) {
+      randomPart += Math.floor(Math.random() * 10).toString();
+    }
+    const candidate = `${prefix}${randomPart}${opDigits}`.slice(0, 12).padEnd(12, '0');
+    if (!usedSkus || !usedSkus.has(candidate)) {
+      if (usedSkus) usedSkus.add(candidate);
+      return candidate;
+    }
+    attempts++;
+  }
+  return `${prefix}${Date.now().toString().slice(-9)}`;
+}
+

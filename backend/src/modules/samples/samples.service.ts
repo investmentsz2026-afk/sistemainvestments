@@ -19,6 +19,24 @@ export class SamplesService {
     return prefix + randomPart;
   }
 
+  private generateOpBarcode(cleanOp: string, used?: Set<string>): string {
+    const opDigits = cleanOp || '0000';
+    const prefix = '775';
+    let attempts = 0;
+    while (attempts < 1000) {
+      const neededRandom = Math.max(0, 12 - prefix.length - opDigits.length);
+      let rand = '';
+      for (let i = 0; i < neededRandom; i++) rand += Math.floor(Math.random() * 10).toString();
+      const cand = `${prefix}${rand}${opDigits}`.slice(0, 12).padEnd(12, '0');
+      if (!used || !used.has(cand)) {
+        if (used) used.add(cand);
+        return cand;
+      }
+      attempts++;
+    }
+    return `${prefix}${Date.now().toString().slice(-9)}`;
+  }
+
   async create(udpId: string, data: any) {
     const { name, code, description, characteristics, images, materials, isExisting } = data;
     
@@ -68,7 +86,7 @@ export class SamplesService {
 
   async findAll(user?: any) {
     const where: any = {};
-    return (this.prisma as any).productSample.findMany({
+    const samples = await (this.prisma as any).productSample.findMany({
       where,
       include: {
         udp: { select: { name: true } },
@@ -83,6 +101,14 @@ export class SamplesService {
         processAudits: true
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    return samples.map((s: any) => {
+      const entalle = (Array.isArray(s.productionSizeData) && s.productionSizeData[0]?.entalle) || null;
+      return {
+        ...s,
+        entalle: s.entalle || entalle
+      };
     });
   }
 
@@ -103,11 +129,15 @@ export class SamplesService {
       },
     });
     if (!sample) throw new NotFoundException('Muestra no encontrada');
-    return sample;
+    const entalle = (Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.entalle) || null;
+    return {
+      ...sample,
+      entalle: sample.entalle || entalle
+    };
   }
 
   async updateReview(id: string, commercialId: string, data: any) {
-    const { status, observations, recommendations, materials, op, barcode, productionQuantity, productionColor, productionSizeData } = data;
+    const { status, observations, recommendations, materials, op, barcode, productionQuantity, productionColor, productionSizeData, entalle } = data;
 
     const existingSample = await this.findOne(id);
 
@@ -116,11 +146,42 @@ export class SamplesService {
     }
 
     const hasOPCreation = !!(op && op.trim());
+    const cleanOp = hasOPCreation ? op.replace(/\D/g, '') : '';
     
     // Ensure pure numeric barcode
     let sampleBarcode = barcode || existingSample.barcode;
-    if (!sampleBarcode || !/^\d+$/.test(sampleBarcode)) {
+    if (hasOPCreation && cleanOp) {
+      if (!sampleBarcode || !/^\d{12}$/.test(sampleBarcode) || !sampleBarcode.endsWith(cleanOp)) {
+        sampleBarcode = this.generateOpBarcode(cleanOp);
+      }
+    } else if (!sampleBarcode || !/^\d+$/.test(sampleBarcode)) {
       sampleBarcode = this.generateNumericBarcode();
+    }
+
+    // Ensure every item in productionSizeData has its unique 12-digit numeric SKU ending with the OP digits
+    let finalSizeData = productionSizeData;
+    if (hasOPCreation && Array.isArray(productionSizeData)) {
+      const usedSkus = new Set<string>();
+      if (sampleBarcode) usedSkus.add(sampleBarcode);
+
+      finalSizeData = productionSizeData.map((item: any) => {
+        let itemSku = item.sku || item.variantSku;
+        if (!itemSku || !/^\d{12}$/.test(itemSku) || (cleanOp && !itemSku.endsWith(cleanOp))) {
+          itemSku = this.generateOpBarcode(cleanOp, usedSkus);
+        } else {
+          usedSkus.add(itemSku);
+        }
+        return {
+          ...item,
+          sku: itemSku,
+          variantSku: itemSku,
+          entalle: item.entalle || entalle || null
+        };
+      });
+
+      if (finalSizeData.length > 0 && finalSizeData[0]?.sku) {
+        sampleBarcode = finalSizeData[0].sku;
+      }
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -135,7 +196,7 @@ export class SamplesService {
           op: hasOPCreation ? op.trim() : (status === 'APROBADO' ? existingSample.op : null),
           productionQuantity: hasOPCreation ? (productionQuantity || null) : (status === 'APROBADO' ? existingSample.productionQuantity : null),
           productionColor: hasOPCreation ? (productionColor || null) : (status === 'APROBADO' ? existingSample.productionColor : null),
-          productionSizeData: hasOPCreation ? (productionSizeData || null) : (status === 'APROBADO' ? existingSample.productionSizeData : null),
+          productionSizeData: hasOPCreation ? (finalSizeData || null) : (status === 'APROBADO' ? existingSample.productionSizeData : null),
           commercialId,
           approvedAt: status === 'APROBADO' ? (existingSample.approvedAt || new Date()) : null,
           adminOpApprovalStatus: hasOPCreation ? 'PENDIENTE' : (status === 'APROBADO' ? (existingSample.adminOpApprovalStatus || 'SIN_OP') : 'SIN_OP'),

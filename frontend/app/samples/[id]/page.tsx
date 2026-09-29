@@ -36,6 +36,7 @@ import { SampleMeasurementsModal } from '../../../components/samples/SampleMeasu
 import { UDPEditSampleModal } from '../../../components/samples/UDPEditSampleModal';
 import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 import { getImageUrl } from '../../../lib/imageUrl';
+import { generateOpGarmentSku } from '../../../lib/sku-generator';
 
 export default function SampleDetailPage() {
     const { id } = useParams();
@@ -52,6 +53,7 @@ export default function SampleDetailPage() {
     const [recommendations, setRecommendations] = useState('');
     const [bom, setBom] = useState<any[]>([]);
     const [opName, setOpName] = useState('');
+    const [entalle, setEntalle] = useState('');
     const [prodQuantity, setProdQuantity] = useState('');
     const [productionDetail, setProductionDetail] = useState<{size: string, color: string, quantity: number}[]>([]);
     const [bomViewSize, setBomViewSize] = useState<string | null>(null);
@@ -311,6 +313,8 @@ export default function SampleDetailPage() {
                 setBom(initialBom);
             }
             if (sampleData.op) setOpName(sampleData.op);
+            const savedEntalle = sampleData.entalle || (Array.isArray(sampleData.productionSizeData) ? sampleData.productionSizeData[0]?.entalle : '') || '';
+            setEntalle(savedEntalle);
             if (sampleData.productionQuantity) setProdQuantity(sampleData.productionQuantity.toString());
             if (sampleData.productionSizeData) {
                 // If it's the new array format
@@ -492,7 +496,7 @@ export default function SampleDetailPage() {
 
     const handleSaveOP = async () => {
         if (!opName || !opName.trim()) {
-            toast.error('Debes ingresar el número de OP (Ej: OP-050).');
+            toast.error('Debes ingresar el número de OP.');
             return;
         }
         if (!prodQuantity || parseFloat(prodQuantity) <= 0) {
@@ -504,17 +508,28 @@ export default function SampleDetailPage() {
             return;
         }
 
-        const enrichedProductionDetail = productionDetail.map(pd => ({
-            ...pd,
-            salePrice: salesPrices[pd.size]?.price || 0,
-            secondSalePrice: salesPrices[pd.size]?.secondPrice || 0
-        }));
+        const cleanOp = opName.replace(/\D/g, '') || opName.trim();
+        const usedSkus = new Set<string>();
+
+        const enrichedProductionDetail = productionDetail.map(pd => {
+            const itemSku = (pd as any).sku || generateOpGarmentSku(cleanOp, usedSkus);
+            return {
+                ...pd,
+                sku: itemSku,
+                variantSku: itemSku,
+                entalle: (entalle || '').trim().toUpperCase(),
+                salePrice: salesPrices[pd.size]?.price || 0,
+                secondSalePrice: salesPrices[pd.size]?.secondPrice || 0
+            };
+        });
 
         setIsSaving(true);
         try {
             await api.put(`/samples/${id}/review`, {
                 status: 'APROBADO',
                 op: opName.trim().toUpperCase(),
+                entalle: (entalle || '').trim().toUpperCase(),
+                barcode: enrichedProductionDetail[0]?.sku,
                 productionQuantity: parseFloat(prodQuantity),
                 productionColor: productionDetail[0]?.color || 'Varios',
                 productionSizeData: enrichedProductionDetail,
@@ -1202,10 +1217,10 @@ export default function SampleDetailPage() {
                                         </div>
                                     )}
 
-                                    {sample.status === 'APROBADO' && sample.barcode && (
+                                    {sample.status === 'APROBADO' && sample.op && sample.barcode && (
                                         <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                                             <div className="flex flex-col items-center sm:items-start">
-                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU Numérico de Muestra</span>
+                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU Numérico de OP ({sample.op})</span>
                                                 <div className="my-2">
                                                     <ProductBarcode value={sample.barcode} width={1.2} height={42} displayValue={false} />
                                                 </div>
@@ -1213,7 +1228,7 @@ export default function SampleDetailPage() {
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => setShowSampleStickerModal(true)}
+                                                onClick={() => setShowOPPrintModal(true)}
                                                 className="px-5 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition shadow-lg shadow-indigo-100 flex items-center gap-2"
                                             >
                                                 <Printer className="w-4 h-4" /> Imprimir Sticker
@@ -1238,7 +1253,9 @@ export default function SampleDetailPage() {
                                                     type="button"
                                                     onClick={() => {
                                                         setIsCreatingOP(true);
-                                                        setOpName(sample.op);
+                                                        setOpName(sample.op || '');
+                                                        const currentEntalle = sample.entalle || (Array.isArray(sample.productionSizeData) ? sample.productionSizeData[0]?.entalle : '') || '';
+                                                        setEntalle(currentEntalle);
                                                     }}
                                                     className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
                                                 >
@@ -1257,14 +1274,15 @@ export default function SampleDetailPage() {
                                                     <h4 className="text-base font-black text-gray-900 uppercase">¿Mandar a Confección Masiva?</h4>
                                                     <p className="text-xs text-gray-500 font-bold max-w-sm mx-auto mt-1">
                                                         Esta muestra está aprobada como prototipo. Puedes generar su Orden de Producción (OP) con tallas, cantidades y precios para enviarla a taller.
-                                                    </p>
+                                                     </p>
                                                 </div>
                                                 {canCommercialEdit && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             setIsCreatingOP(true);
-                                                            if (!opName) setOpName('OP-');
+                                                            setOpName('');
+                                                            setEntalle('');
                                                         }}
                                                         className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-black transition active:scale-95 flex items-center gap-2 mx-auto"
                                                     >
@@ -1278,10 +1296,16 @@ export default function SampleDetailPage() {
                                         {sample.op && !isCreatingOP && (
                                             <div className="space-y-6">
                                                 <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
-                                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                                                         <div>
                                                             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">N° de OP</p>
                                                             <p className="font-black text-emerald-950 text-xl font-mono">{sample.op}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Entalle</p>
+                                                            <p className="font-black text-emerald-950 text-xl uppercase">
+                                                                {sample.entalle || (Array.isArray(sample.productionSizeData) ? sample.productionSizeData[0]?.entalle : '') || '-'}
+                                                            </p>
                                                         </div>
                                                         <div>
                                                             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total a Confeccionar</p>
@@ -1296,18 +1320,19 @@ export default function SampleDetailPage() {
                                                     )}
 
                                                     {/* OP Barcode sticker button */}
-                                                    {sample.barcode && (
-                                                        <div className="pt-4 border-t border-emerald-100 flex items-center justify-between">
-                                                            <span className="text-[10px] font-black text-gray-500 uppercase">Etiqueta de OP</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowOPPrintModal(true)}
-                                                                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 shadow-sm hover:bg-black transition"
-                                                            >
-                                                                <Printer className="w-3.5 h-3.5" /> Imprimir Etiqueta OP
-                                                            </button>
+                                                    <div className="pt-4 border-t border-emerald-100 flex items-center justify-between flex-wrap gap-2">
+                                                        <div>
+                                                            <span className="text-xs font-black text-emerald-950 uppercase block">Etiquetas Oficiales de la OP</span>
+                                                            <span className="text-[10px] font-bold text-gray-500">Stickers formato almacén (30.2 x 40mm) con entalle y SKU que incluye la OP</span>
                                                         </div>
-                                                    )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowOPPrintModal(true)}
+                                                            className="px-5 py-2.5 bg-indigo-600 hover:bg-black text-white rounded-xl text-xs font-black uppercase flex items-center gap-2 shadow-md transition active:scale-95"
+                                                        >
+                                                            <Printer className="w-4 h-4" /> Imprimir Sticker
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 {/* Size breakdown */}
@@ -1350,16 +1375,36 @@ export default function SampleDetailPage() {
                                         {isCreatingOP && (
                                             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
                                                 <div className="p-6 bg-indigo-50/40 rounded-3xl border border-indigo-100 space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                                         <div>
                                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Orden de Producción (OP) *</label>
                                                             <input
                                                                 type="text"
                                                                 className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 uppercase font-mono"
-                                                                placeholder="Ej: OP-050"
+                                                                placeholder="Ej: 1045"
                                                                 value={opName}
                                                                 onChange={e => setOpName(e.target.value)}
                                                             />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Entalle / Corte</label>
+                                                            <input
+                                                                type="text"
+                                                                list="entalle-options-list"
+                                                                className="w-full bg-white border border-gray-200 rounded-2xl p-4 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 transition mt-2 uppercase"
+                                                                placeholder="Ej: SLIM FIT, CLÁSICO..."
+                                                                value={entalle}
+                                                                onChange={e => setEntalle(e.target.value)}
+                                                            />
+                                                            <datalist id="entalle-options-list">
+                                                                <option value="SLIM FIT" />
+                                                                <option value="CLÁSICO" />
+                                                                <option value="REGULAR" />
+                                                                <option value="COMFORT" />
+                                                                <option value="SKINNY" />
+                                                                <option value="OVERSIZE" />
+                                                                <option value="ESTÁNDAR" />
+                                                            </datalist>
                                                         </div>
                                                         <div>
                                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Total Prendas a Producir</label>
