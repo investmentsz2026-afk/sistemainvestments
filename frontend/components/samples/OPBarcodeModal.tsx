@@ -1,8 +1,8 @@
 // frontend/components/samples/OPBarcodeModal.tsx
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { X, Printer, ChevronLeft, ChevronRight, Tag, Layers, Check } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Printer, ChevronLeft, ChevronRight, Layers, Check } from 'lucide-react';
 import { ProductBarcode } from '../products/Barcode';
 import { generateOpGarmentSku } from '../../lib/sku-generator';
 
@@ -58,13 +58,6 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     }];
   }, [sample]);
 
-  // Adjust quantity when selecting variant
-  useEffect(() => {
-    if (variants[selectedVariantIndex]) {
-      setQuantity(Math.max(1, Number(variants[selectedVariantIndex].quantity) || 1));
-    }
-  }, [selectedVariantIndex, variants]);
-
   const activeVariant = variants[selectedVariantIndex] || variants[0];
   const entalleDisplay = (activeVariant?.entalle || sample?.entalle || '').trim();
   const sampleName = (sample?.name || 'PRENDA').toUpperCase();
@@ -74,51 +67,66 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
   // EXACT same print styling used in Logistics / Inventory BarcodeModal
   const commonStyles = `
     @page {
-      size: 30.2mm 40mm;
-      margin: 0 !important;
+      size: 100mm 40mm;
+      margin: 0;
     }
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      text-transform: uppercase;
+      -webkit-font-smoothing: none;
+      -moz-osx-font-smoothing: grayscale;
+      font-smoothing: none;
+      text-rendering: crispEdges;
+      color: #000 !important;
     }
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      width: 30.2mm !important;
-      height: 40mm !important;
-      overflow: hidden;
+      background: #fff;
+      color: #000;
+      width: 100mm !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      display: grid !important;
+      grid-template-columns: repeat(3, 30.2mm) !important;
+      gap: 3mm !important;
+      justify-content: start !important;
+      align-content: start !important;
     }
     .barcode-label {
-      width: 30.2mm !important;
-      height: 40mm !important;
-      position: relative;
+      width: 30.2mm;
+      height: 40mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      page-break-inside: avoid;
+      background: white;
       overflow: hidden;
-      page-break-after: always;
     }
     .label-inner {
-      width: 40mm !important;
-      height: 30.2mm !important;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(90deg);
+      width: 40mm;
+      height: 30.2mm;
+      transform: rotate(90deg);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 0.5mm 1mm;
-      background: white;
-      text-transform: uppercase;
-      color: #000 !important;
+      justify-content: flex-start;
+      padding: 1mm 1mm;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    .barcode-label:last-child {
+      page-break-after: auto;
     }
     .label-header {
       text-align: center;
       width: 100%;
       line-height: 1.1;
-      font-family: Arial, Helvetica, sans-serif;
     }
     .brand {
       font-size: 6.2pt;
@@ -132,7 +140,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
       text-rendering: geometricPrecision;
     }
     .category {
-      font-size: 5pt;
+      font-size: 6.2pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
@@ -143,7 +151,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
       text-rendering: geometricPrecision;
     }
     .model {
-      font-size: 6.2pt;
+      font-size: 7.2pt;
       font-family: 'Arial Black', sans-serif;
       font-weight: 900;
       margin-bottom: 0.1mm;
@@ -239,7 +247,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     }
   `;
 
-  // Print single variant
+  // Print single variant with exact requested quantity
   const printSingleVariant = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -249,8 +257,9 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     const vModelDisplay = `${sampleName}${vEntalle ? ' - ' + vEntalle.toUpperCase() : ''}`;
     const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
     const hasPrice = variant.salePrice > 0;
+    const printCount = Math.max(1, quantity);
 
-    const items = Array(quantity).fill(0).map((_, index) => {
+    const items = Array(printCount).fill(0).map((_, index) => {
       return `
         <div class="barcode-label">
           <div class="label-inner">
@@ -262,7 +271,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
             </div>
             <div class="barcode-section">
               <div class="barcode-wrapper">
-                <svg id="barcode-${index}-${Date.now()}" class="barcode-svg"></svg>
+                <svg id="barcode-${index}-${Date.now()}" class="barcode-svg" data-sku="${variant.sku}"></svg>
                 <div class="sku-text">${variant.sku}</div>
               </div>
               ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
@@ -276,7 +285,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Sticker OP - ${sample.op} - Talla ${variant.size}</title>
+          <title>Stickers OP - ${sample.op} - Talla ${variant.size}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
           <style>${commonStyles}</style>
         </head>
@@ -285,8 +294,9 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
           <script>
             setTimeout(() => {
               document.querySelectorAll('.barcode-svg').forEach((el) => {
+                const sku = el.getAttribute('data-sku') || "${variant.sku}";
                 try {
-                   JsBarcode(el, "${variant.sku}", {
+                  JsBarcode(el, sku, {
                     format: "CODE128",
                     width: 1.0,
                     height: 35,
@@ -308,19 +318,19 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     printWindow.document.close();
   };
 
-  // Print all variants in batch
+  // Print all variants in batch (quantity copies each)
   const printAllVariants = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const printCount = Math.max(1, quantity);
     const items = variants.flatMap((variant, vIdx) => {
       const vEntalle = (variant.entalle || sample?.entalle || '').trim();
       const vModelDisplay = `${sampleName}${vEntalle ? ' - ' + vEntalle.toUpperCase() : ''}`;
       const hasSize = variant.size && variant.size !== 'N/A' && variant.size !== '-';
       const hasPrice = variant.salePrice > 0;
-      const count = Math.max(1, Number(variant.quantity) || 1);
 
-      return Array(count).fill(0).map((_, index) => {
+      return Array(printCount).fill(0).map((_, index) => {
         return `
           <div class="barcode-label">
             <div class="label-inner">
@@ -332,7 +342,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
               </div>
               <div class="barcode-section">
                 <div class="barcode-wrapper">
-                  <svg id="barcode-all-${vIdx}-${index}" class="barcode-svg" data-sku="${variant.sku}"></svg>
+                  <svg id="barcode-all-${vIdx}-${index}-${Date.now()}" class="barcode-svg" data-sku="${variant.sku}"></svg>
                   <div class="sku-text">${variant.sku}</div>
                 </div>
                 ${hasSize ? `<div class="size-text">${variant.size}</div>` : ''}
@@ -382,6 +392,13 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
     printWindow.document.close();
   };
 
+  const handleSelectVariant = (idx: number) => {
+    setSelectedVariantIndex(idx);
+    if (variants[idx]) {
+      setQuantity(Math.max(1, Number(variants[idx].quantity) || 1));
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-[2rem] max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 my-auto border border-gray-100 flex flex-col max-h-[92vh]">
@@ -409,7 +426,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
         </div>
 
         {/* MODAL CONTENT */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6">
+        <div className="p-6 sm:p-8 overflow-y-auto space-y-6 flex-1">
           {/* 1. VARIANT / ITEM SELECTOR (if multiple sizes/colors) */}
           {variants.length > 1 && (
             <div>
@@ -421,7 +438,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
                   <button
                     key={v.id}
                     type="button"
-                    onClick={() => setSelectedVariantIndex(idx)}
+                    onClick={() => handleSelectVariant(idx)}
                     className={`p-3 rounded-xl border text-left transition flex items-center justify-between ${
                       selectedVariantIndex === idx
                         ? 'border-indigo-600 bg-indigo-50/60 shadow-sm ring-2 ring-indigo-500/20'
@@ -525,7 +542,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
           <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
-                Cantidad a Imprimir para Talla {activeVariant.size}
+                Cantidad de Stickers a Imprimir
               </label>
               <div className="flex items-center gap-3">
                 <button
@@ -539,8 +556,11 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
                   type="number"
                   min="1"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-20 text-center py-2 border border-gray-300 rounded-xl bg-white font-black text-base focus:ring-2 focus:ring-indigo-500 outline-none"
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setQuantity(isNaN(val) ? 1 : Math.max(1, val));
+                  }}
+                  className="w-24 text-center py-2 border border-gray-300 rounded-xl bg-white font-black text-base focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
                 <button
                   type="button"
@@ -553,7 +573,7 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
                   type="button"
                   onClick={() => setQuantity(Number(activeVariant.quantity) || 1)}
                   className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase transition"
-                  title="Usar cantidad de producción"
+                  title="Cargar cantidad del desglose de producción"
                 >
                   Cargar Qty ({activeVariant.quantity})
                 </button>
@@ -561,34 +581,34 @@ export const OPBarcodeModal: React.FC<OPBarcodeModalProps> = ({ sample, onClose 
             </div>
 
             <div className="text-left sm:text-right">
-              <span className="text-[10px] text-gray-400 font-black uppercase block mb-0.5">Impresora compatible</span>
-              <span className="text-xs font-black text-indigo-600 uppercase">Térmica 30.2 x 40mm</span>
+              <span className="text-[10px] text-gray-400 font-black uppercase block mb-0.5">Formato Oficial</span>
+              <span className="text-xs font-black text-indigo-600 uppercase">3 Columnas (100 x 40mm)</span>
             </div>
           </div>
+        </div>
 
-          {/* 4. ACTION BUTTONS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+        {/* 4. ACTION BUTTONS (Sticky Footer) */}
+        <div className="p-4 sm:p-6 bg-white border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={printSingleVariant}
+            className="py-3.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir Talla {activeVariant.size} ({quantity} {quantity === 1 ? 'sticker' : 'stickers'})
+          </button>
+
+          {variants.length > 1 && (
             <button
               type="button"
-              onClick={printSingleVariant}
-              className="py-4 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95"
+              onClick={printAllVariants}
+              className="py-3.5 px-5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-slate-200 flex items-center justify-center gap-2 active:scale-95"
+              title={`Imprime ${quantity} stickers para cada una de las tallas`}
             >
-              <Printer className="w-4 h-4" />
-              Imprimir Talla {activeVariant.size} ({quantity} {quantity === 1 ? 'sticker' : 'stickers'})
+              <Layers className="w-4 h-4 text-emerald-400" />
+              Imprimir Todas las Tallas ({variants.length * quantity} stickers)
             </button>
-
-            {variants.length > 1 && (
-              <button
-                type="button"
-                onClick={printAllVariants}
-                className="py-4 px-5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-slate-200 flex items-center justify-center gap-2 active:scale-95"
-                title="Imprime todas las tallas y colores según la cantidad de producción de cada ítem"
-              >
-                <Layers className="w-4 h-4 text-emerald-400" />
-                Imprimir Todas las Tallas ({variants.reduce((acc, v) => acc + (Number(v.quantity) || 1), 0)} stickers)
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
