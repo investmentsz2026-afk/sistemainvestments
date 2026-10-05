@@ -49,11 +49,21 @@ export default function CollectionsPage() {
         }
     };
 
+    const getSalePaymentStatus = (sale: any) => {
+        const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
+        const totalPaid = approvedPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const isPaidFull = sale.paymentStatus === 'CANCELADO' || (sale.totalAmount > 0 && (sale.totalAmount - totalPaid) <= 0.01 && totalPaid > 0);
+        if (isPaidFull) return 'CANCELADO';
+        if (sale.paymentStatus === 'PARCIAL' || totalPaid > 0) return 'PARCIAL';
+        return sale.paymentStatus || 'PENDIENTE';
+    };
+
     const filteredSales = sales.filter(s => {
         const matchesSearch = s.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              s.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              s.id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'ALL' || s.paymentStatus === statusFilter;
+        const status = getSalePaymentStatus(s);
+        const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
         const isNotAnnulled = s.status !== 'ANULADO';
         return matchesSearch && matchesStatus && isNotAnnulled;
     });
@@ -316,8 +326,11 @@ export default function CollectionsPage() {
                                     </tr>
                                 ) : (
                                     filteredSales.map((sale) => {
-                                        const paid = (sale.payments || []).reduce((acc: number, p: any) => acc + p.amount, 0);
-                                        const balance = sale.totalAmount - paid;
+                                        const paid = (sale.payments || [])
+                                            .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+                                            .reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+                                        const balance = Math.max(0, Math.round((sale.totalAmount - paid) * 100) / 100);
+                                        const status = getSalePaymentStatus(sale);
                                         return (
                                             <tr key={sale.id} className="hover:bg-gray-50/50 transition duration-150 group">
                                                 <td className="px-4 py-4">
@@ -342,10 +355,10 @@ export default function CollectionsPage() {
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                                        sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600' : 
-                                                        sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
+                                                        status === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600' : 
+                                                        status === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'
                                                     }`}>
-                                                        {sale.paymentStatus || 'PENDIENTE'}
+                                                        {status}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4 text-right">

@@ -133,9 +133,18 @@ export default function SalesPage() {
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
 
+    const getSalePaymentStatus = (sale: any) => {
+        const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
+        const totalPaid = approvedPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const isPaidFull = sale.paymentStatus === 'CANCELADO' || (sale.totalAmount > 0 && (sale.totalAmount - totalPaid) <= 0.01 && totalPaid > 0);
+        if (isPaidFull) return 'CANCELADO';
+        if (sale.paymentStatus === 'PARCIAL' || totalPaid > 0) return 'PARCIAL';
+        return sale.paymentStatus || 'PENDIENTE';
+    };
+
     const calcPendingToCollect = (sale: any) => {
         const totalPaid = (sale.payments || [])
-            .filter((p: any) => p.status === 'APROBADO')
+            .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
             .reduce((acc: number, p: any) => acc + p.amount, 0);
         return Math.max(0, sale.totalAmount - totalPaid);
     };
@@ -184,7 +193,7 @@ export default function SalesPage() {
                         row['Costo Total Factura'] = calcDynamicCost(sale);
                     }
                     row['Estado Factura'] = sale.status;
-                    row['Estado Pago'] = sale.paymentStatus || 'PENDIENTE';
+                    row['Estado Pago'] = getSalePaymentStatus(sale);
                     data.push(row);
                 });
             } else {
@@ -210,7 +219,7 @@ export default function SalesPage() {
                     row['Costo Total Factura'] = calcDynamicCost(sale);
                 }
                 row['Estado Factura'] = sale.status;
-                row['Estado Pago'] = sale.paymentStatus || 'PENDIENTE';
+                row['Estado Pago'] = getSalePaymentStatus(sale);
                 data.push(row);
             }
         });
@@ -595,12 +604,17 @@ export default function SalesPage() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-4">
-                                                <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
-                                                    sale.paymentStatus === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                    sale.paymentStatus === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'
-                                                }`}>
-                                                    {sale.paymentStatus || 'PENDIENTE'}
-                                                </span>
+                                                {(() => {
+                                                    const status = getSalePaymentStatus(sale);
+                                                    return (
+                                                        <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
+                                                            status === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                            status === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                        }`}>
+                                                            {status}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center gap-2">

@@ -165,6 +165,23 @@ export class SalesService {
     return sale;
   }
 
+  private calculatePaymentStatus(totalAmount: number, payments: any[]): 'CANCELADO' | 'PARCIAL' | 'PENDIENTE' {
+    const totalPaid = (payments || [])
+      .filter(p => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+      .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+    const pendingBalance = totalAmount - totalPaid;
+    const isFullyPaid = pendingBalance <= 0.01 || Math.round(totalPaid * 100) >= Math.round(totalAmount * 100);
+
+    if (isFullyPaid && totalPaid > 0) {
+      return 'CANCELADO';
+    }
+    if (totalPaid > 0) {
+      return 'PARCIAL';
+    }
+    return 'PENDIENTE';
+  }
+
   async findAll(user: any, query: any) {
     const { startDate, endDate, clientId, sellerId, status, zone } = query;
     const where: any = {};
@@ -189,7 +206,7 @@ export class SalesService {
       };
     }
 
-    return this.prisma.sale.findMany({
+    const sales = await this.prisma.sale.findMany({
       where,
       include: {
         client: true,
@@ -209,6 +226,29 @@ export class SalesService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    const outOfSyncItems: { id: string; status: string }[] = [];
+    const reconciledSales = sales.map(sale => {
+      const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments);
+      if (correctStatus !== sale.paymentStatus) {
+        outOfSyncItems.push({ id: sale.id, status: correctStatus });
+        return { ...sale, paymentStatus: correctStatus };
+      }
+      return sale;
+    });
+
+    if (outOfSyncItems.length > 0) {
+      Promise.all(
+        outOfSyncItems.map(item =>
+          this.prisma.sale.update({
+            where: { id: item.id },
+            data: { paymentStatus: item.status }
+          }).catch(err => console.error(`Error auto-syncing sale ${item.id} status:`, err))
+        )
+      ).catch(err => console.error('Error in batch sale status auto-sync:', err));
+    }
+
+    return reconciledSales;
   }
 
   async findOne(id: string) {
@@ -233,6 +273,16 @@ export class SalesService {
     });
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments);
+    if (correctStatus !== sale.paymentStatus) {
+      sale.paymentStatus = correctStatus;
+      this.prisma.sale.update({
+        where: { id: sale.id },
+        data: { paymentStatus: correctStatus }
+      }).catch(err => console.error(`Error auto-syncing sale ${sale.id} paymentStatus:`, err));
+    }
+
     return sale;
   }
 
@@ -247,21 +297,22 @@ export class SalesService {
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
     const totalPaid = sale.payments
-      .filter(p => p.status === 'APROBADO')
+      .filter(p => p.status === 'APROBADO' || p.status === 'CONCILIADO')
       .reduce((acc, p) => acc + p.amount, 0);
 
     const totalPending = sale.payments
       .filter(p => p.status === 'PENDIENTE')
       .reduce((acc, p) => acc + p.amount, 0);
 
-    if (totalPaid >= sale.totalAmount) {
+    const pendingBalance = sale.totalAmount - totalPaid;
+    if (pendingBalance <= 0.01) {
       throw new BadRequestException('Esta venta ya está completamente pagada (Liquidada).');
     }
 
-    const remainingToPay = sale.totalAmount - totalPaid;
+    const remainingToPay = pendingBalance;
     const remainingToPayWithPending = remainingToPay - totalPending;
 
-    if (remainingToPayWithPending <= 0) {
+    if (remainingToPayWithPending <= 0.01) {
       throw new BadRequestException('Ya existen abonos pendientes de aprobación que cubren el saldo restante.');
     }
 
@@ -347,16 +398,11 @@ export class SalesService {
 
       // If registered by a vendor, the payment remains pending and doesn't update sale status
       if (!isVendor) {
-        // Calculate total paid including the new payment (only approved ones)
-        const existingTotal = sale.payments
-          .filter(p => p.status === 'APROBADO')
-          .reduce((acc, p) => acc + p.amount, 0);
-        const newTotalPaid = existingTotal + parseFloat(amount);
+        const allPayments = await tx.salePayment.findMany({
+          where: { saleId }
+        });
 
-        let paymentStatus = 'PARCIAL';
-        if (newTotalPaid >= sale.totalAmount) {
-          paymentStatus = 'CANCELADO';
-        }
+        const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
 
         await tx.sale.update({
           where: { id: saleId },
@@ -477,14 +523,7 @@ export class SalesService {
         where: { saleId: sale.id }
       });
 
-      const newTotalPaid = allPayments
-        .filter(p => p.status === 'APROBADO')
-        .reduce((acc, p) => acc + p.amount, 0);
-
-      let paymentStatus = 'PARCIAL';
-      if (newTotalPaid >= sale.totalAmount) {
-        paymentStatus = 'CANCELADO';
-      }
+      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
 
       await tx.sale.update({
         where: { id: sale.id },
@@ -520,14 +559,7 @@ export class SalesService {
         where: { saleId: sale.id }
       });
 
-      const newTotalPaid = remainingPayments
-        .filter(p => p.status === 'APROBADO')
-        .reduce((acc, p) => acc + p.amount, 0);
-
-      let paymentStatus = 'PENDIENTE';
-      if (newTotalPaid > 0) {
-        paymentStatus = newTotalPaid >= sale.totalAmount ? 'CANCELADO' : 'PARCIAL';
-      }
+      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, remainingPayments);
 
       await tx.sale.update({
         where: { id: sale.id },
@@ -553,7 +585,7 @@ export class SalesService {
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
     const totalPaid = sale.payments
-      .filter(p => p.status === 'APROBADO')
+      .filter(p => p.status === 'APROBADO' || p.status === 'CONCILIADO')
       .reduce((acc, p) => acc + p.amount, 0);
 
     const totalPending = sale.payments
@@ -563,11 +595,11 @@ export class SalesService {
     const pendingAmount = sale.totalAmount - totalPaid;
     const remainingToPayWithPending = pendingAmount - totalPending;
 
-    if (pendingAmount <= 0) {
+    if (pendingAmount <= 0.01) {
       throw new BadRequestException('Esta venta ya está completamente pagada (Liquidada).');
     }
 
-    if (remainingToPayWithPending <= 0) {
+    if (remainingToPayWithPending <= 0.01) {
       throw new BadRequestException('Ya existen abonos pendientes de aprobación que cubren el saldo restante.');
     }
 
@@ -590,10 +622,14 @@ export class SalesService {
         });
       }
 
-      if (!isVendor && liquidationAmount === pendingAmount) {
+      if (!isVendor) {
+        const allPayments = await tx.salePayment.findMany({
+          where: { saleId }
+        });
+        const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
         return await tx.sale.update({
           where: { id: saleId },
-          data: { paymentStatus: 'CANCELADO' }
+          data: { paymentStatus }
         });
       }
 
@@ -636,14 +672,14 @@ export class SalesService {
     }
 
     const existingApprovedTotal = payment.sale.payments
-      .filter(p => p.status === 'APROBADO' && p.id !== paymentId)
+      .filter(p => (p.status === 'APROBADO' || p.status === 'CONCILIADO') && p.id !== paymentId)
       .reduce((acc, p) => acc + p.amount, 0);
 
-    if (existingApprovedTotal >= payment.sale.totalAmount) {
+    const remainingToPay = payment.sale.totalAmount - existingApprovedTotal;
+    if (remainingToPay <= 0.01) {
       throw new BadRequestException('Esta venta ya está completamente pagada.');
     }
 
-    const remainingToPay = payment.sale.totalAmount - existingApprovedTotal;
     if (payment.amount > remainingToPay + 0.01) {
       throw new BadRequestException(`El monto de este abono (S/ ${payment.amount}) supera el saldo pendiente restante por pagar (S/ ${remainingToPay.toFixed(2)}).`);
     }
@@ -669,16 +705,11 @@ export class SalesService {
         data: updateData,
       });
 
-      // Calculate total paid including this newly approved payment
-      const existingApprovedTotal = payment.sale.payments
-        .filter(p => p.status === 'APROBADO' && p.id !== paymentId)
-        .reduce((acc, p) => acc + p.amount, 0);
-      const newTotalPaid = existingApprovedTotal + payment.amount;
+      const allPayments = await tx.salePayment.findMany({
+        where: { saleId: payment.saleId }
+      });
 
-      let paymentStatus = 'PARCIAL';
-      if (newTotalPaid >= payment.sale.totalAmount) {
-        paymentStatus = 'CANCELADO';
-      }
+      const paymentStatus = this.calculatePaymentStatus(payment.sale.totalAmount, allPayments);
 
       await tx.sale.update({
         where: { id: payment.saleId },
@@ -693,6 +724,7 @@ export class SalesService {
   async conciliatePayment(paymentId: string) {
     const payment = await this.prisma.salePayment.findUnique({
       where: { id: paymentId },
+      include: { sale: true }
     });
 
     if (!payment) throw new NotFoundException('Pago no encontrado');
@@ -700,9 +732,23 @@ export class SalesService {
       throw new BadRequestException('Solo se pueden conciliar pagos aprobados por Comercial.');
     }
 
-    return this.prisma.salePayment.update({
-      where: { id: paymentId },
-      data: { status: 'CONCILIADO' },
+    return await this.prisma.$transaction(async (tx) => {
+      const conciliated = await tx.salePayment.update({
+        where: { id: paymentId },
+        data: { status: 'CONCILIADO' },
+      });
+
+      const allPayments = await tx.salePayment.findMany({
+        where: { saleId: payment.saleId }
+      });
+
+      const paymentStatus = this.calculatePaymentStatus(payment.sale.totalAmount, allPayments);
+      await tx.sale.update({
+        where: { id: payment.saleId },
+        data: { paymentStatus }
+      });
+
+      return conciliated;
     });
   }
 
@@ -712,24 +758,42 @@ export class SalesService {
       throw new BadRequestException('No se han seleccionado pagos para conciliar.');
     }
 
-    // Verify all provided payments belong to the sale and are APROBADO
-    const payments = await this.prisma.salePayment.findMany({
-      where: { 
-        id: { in: paymentIds },
-        saleId,
-        status: 'APROBADO'
-      }
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId }
     });
+    if (!sale) throw new NotFoundException('Venta no encontrada');
 
-    if (payments.length !== paymentIds.length) {
-      throw new BadRequestException('Algunos de los pagos seleccionados no son válidos o no pertenecen a esta venta.');
-    }
+    return await this.prisma.$transaction(async (tx) => {
+      const payments = await tx.salePayment.findMany({
+        where: { 
+          id: { in: paymentIds },
+          saleId,
+          status: 'APROBADO'
+        }
+      });
 
-    return this.prisma.salePayment.updateMany({
-      where: { 
-        id: { in: paymentIds }
-      },
-      data: { status: 'CONCILIADO' }
+      if (payments.length !== paymentIds.length) {
+        throw new BadRequestException('Algunos de los pagos seleccionados no son válidos o no pertenecen a esta venta.');
+      }
+
+      await tx.salePayment.updateMany({
+        where: { 
+          id: { in: paymentIds }
+        },
+        data: { status: 'CONCILIADO' }
+      });
+
+      const allPayments = await tx.salePayment.findMany({
+        where: { saleId }
+      });
+
+      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
+      await tx.sale.update({
+        where: { id: saleId },
+        data: { paymentStatus }
+      });
+
+      return { success: true };
     });
   }
 

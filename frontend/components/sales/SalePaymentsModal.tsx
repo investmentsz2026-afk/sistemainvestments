@@ -399,8 +399,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         if (val < 1) return;
         setCantidadLetras(val);
 
-        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-        const pending = sale ? sale.totalAmount - totalPaid : 0;
+        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+        const pending = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
 
         const splitList = (total: number, count: number) => {
             const base = Math.floor((total / count) * 100) / 100;
@@ -521,8 +521,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         const numericAmount = Math.round(parseFloat(parsedAmountStr) * 100) / 100;
         if (!amount || numericAmount <= 0) return;
 
-        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-        const pendingAmount = Math.round((sale ? sale.totalAmount - totalPaid : 0) * 100) / 100;
+        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+        const pendingAmount = Math.max(0, Math.round((sale ? sale.totalAmount - totalPaid : 0) * 100) / 100);
 
         if (method === 'LETRAS') {
             const sumOfLetras = letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
@@ -678,11 +678,11 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
     if (!isOpen) return null;
 
-    const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
+    const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
     const totalPending = sale?.payments?.filter((p: any) => p.status === 'PENDIENTE').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-    const pendingAmount = sale ? sale.totalAmount - totalPaid : 0;
-    const pendingAmountWithPending = pendingAmount - totalPending;
-    const isCompleted = sale?.paymentStatus === 'CANCELADO';
+    const pendingAmount = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
+    const pendingAmountWithPending = Math.round((pendingAmount - totalPending) * 100) / 100;
+    const isCompleted = sale?.paymentStatus === 'CANCELADO' || (sale && pendingAmount <= 0.01 && totalPaid > 0);
 
     return (
         <AnimatePresence>
@@ -864,11 +864,11 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                      payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
                                                                 </span>
                                                                 <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase border ${
-                                                                    payment.status === 'APROBADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                                    payment.status === 'APROBADO' || payment.status === 'CONCILIADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                                     payment.status === 'RECHAZADO' ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                                                     'bg-amber-50 text-amber-600 border-amber-100'
                                                                 }`}>
-                                                                    {payment.status === 'APROBADO' ? 'CONFIRMADO' :
+                                                                    {payment.status === 'APROBADO' || payment.status === 'CONCILIADO' ? 'CONFIRMADO' :
                                                                      payment.status === 'RECHAZADO' ? 'RECHAZADO' : 'PENDIENTE'}
                                                                 </span>
                                                             </div>
