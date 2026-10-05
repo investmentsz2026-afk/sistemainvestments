@@ -43,6 +43,7 @@ import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { printExchangeCargo } from '../../utils/exchangeCargo';
 
 interface KardexFilters {
   productId: string;
@@ -50,7 +51,7 @@ interface KardexFilters {
   dateRange: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'custom';
   startDate: string;
   endDate: string;
-  movementType: 'all' | 'ENTRY' | 'EXIT';
+  movementType: 'all' | 'ENTRY' | 'EXIT' | 'CAMBIO';
   inventoryType: string;
 }
 
@@ -132,7 +133,11 @@ export default function KardexPage() {
     const matchesDate = movementDate >= startDateTime && movementDate <= endDateTime;
     const matchesProduct = filters.productId === 'todos' || movement.variant.productId === filters.productId;
     const matchesVariant = filters.variantId === 'todas' || movement.variantId === filters.variantId;
-    const matchesType = filters.movementType === 'all' || movement.type === filters.movementType;
+    const matchesType = filters.movementType === 'all'
+      ? true
+      : filters.movementType === 'CAMBIO'
+        ? movement.reason?.toLowerCase() === 'cambio'
+        : movement.type === filters.movementType;
     const matchesInventoryType = filters.inventoryType === 'TODOS' || movement.variant.product.inventoryType === filters.inventoryType;
 
     return matchesDate && matchesProduct && matchesVariant && matchesType && matchesInventoryType;
@@ -196,6 +201,41 @@ export default function KardexPage() {
 
   const kardexWithRunningStock = getKardexWithRunningStock();
 
+  // Helper para extraer datos de canje / cambio
+  const getExchangeData = (movement: any) => {
+    if (movement?.reason?.toLowerCase() !== 'cambio') return null;
+    let data: any = null;
+    if (movement.reference) {
+      try {
+        data = JSON.parse(movement.reference);
+      } catch {
+        // Formato simple / texto plano
+      }
+    }
+    return {
+      exchangeId: data?.exchangeId || `CHG-${movement.id?.slice(-6).toUpperCase() || 'CANJE'}`,
+      invoiceNumber: data?.invoiceNumber || (movement.reference && !data ? movement.reference : 'S/N'),
+      clientName: data?.clientName || 'Cliente',
+      clientDocument: data?.clientDocument || '',
+      date: new Date(movement.createdAt).toLocaleString('es-PE'),
+      notes: data?.notes || `Movimiento de ${movement.type === 'ENTRY' ? 'Entrada' : 'Salida'} por cambio de producto`,
+      outItems: data?.outItems || (movement.type === 'EXIT' ? [{
+        variantSku: movement.variant?.variantSku || '',
+        productName: movement.variant?.product?.name || '',
+        size: movement.variant?.size,
+        color: movement.variant?.color,
+        quantity: movement.quantity
+      }] : []),
+      inItems: data?.inItems || (movement.type === 'ENTRY' ? [{
+        variantSku: movement.variant?.variantSku || '',
+        productName: movement.variant?.product?.name || '',
+        size: movement.variant?.size,
+        color: movement.variant?.color,
+        quantity: movement.quantity
+      }] : [])
+    };
+  };
+
   // Search filter — searches across ALL records regardless of page
   const searchFilteredKardex = kardexWithRunningStock.filter(m => {
     if (!searchTerm.trim()) return true;
@@ -221,22 +261,34 @@ export default function KardexPage() {
 
   // Exportar a Excel
   const exportToExcel = () => {
-    const data = kardexWithRunningStock.map(m => ({
-      'Fecha': format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm'),
-      'Tipo': m.type === 'ENTRY' ? 'Entrada' : 'Salida',
-      'Producto': m.variant.product.name,
-      'OP': m.variant.product.op || '--',
-      'SKU': m.variant.variantSku,
-      'Talla': m.variant.size,
-      'Color': m.variant.color,
-      'Cantidad': m.quantity,
-      'Motivo': m.reason,
-      'Referencia': m.reference || '-',
-      'Stock Anterior': m.previousStock,
-      'Stock Nuevo': m.newStock,
-      'Stock Correlativo': m.runningStock,
-      'Usuario': m.user.name
-    }));
+    const data = kardexWithRunningStock.map(m => {
+      let refDisplay = m.reference || '-';
+      if (m.reason?.toLowerCase() === 'cambio' && m.reference) {
+        try {
+          const parsed = JSON.parse(m.reference);
+          if (parsed.invoiceNumber) {
+            refDisplay = `Canje Fac: ${parsed.invoiceNumber}${parsed.clientName ? ` (${parsed.clientName})` : ''}`;
+          }
+        } catch {}
+      }
+
+      return {
+        'Fecha': format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm'),
+        'Tipo': m.type === 'ENTRY' ? 'Entrada' : 'Salida',
+        'Producto': m.variant.product.name,
+        'OP': m.variant.product.op || '--',
+        'SKU': m.variant.variantSku,
+        'Talla': m.variant.size,
+        'Color': m.variant.color,
+        'Cantidad': m.quantity,
+        'Motivo': m.reason,
+        'Referencia': refDisplay,
+        'Stock Anterior': m.previousStock,
+        'Stock Nuevo': m.newStock,
+        'Stock Correlativo': m.runningStock,
+        'Usuario': m.user.name
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -569,6 +621,7 @@ export default function KardexPage() {
                   <option value="all">Todos</option>
                   <option value="ENTRY">Solo entradas</option>
                   <option value="EXIT">Solo salidas</option>
+                  <option value="CAMBIO">🔄 Movimientos por Cambios</option>
                 </select>
               </div>
 
@@ -735,9 +788,48 @@ export default function KardexPage() {
                       <span className="font-bold text-blue-600">{movement.runningStock}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900">{movement.reason}</p>
-                      {movement.reference && (
-                        <p className="text-xs text-gray-500">Ref: {movement.reference}</p>
+                      {movement.reason?.toLowerCase() === 'cambio' ? (
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            🔄 Cambio
+                          </span>
+                          {(() => {
+                            const cargo = getExchangeData(movement);
+                            return (
+                              <div className="pt-0.5">
+                                {cargo?.invoiceNumber && cargo.invoiceNumber !== 'S/N' && (
+                                  <p className="text-xs text-gray-700 font-semibold">
+                                    Fac: {cargo.invoiceNumber}
+                                  </p>
+                                )}
+                                {cargo?.clientName && cargo.clientName !== 'Cliente' && (
+                                  <p className="text-[11px] text-gray-500 truncate max-w-[150px]">
+                                    {cargo.clientName}
+                                  </p>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (cargo) printExchangeCargo(cargo);
+                                  }}
+                                  className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-purple-50 text-purple-700 hover:bg-purple-200 border border-purple-200 shadow-sm transition"
+                                  title="Imprimir o descargar Cargo de Cambio para firma del cliente"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  <span>Cargo PDF</span>
+                                </button>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-gray-900">{movement.reason}</p>
+                          {movement.reference && (
+                            <p className="text-xs text-gray-500">Ref: {movement.reference}</p>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="px-6 py-4">
@@ -861,11 +953,50 @@ export default function KardexPage() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Motivo:</span> {movement.reason}
-                </p>
-                {movement.reference && (
-                  <p className="text-sm text-gray-500 mt-1">Ref: {movement.reference}</p>
+                {movement.reason?.toLowerCase() === 'cambio' ? (
+                  <div className="space-y-1.5 mb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                        🔄 Cambio
+                      </span>
+                      {(() => {
+                        const cargo = getExchangeData(movement);
+                        return cargo ? (
+                          <button
+                            type="button"
+                            onClick={() => printExchangeCargo(cargo)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-purple-50 text-purple-700 hover:bg-purple-200 border border-purple-200 transition"
+                            title="Descargar / Imprimir Cargo de Cambio"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>Cargo PDF</span>
+                          </button>
+                        ) : null;
+                      })()}
+                    </div>
+                    {(() => {
+                      const cargo = getExchangeData(movement);
+                      return (
+                        <>
+                          {cargo?.invoiceNumber && cargo.invoiceNumber !== 'S/N' && (
+                            <p className="text-xs text-gray-700 font-semibold">Factura: {cargo.invoiceNumber}</p>
+                          )}
+                          {cargo?.clientName && cargo.clientName !== 'Cliente' && (
+                            <p className="text-xs text-gray-500">Cliente: {cargo.clientName}</p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">Motivo:</span> {movement.reason}
+                    </p>
+                    {movement.reference && (
+                      <p className="text-sm text-gray-500 mt-1">Ref: {movement.reference}</p>
+                    )}
+                  </>
                 )}
                 <div className="flex items-center gap-2 mt-2">
                   <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">

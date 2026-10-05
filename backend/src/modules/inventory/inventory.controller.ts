@@ -37,4 +37,12 @@ export class InventoryController {
       scanMovementDto.reason
     );
   }
+
+  @Post('exchange')
+  registerExchange(
+    @Request() req,
+    @Body() exchangeData: any,
+  ) {
+    return this.inventoryService.registerExchange(req.user.id, exchangeData);
+  }
 }

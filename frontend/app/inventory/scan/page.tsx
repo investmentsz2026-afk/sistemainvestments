@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import Webcam from 'react-webcam';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
+import ProductExchangeModal from '../../../components/inventory/ProductExchangeModal';
 
 // Tipos
 type MovementType = 'ENTRY' | 'EXIT';
@@ -119,6 +120,7 @@ export default function ScanPage() {
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [currentItem, setCurrentItem] = useState<any>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [reference, setReference] = useState('');
   const [isScanning, setIsScanning] = useState(false);
@@ -1033,7 +1035,14 @@ export default function ScanPage() {
                   Cancelar
                 </button>
                 <button
-                  onClick={handleSubmitMovements}
+                  onClick={() => {
+                    if (movementType === 'EXIT' && reason === 'Cambio') {
+                      setShowConfirmation(false);
+                      setIsExchangeModalOpen(true);
+                    } else {
+                      handleSubmitMovements();
+                    }
+                  }}
                   disabled={isRegistering || !reason}
                   className={`flex-1 px-4 py-2 rounded-lg text-white transition ${
                     movementType === 'ENTRY'
@@ -1048,6 +1057,21 @@ export default function ScanPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Canje / Cambio de Producto por Factura */}
+      <ProductExchangeModal
+        isOpen={isExchangeModalOpen}
+        onClose={() => setIsExchangeModalOpen(false)}
+        outItems={scannedItems}
+        onSuccess={() => {
+          setScannedItems([]);
+          setReason('');
+          setReference('');
+          if (cameraActive && typeof stopCamera === 'function') {
+            stopCamera();
+          }
+        }}
+      />
     </Layout>
   );
 }
