@@ -399,8 +399,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         if (val < 1) return;
         setCantidadLetras(val);
 
-        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-        const pending = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
+        const currentOtherPayments = (sale?.payments || []).filter((p: any) => 
+            (!editingPaymentId || p.id !== editingPaymentId) && 
+            (p.status === 'APROBADO' || p.status === 'CONCILIADO')
+        );
+        const currentOtherPaid = currentOtherPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const pending = sale ? Math.max(0, Math.round((sale.totalAmount - currentOtherPaid) * 100) / 100) : 0;
 
         const splitList = (total: number, count: number) => {
             const base = Math.floor((total / count) * 100) / 100;
@@ -521,13 +525,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
         const numericAmount = Math.round(parseFloat(parsedAmountStr) * 100) / 100;
         if (!amount || numericAmount <= 0) return;
 
-        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-        const pendingAmount = Math.max(0, Math.round((sale ? sale.totalAmount - totalPaid : 0) * 100) / 100);
+        const currentOtherPayments = (sale?.payments || []).filter((p: any) => 
+            (!editingPaymentId || p.id !== editingPaymentId) && 
+            (p.status === 'APROBADO' || p.status === 'CONCILIADO')
+        );
+        const currentOtherPaid = currentOtherPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const maxAvailable = Math.max(0, Math.round((sale ? sale.totalAmount - currentOtherPaid : 0) * 100) / 100);
 
         if (method === 'LETRAS') {
             const sumOfLetras = letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0);
-            if (sumOfLetras > pendingAmount + 0.01) {
-                setErrorMsg(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no puede superar el saldo pendiente de la venta (S/ ${pendingAmount.toFixed(2)}).`);
+            if (sumOfLetras > maxAvailable + 0.01) {
+                setErrorMsg(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no puede superar el saldo disponible de la venta (S/ ${maxAvailable.toFixed(2)}).`);
                 return;
             }
             const invalidLetras = letrasList.some(l => !l.dueDate || !l.amount || parseFloat(l.amount) <= 0);
@@ -536,8 +544,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 return;
             }
         } else {
-            if (numericAmount > pendingAmount) {
-                setErrorMsg(`El saldo pendiente es de S/ ${pendingAmount.toLocaleString()}. No puede exceder este monto.`);
+            if (numericAmount > maxAvailable) {
+                setErrorMsg(`El saldo disponible es de S/ ${maxAvailable.toLocaleString()}. No puede exceder este monto.`);
                 return;
             }
         }
@@ -638,6 +646,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     };
 
     const handleEditClick = (payment: any) => {
+        setErrorMsg(null);
         setEditingPaymentId(payment.id);
         setAmount(payment.amount.toString());
         setMethod(payment.method);
@@ -683,6 +692,13 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const pendingAmount = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
     const pendingAmountWithPending = Math.round((pendingAmount - totalPending) * 100) / 100;
     const isCompleted = sale?.paymentStatus === 'CANCELADO' || (sale && pendingAmount <= 0.01 && totalPaid > 0);
+
+    const currentFormOtherPayments = (sale?.payments || []).filter((p: any) => 
+        (!editingPaymentId || p.id !== editingPaymentId) && 
+        (p.status === 'APROBADO' || p.status === 'CONCILIADO')
+    );
+    const currentFormOtherPaid = currentFormOtherPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+    const availableForForm = sale ? Math.max(0, Math.round((sale.totalAmount - currentFormOtherPaid) * 100) / 100) : 0;
 
     return (
         <AnimatePresence>
@@ -784,6 +800,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                     {!isCompleted && pendingAmountWithPending > 0 && (
                                         <button 
                                             onClick={() => {
+                                                setEditingPaymentId(null);
                                                 setShowAddForm(true);
                                                 setErrorMsg(null);
                                             }}
@@ -1123,8 +1140,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                         setNotes('Descuento global al total de ventas');
                                                     } else if (e.target.value === 'LETRAS') {
                                                         setNotes('Pago en letras de cambio');
-                                                        const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-                                                        const pending = sale ? sale.totalAmount - totalPaid : 0;
+                                                        const currentOtherPayments = (sale?.payments || []).filter((p: any) => 
+                                                            (!editingPaymentId || p.id !== editingPaymentId) && 
+                                                            (p.status === 'APROBADO' || p.status === 'CONCILIADO')
+                                                        );
+                                                        const currentOtherPaid = currentOtherPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+                                                        const pending = sale ? Math.max(0, Math.round((sale.totalAmount - currentOtherPaid) * 100) / 100) : 0;
                                                         
                                                         const defaultDueDate = new Date();
                                                         defaultDueDate.setDate(defaultDueDate.getDate() + 30);
@@ -1279,29 +1300,29 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
                                                     <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Saldo Restante</span>
                                                     <span className={`text-xs font-mono font-black ${
-                                                        pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 
+                                                        availableForForm - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 
                                                             ? 'text-amber-500' 
                                                             : 'text-emerald-600'
                                                     }`}>
-                                                        S/ {Math.max(0, pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        S/ {Math.max(0, availableForForm - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > pendingAmount + 0.01 && (
+                                            {letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > availableForForm + 0.01 && (
                                                 <div className="bg-rose-50 border border-rose-250 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
                                                     <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
                                                     <p className="text-[8.5px] text-rose-600 font-bold leading-normal uppercase tracking-wider">
-                                                        La suma de las letras no puede superar el saldo pendiente de S/ {pendingAmount.toFixed(2)}. Diferencia excedida: S/ {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - pendingAmount).toFixed(2)}.
+                                                        La suma de las letras no puede superar el saldo disponible de S/ {availableForForm.toFixed(2)}. Diferencia excedida: S/ {Math.abs(letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) - availableForForm).toFixed(2)}.
                                                     </p>
                                                 </div>
                                             )}
 
-                                            {pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 && (
+                                            {availableForForm - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0) > 0.01 && (
                                                 <div className="bg-sky-50 border border-sky-200/60 p-2.5 rounded-xl text-left flex items-start gap-2 w-full">
                                                     <Info className="w-3.5 h-3.5 text-sky-500 shrink-0 mt-0.5" />
                                                     <p className="text-[8.5px] text-sky-600 font-bold leading-normal uppercase tracking-wider">
-                                                        Abono parcial en letras. Quedará un saldo pendiente de S/ {(pendingAmount - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toFixed(2)} que se podrá cobrar después con otros métodos de pago.
+                                                        Abono parcial en letras. Quedará un saldo pendiente de S/ {(availableForForm - letrasList.reduce((sum, l) => sum + parseFloat(l.amount || 0), 0)).toFixed(2)} que se podrá cobrar después con otros métodos de pago.
                                                     </p>
                                                 </div>
                                             )}

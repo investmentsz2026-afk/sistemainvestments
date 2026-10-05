@@ -428,8 +428,8 @@ export class SalesService {
     const otherPayments = sale.payments.filter(p => p.id !== paymentId);
 
     const totalPaid = otherPayments
-      .filter(p => p.status === 'APROBADO')
-      .reduce((acc, p) => acc + p.amount, 0);
+      .filter(p => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+      .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 
     const remainingToPay = sale.totalAmount - totalPaid;
 
@@ -445,6 +445,9 @@ export class SalesService {
       const sumOfLetras = data.letras.reduce((sum: number, l: any) => sum + parseFloat(l.amount || 0), 0);
       if (Math.abs(sumOfLetras - inputAmount) > 0.01) {
         throw new BadRequestException(`La suma de las letras (S/ ${sumOfLetras.toFixed(2)}) no coincide con el monto total del abono (S/ ${inputAmount.toFixed(2)}).`);
+      }
+      if (inputAmount > remainingToPay + 0.01) {
+        throw new BadRequestException(`La suma de las letras (S/ ${inputAmount.toFixed(2)}) supera el saldo disponible de S/ ${remainingToPay.toFixed(2)}.`);
       }
     } else {
       if (inputAmount > remainingToPay + 0.01) {
@@ -464,11 +467,11 @@ export class SalesService {
 
       let paymentData: any = {
         amount: parseFloat(amount),
-        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+        paymentDate: paymentDate ? new Date(paymentDate.includes('T') ? paymentDate : `${paymentDate}T00:00:00.000Z`) : new Date(),
         method: method || 'EFECTIVO',
         notes,
         evidenceUrl,
-        status: isVendor ? 'PENDIENTE' : 'APROBADO',
+        status: isVendor ? 'PENDIENTE' : (payment.status || 'APROBADO'),
         creditNoteMotive: null,
         creditNoteNumber: null,
         sunatStatus: null,
@@ -482,7 +485,7 @@ export class SalesService {
         paymentData.letraDetails = {
           create: data.letras.map((letra: any) => ({
             number: parseInt(letra.number),
-            dueDate: new Date(letra.dueDate),
+            dueDate: new Date(letra.dueDate?.includes('T') ? letra.dueDate : `${letra.dueDate}T00:00:00.000Z`),
             amount: parseFloat(letra.amount),
             uniqueNumber: letra.uniqueNumber || null,
             observation: letra.observation || null,
