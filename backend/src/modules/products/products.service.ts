@@ -30,7 +30,7 @@ export class ProductsService {
           category: createProductDto.category,
           size: (createProductDto.sizes && createProductDto.sizes[0]) || '01',
           color: (createProductDto.colors && createProductDto.colors[0]) || 'UN',
-          location: createProductDto.location || 'A1',
+          location: (createProductDto.location && createProductDto.location.trim()) ? createProductDto.location.trim().toUpperCase() : 'A1',
           correlative: createProductDto.correlative || counter,
         });
       } else {
@@ -59,7 +59,7 @@ export class ProductsService {
         realPrice: createProductDto.realPrice || 0.0,
         minStock: createProductDto.minStock || 5,
         weight: createProductDto.weight !== undefined ? createProductDto.weight : null,
-        location: createProductDto.location !== undefined ? createProductDto.location : null,
+        location: (createProductDto.location && createProductDto.location.trim()) ? createProductDto.location.trim().toUpperCase() : 'A1',
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
         imageUrl: createProductDto.imageUrl,
@@ -137,7 +137,7 @@ export class ProductsService {
           category: product.category,
           size: createVariantDto.size,
           color: createVariantDto.color,
-          location: createVariantDto.location || product.location || 'A1',
+          location: (createVariantDto.location && createVariantDto.location.trim()) ? createVariantDto.location.trim().toUpperCase() : (product.location || 'A1'),
         });
       } else if (product.op) {
         variantSku = await this.generateUniqueSkuForOp(product.op);
@@ -159,7 +159,7 @@ export class ProductsService {
         color: createVariantDto.color,
         stock: createVariantDto.initialStock || 0,
         variantSku,
-        location: createVariantDto.location || product.location || null,
+        location: (createVariantDto.location && createVariantDto.location.trim()) ? createVariantDto.location.trim().toUpperCase() : (product.location || 'A1'),
         op: product.op || undefined,
       },
     });

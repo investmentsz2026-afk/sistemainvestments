@@ -282,6 +282,7 @@ export default function NewProductPage() {
       setError(null);
       
       const { opVariants, importedStockQuantities, ...cleanData } = data;
+      cleanData.location = (cleanData.location && cleanData.location.trim()) ? cleanData.location.trim().toUpperCase() : 'A1';
       let createdProduct: any = null;
 
       if (data.op && data.opVariants) {

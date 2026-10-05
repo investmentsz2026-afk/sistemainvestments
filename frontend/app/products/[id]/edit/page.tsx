@@ -31,6 +31,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       setError(null);
       // Extraer campos que no deben enviarse al backend para evitar errores de validación de DTO (non-whitelisted fields)
       const { opVariants, importedStockQuantities, purchaseItemId, ...cleanData } = data;
+      cleanData.location = (cleanData.location && cleanData.location.trim()) ? cleanData.location.trim().toUpperCase() : 'A1';
       await updateProduct({ id: params.id, ...cleanData });
       router.push('/products');
     } catch (err: any) {

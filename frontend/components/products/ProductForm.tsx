@@ -140,7 +140,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
     (val) => (val === '' || val === null || val === undefined || isNaN(Number(val)) ? undefined : Number(val)),
     z.number().optional().nullable()
   ),
-  location: z.string().optional(),
+  location: z.string().optional().nullable().default('A1'),
   correlative: z.string().optional(),
   purchasePrice: z.number().min(0, 'El precio de compra debe ser mayor o igual a 0').optional().default(0.1),
   sellingPrice: z.number().min(0, 'El precio de venta debe ser mayor o igual a 0').optional().default(0.1),
@@ -252,7 +252,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       realPrice: 0,
       minStock: 5,
       weight: undefined,
-      location: initialData?.location || '',
+      location: initialData?.location || 'A1',
       correlative: initialData?.correlative || (initialData?.sku ? (initialData.sku.match(/^[A-Za-z]+(\d{4})/)?.[1] || initialData.sku.replace(/\D/g, '').slice(0, 4) || '') : ''),
       sizes: [],
       colors: [],
@@ -266,8 +266,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   React.useEffect(() => {
     if (initialData) {
       const dataToReset = { ...initialData };
-      if (!dataToReset.location && initialData.location) {
-        dataToReset.location = initialData.location;
+      if (!dataToReset.location) {
+        dataToReset.location = initialData.location || 'A1';
       }
       if (!dataToReset.correlative && initialData.sku) {
         const match = initialData.sku.match(/^[A-Za-z]+(\d{4})/);
@@ -552,6 +552,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   };
 
   const handleFormSubmit = (data: ProductFormData) => {
+    // Si no se especifica ubicación en almacén o se deja en blanco, asignar 'A1' por defecto
+    data.location = (data.location && data.location.trim()) ? data.location.trim().toUpperCase() : 'A1';
+
     const isCorreas = (data.category || '').toLowerCase().includes('correa');
     const isMat = ['MATERIALES', 'MAQUINARIA', 'AVIOS', 'MERCHAN_DESIGN', 'OTROS'].includes(data.inventoryType) && !isCorreas;
     if (isMat) {
@@ -874,16 +877,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             <div className={['AVIOS', 'MATERIALES'].includes(watchInventoryType) ? 'md:col-span-1' : ''}>
               <label className={labelClass}>
                 <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                Ubicación en Almacén {['AVIOS', 'MATERIALES'].includes(watchInventoryType) ? <span className="text-amber-600 font-bold text-[10px]">(Parte del SKU)</span> : <span className="text-gray-400 text-[10px]">(Opcional)</span>}
+                Ubicación en Almacén <span className="text-gray-400 text-[10px] font-medium">(Por defecto A1)</span>
               </label>
               <input
                 type="text"
                 {...register('location')}
                 className={`${inputBase} uppercase font-bold tracking-wider ${errors.location ? inputError : inputNormal}`}
-                placeholder="Ej: A1, A2, EST-01"
+                placeholder="A1"
               />
               <p className="mt-1.5 text-[10px] text-gray-400 flex items-center gap-1">
-                <Info className="w-3 h-3" /> Ubicación donde se almacena el avío o material.
+                <Info className="w-3 h-3" /> Ubicación en almacén (si se deja vacío se asigna automáticamente A1).
               </p>
             </div>
 
