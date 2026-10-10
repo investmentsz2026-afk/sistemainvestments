@@ -20,7 +20,9 @@ import {
     Receipt,
     RefreshCw,
     Calendar,
-    Filter
+    Filter,
+    Info,
+    CreditCard
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { toast } from 'react-hot-toast';
@@ -44,6 +46,22 @@ const formatCurrency = (amount: number) => {
     return `S/ ${(amount || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const formatPaymentMethod = (method: string) => {
+    switch (method) {
+        case 'EFECTIVO': return 'Efectivo';
+        case 'TRANSFERENCIA': return 'Transferencia';
+        case 'DEPOSITO': return 'Depósito';
+        case 'YAPE': return 'Yape';
+        case 'PLIN': return 'Plin';
+        case 'LETRAS': return 'Letras de Cambio';
+        case 'NOTA_CREDITO': return 'Nota de Crédito';
+        case 'LIQUIDACION': return 'Liquidación';
+        case 'CHEQUE': return 'Cheque';
+        case 'TARJETA': return 'Tarjeta';
+        default: return method || 'Pago';
+    }
+};
+
 export default function ClientAccountStatementModal({
     isOpen,
     onClose,
@@ -59,6 +77,47 @@ export default function ClientAccountStatementModal({
     const [isExportingImage, setIsExportingImage] = useState(false);
     const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
 
+    // Amortización details hover popover state
+    const [hoveredSale, setHoveredSale] = useState<{
+        saleId: string;
+        invoiceNumber: string;
+        payments: any[];
+        totalPaid: number;
+        rect: { top: number; left: number; right: number; bottom: number };
+    } | null>(null);
+    const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const handleMouseEnterAmortizacion = (sale: any, totalPaid: number, e: React.MouseEvent<HTMLElement>) => {
+        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+        const rect = e.currentTarget.getBoundingClientRect();
+        setHoveredSale({
+            saleId: sale.id,
+            invoiceNumber: sale.invoiceNumber ? sale.invoiceNumber : `#${sale.id.slice(-6).toUpperCase()}`,
+            payments: sale.payments || [],
+            totalPaid,
+            rect: {
+                top: rect.top,
+                left: rect.left,
+                right: rect.right,
+                bottom: rect.bottom,
+            }
+        });
+    };
+
+    const handleMouseLeaveAmortizacion = () => {
+        hideTimeoutRef.current = setTimeout(() => {
+            setHoveredSale(null);
+        }, 180);
+    };
+
+    const handlePopoverMouseEnter = () => {
+        if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+
+    const handlePopoverMouseLeave = () => {
+        setHoveredSale(null);
+    };
+
     // Period filter state: Semester / Annual / All
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
@@ -72,6 +131,7 @@ export default function ClientAccountStatementModal({
             fetchClients();
         } else {
             setClientSearch('');
+            setHoveredSale(null);
             if (!initialClientId) {
                 setSelectedClient(null);
                 setClientSales([]);
@@ -213,7 +273,7 @@ export default function ClientAccountStatementModal({
             totalAmount += saleTotal;
 
             const paid = (s.payments || [])
-                .filter((p: any) => p.status === 'APROBADO')
+                .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
                 .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
             totalPaid += paid;
 
@@ -238,6 +298,7 @@ export default function ClientAccountStatementModal({
 
     // Download Statement as PNG Image using html2canvas
     const handleDownloadImage = async () => {
+        setHoveredSale(null);
         if (!statementCardRef.current || !selectedClient) {
             toast.error('Selecciona un cliente para exportar');
             return;
@@ -308,7 +369,7 @@ export default function ClientAccountStatementModal({
             `📊 *RESUMEN DEL PERIODO:*`,
             `• Compras: ${metrics.activeCount} comprobante(s)`,
             `• Total Facturado: S/ ${metrics.totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
-            `• Total Pagado: S/ ${metrics.totalPaid.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
+            `• Total Amortizado: S/ ${metrics.totalPaid.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`,
             metrics.totalBalance > 0
                 ? `🔴 *SALDO PENDIENTE: S/ ${metrics.totalBalance.toLocaleString('es-PE', { minimumFractionDigits: 2 })}*`
                 : `🟢 *ESTADO: AL DÍA (TOTALMENTE CANCELADO)*`,
@@ -316,13 +377,13 @@ export default function ClientAccountStatementModal({
             `📋 *DETALLE:*`,
             ...activeSales.map((s, idx) => {
                 const paid = (s.payments || [])
-                    .filter((p: any) => p.status === 'APROBADO')
+                    .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
                     .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
                 const bal = Math.max(0, (Number(s.totalAmount) || 0) - paid);
                 const sDate = formatDate(s.createdAt);
                 const doc = s.invoiceNumber ? s.invoiceNumber : `#${s.id.slice(-6).toUpperCase()}`;
                 const statusTag = bal <= 0.01 ? 'CANCELADO' : paid > 0 ? `PARCIAL (Resta S/ ${bal.toFixed(2)})` : 'PENDIENTE';
-                return `${idx + 1}. ${sDate} | ${doc} | Total: S/ ${s.totalAmount.toFixed(2)} | Pagado: S/ ${paid.toFixed(2)} | Saldo: S/ ${bal.toFixed(2)} [${statusTag}]`;
+                return `${idx + 1}. ${doc} | ${sDate} | Total: S/ ${s.totalAmount.toFixed(2)} | Amortización: S/ ${paid.toFixed(2)} | Saldo: S/ ${bal.toFixed(2)} [${statusTag}]`;
             }),
             `\n_Para cualquier consulta comunicarse con el área comercial de Investments Z&G._`
         ].filter(Boolean).join('\n');
@@ -510,7 +571,10 @@ export default function ClientAccountStatementModal({
                     </div>
 
                     {/* MODAL BODY */}
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 space-y-4">
+                    <div 
+                        className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 space-y-4"
+                        onScroll={() => setHoveredSale(null)}
+                    >
                         {!selectedClient ? (
                             <div className="bg-white rounded-2xl p-10 text-center border-2 border-dashed border-gray-200 max-w-sm mx-auto my-10 space-y-3">
                                 <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
@@ -641,7 +705,7 @@ export default function ClientAccountStatementModal({
                                             </div>
 
                                             <div className="bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-2xs text-center">
-                                                <span className="text-[9px] font-black uppercase text-emerald-600 block leading-tight">Pagado</span>
+                                                <span className="text-[9px] font-black uppercase text-emerald-600 block leading-tight">Amortización</span>
                                                 <span className="text-xs font-black font-mono text-emerald-900">{formatCurrency(metrics.totalPaid)}</span>
                                             </div>
 
@@ -654,7 +718,7 @@ export default function ClientAccountStatementModal({
                                         </div>
                                     </div>
 
-                                    {/* 3. Streamlined Table (Fecha, Comprobante, Total Venta, Pagado, Saldo) */}
+                                    {/* 3. Streamlined Table (1. Comprobante, 2. Fecha, 3. Total Venta, 4. Amortización, 5. Saldo) */}
                                     <div className="space-y-1.5">
                                         {periodSales.length === 0 ? (
                                             <div className="p-6 text-center bg-gray-50 rounded-xl border border-gray-100 text-gray-400 font-bold text-xs uppercase tracking-wider">
@@ -665,10 +729,10 @@ export default function ClientAccountStatementModal({
                                                 <table className="w-full text-left border-collapse">
                                                     <thead>
                                                         <tr className="bg-slate-100 text-[10px] font-black text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                                                            <th className="py-2.5 px-3">Fecha</th>
                                                             <th className="py-2.5 px-3">Comprobante</th>
+                                                            <th className="py-2.5 px-3">Fecha</th>
                                                             <th className="py-2.5 px-3 text-right">Total Venta</th>
-                                                            <th className="py-2.5 px-3 text-right">Pagado</th>
+                                                            <th className="py-2.5 px-3 text-right">Amortización</th>
                                                             <th className="py-2.5 px-3 text-right">Saldo</th>
                                                         </tr>
                                                     </thead>
@@ -676,7 +740,7 @@ export default function ClientAccountStatementModal({
                                                         {periodSales.map((sale, idx) => {
                                                             const isCancelled = sale.status === 'ANULADO';
                                                             const totalPaid = (sale.payments || [])
-                                                                .filter((p: any) => p.status === 'APROBADO')
+                                                                .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
                                                                 .reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
                                                             const balance = isCancelled ? 0 : Math.max(0, (Number(sale.totalAmount) || 0) - totalPaid);
 
@@ -685,9 +749,7 @@ export default function ClientAccountStatementModal({
                                                                     key={sale.id}
                                                                     className={`hover:bg-slate-50 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}`}
                                                                 >
-                                                                    <td className="py-2 px-3 font-bold text-gray-700 whitespace-nowrap text-[11px]">
-                                                                        {formatDate(sale.createdAt)}
-                                                                    </td>
+                                                                    {/* 1ra Columna: Comprobante */}
                                                                     <td className="py-2 px-3 font-mono font-bold text-gray-900 text-xs">
                                                                         {sale.invoiceNumber ? (
                                                                             <span className="text-indigo-700">{sale.invoiceNumber}</span>
@@ -700,12 +762,39 @@ export default function ClientAccountStatementModal({
                                                                             </span>
                                                                         )}
                                                                     </td>
+
+                                                                    {/* 2da Columna: Fecha */}
+                                                                    <td className="py-2 px-3 font-bold text-gray-700 whitespace-nowrap text-[11px]">
+                                                                        {formatDate(sale.createdAt)}
+                                                                    </td>
+
+                                                                    {/* 3ra Columna: Total Venta */}
                                                                     <td className={`py-2 px-3 text-right font-mono font-bold ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                                                                         {formatCurrency(sale.totalAmount)}
                                                                     </td>
+
+                                                                    {/* 4ta Columna: Amortización (con Hover para detalles del pago) */}
                                                                     <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
-                                                                        {formatCurrency(totalPaid)}
+                                                                        <div
+                                                                            className="inline-flex items-center justify-end gap-1.5 cursor-pointer group/amort py-0.5 px-1.5 -mr-1 rounded hover:bg-emerald-50 transition-colors"
+                                                                            onMouseEnter={(e) => handleMouseEnterAmortizacion(sale, totalPaid, e)}
+                                                                            onMouseLeave={handleMouseLeaveAmortizacion}
+                                                                            title="Pasa el cursor para ver detalles de amortización"
+                                                                        >
+                                                                            <span className="underline decoration-dotted underline-offset-4 decoration-emerald-300 group-hover/amort:decoration-emerald-700 transition-colors">
+                                                                                {formatCurrency(totalPaid)}
+                                                                            </span>
+                                                                            {sale.payments && sale.payments.length > 0 && (
+                                                                                <span
+                                                                                    data-html2canvas-ignore="true"
+                                                                                    className="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover/amort:scale-125 transition-transform shrink-0"
+                                                                                    title={`${sale.payments.length} pago(s) registrado(s)`}
+                                                                                />
+                                                                            )}
+                                                                        </div>
                                                                     </td>
+
+                                                                    {/* 5ta Columna: Saldo */}
                                                                     <td className={`py-2 px-3 text-right font-mono font-black ${balance > 0.01 ? 'text-rose-600' : 'text-gray-400'}`}>
                                                                         {formatCurrency(balance)}
                                                                     </td>
@@ -747,6 +836,132 @@ export default function ClientAccountStatementModal({
                             </div>
                         )}
                     </div>
+
+                    {/* ── FLOATING AMORTIZACIÓN PAYMENT DETAILS POPOVER ── */}
+                    {hoveredSale && (
+                        <div
+                            data-html2canvas-ignore="true"
+                            onMouseEnter={handlePopoverMouseEnter}
+                            onMouseLeave={handlePopoverMouseLeave}
+                            className="fixed z-50 w-[calc(100vw-32px)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 text-xs text-gray-800 pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
+                            style={{
+                                top: typeof window !== 'undefined' && hoveredSale.rect.bottom + 270 > window.innerHeight
+                                    ? Math.max(16, hoveredSale.rect.top - 8)
+                                    : hoveredSale.rect.bottom + 6,
+                                left: typeof window !== 'undefined'
+                                    ? Math.max(16, Math.min(window.innerWidth - 390, hoveredSale.rect.right - 340))
+                                    : hoveredSale.rect.left,
+                                transform: typeof window !== 'undefined' && hoveredSale.rect.bottom + 270 > window.innerHeight
+                                    ? 'translateY(-100%)'
+                                    : 'none'
+                            }}
+                        >
+                            {/* Popover Header */}
+                            <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                                        Detalle de Amortización
+                                    </span>
+                                    <h5 className="font-mono font-bold text-gray-900 text-xs">
+                                        {hoveredSale.invoiceNumber}
+                                    </h5>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] font-bold text-gray-400 block">Total Amortizado</span>
+                                    <span className="font-mono font-black text-emerald-700 text-xs">
+                                        {formatCurrency(hoveredSale.totalPaid)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Popover Payments List */}
+                            <div className="py-2.5 max-h-60 overflow-y-auto space-y-2 pr-1">
+                                {hoveredSale.payments.length === 0 ? (
+                                    <div className="py-4 text-center text-gray-400 font-medium">
+                                        <AlertCircle className="w-5 h-5 mx-auto mb-1 text-gray-300" />
+                                        <p className="text-xs font-bold text-gray-600">Sin amortizaciones registradas</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Esta venta no cuenta con pagos ingresados todavía.</p>
+                                    </div>
+                                ) : (
+                                    hoveredSale.payments.map((p: any, pIdx: number) => {
+                                        const isApproved = p.status === 'APROBADO' || p.status === 'CONCILIADO';
+                                        const isRejected = p.status === 'RECHAZADO';
+                                        const methodLabel = formatPaymentMethod(p.method);
+
+                                        return (
+                                            <div
+                                                key={p.id || pIdx}
+                                                className={`p-2.5 rounded-xl border transition ${
+                                                    isRejected
+                                                        ? 'bg-rose-50/50 border-rose-200'
+                                                        : isApproved
+                                                            ? 'bg-emerald-50/30 border-emerald-100'
+                                                            : 'bg-amber-50/30 border-amber-100'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="font-mono font-black text-slate-900 text-xs">
+                                                        S/ {(Number(p.amount) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                                                            {methodLabel}
+                                                        </span>
+                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                            isApproved ? 'bg-emerald-100 text-emerald-800' :
+                                                            isRejected ? 'bg-rose-100 text-rose-800' :
+                                                            'bg-amber-100 text-amber-800'
+                                                        }`}>
+                                                            {isApproved ? 'CONFIRMADO' : isRejected ? 'RECHAZADO' : 'PENDIENTE'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-1 text-[10px] text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                                    <span>📅 <strong>Fecha:</strong> {formatDate(p.paymentDate || p.createdAt)}</span>
+                                                    {p.registeredByName && (
+                                                        <span>👤 <strong>Por:</strong> {p.registeredByName}</span>
+                                                    )}
+                                                </div>
+
+                                                {p.notes && (
+                                                    <p className="mt-1 text-[10px] text-gray-600 bg-white/80 p-1.5 rounded border border-gray-100 italic">
+                                                        📝 {p.notes}
+                                                    </p>
+                                                )}
+
+                                                {p.method === 'NOTA_CREDITO' && p.creditNoteNumber && (
+                                                    <p className="mt-1 text-[10px] font-bold text-violet-700">
+                                                        N° Nota Crédito: {p.creditNoteNumber} {p.creditNoteMotive ? `(${p.creditNoteMotive})` : ''}
+                                                    </p>
+                                                )}
+
+                                                {p.method === 'LETRAS' && p.letraDetails && p.letraDetails.length > 0 && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 space-y-1">
+                                                        <span className="text-[9px] font-black uppercase text-gray-400 block">Detalle de letras:</span>
+                                                        <div className="grid grid-cols-1 gap-1">
+                                                            {p.letraDetails.map((letra: any) => (
+                                                                <div key={letra.id || letra.number} className="flex items-center justify-between bg-white px-2 py-1 rounded text-[10px] border border-gray-150">
+                                                                    <span className="font-bold text-indigo-700">Letra {letra.number}</span>
+                                                                    <span className="font-mono font-bold text-gray-800">S/ {(Number(letra.amount) || 0).toFixed(2)}</span>
+                                                                    <span className="text-[9px] text-gray-500">Vcto: {formatDate(letra.dueDate)}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-400">
+                                <span>Total {hoveredSale.payments.length} movimiento(s)</span>
+                                <span className="italic">Pasa el cursor fuera para cerrar</span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* MODAL FOOTER */}
                     <div className="p-3.5 sm:p-4 bg-white border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
