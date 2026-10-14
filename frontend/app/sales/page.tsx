@@ -43,6 +43,7 @@ export default function SalesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -98,12 +99,42 @@ export default function SalesPage() {
         }
     };
 
+    const getSalePaymentStatus = (sale: any) => {
+        const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
+        const totalPaid = approvedPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const isPaidFull = sale.paymentStatus === 'CANCELADO' || (sale.totalAmount > 0 && (sale.totalAmount - totalPaid) <= 0.01 && totalPaid > 0);
+        if (isPaidFull) return 'CANCELADO';
+        if (sale.paymentStatus === 'PARCIAL' || totalPaid > 0) return 'PARCIAL';
+        return sale.paymentStatus || 'PENDIENTE';
+    };
+
     const filteredSales = sales.filter(s => {
         const matchesSearch = s.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              s.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              s.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              s.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
+
+        const paymentStatus = getSalePaymentStatus(s);
+
+        // Filter by general status or payment status if selected in statusFilter
+        let matchesStatus = true;
+        if (statusFilter !== 'ALL') {
+            if (statusFilter === 'CANCELADO' || statusFilter === 'PAGADO') {
+                matchesStatus = paymentStatus === 'CANCELADO';
+            } else if (statusFilter === 'PARCIAL') {
+                matchesStatus = paymentStatus === 'PARCIAL';
+            } else if (statusFilter === 'PENDIENTE') {
+                matchesStatus = paymentStatus === 'PENDIENTE';
+            } else {
+                matchesStatus = s.status === statusFilter;
+            }
+        }
+
+        // Filter by dedicated payment status filter
+        let matchesPaymentStatus = true;
+        if (paymentStatusFilter !== 'ALL') {
+            matchesPaymentStatus = paymentStatus === paymentStatusFilter;
+        }
         
         const saleDate = new Date(s.createdAt).toISOString().split('T')[0];
         const matchesStart = !startDate || saleDate >= startDate;
@@ -113,7 +144,7 @@ export default function SalesPage() {
 
         const matchesViewMode = viewMode === 'ACTIVOS' ? s.status !== 'ANULADO' : s.status === 'ANULADO';
 
-        return matchesSearch && matchesStatus && matchesStart && matchesEnd && matchesZone && matchesViewMode;
+        return matchesSearch && matchesStatus && matchesPaymentStatus && matchesStart && matchesEnd && matchesZone && matchesViewMode;
     });
 
     // Stats calculations
@@ -132,15 +163,6 @@ export default function SalesPage() {
     const annualRevenue = activeSales.filter(s => new Date(s.createdAt).getFullYear() === thisYear).reduce((acc, s) => acc + s.totalAmount, 0);
 
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
-
-    const getSalePaymentStatus = (sale: any) => {
-        const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
-        const totalPaid = approvedPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
-        const isPaidFull = sale.paymentStatus === 'CANCELADO' || (sale.totalAmount > 0 && (sale.totalAmount - totalPaid) <= 0.01 && totalPaid > 0);
-        if (isPaidFull) return 'CANCELADO';
-        if (sale.paymentStatus === 'PARCIAL' || totalPaid > 0) return 'PARCIAL';
-        return sale.paymentStatus || 'PENDIENTE';
-    };
 
     const calcPendingToCollect = (sale: any) => {
         const totalPaid = (sale.payments || [])
@@ -232,7 +254,7 @@ export default function SalesPage() {
             const doc = sale.invoiceNumber || 'S/N';
             const clientName = sale.client?.name || 'Cliente Varios';
             
-            const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO');
+            const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
             const sortedPayments = [...approvedPayments].sort((a: any, b: any) => 
                 new Date(a.paymentDate || a.createdAt).getTime() - new Date(b.paymentDate || b.createdAt).getTime()
             );
@@ -241,7 +263,7 @@ export default function SalesPage() {
             const dep2 = sortedPayments[1] ? sortedPayments[1].amount : '';
             
             const totalCobranza = approvedPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
-            const saldo = sale.totalAmount - totalCobranza;
+            const saldo = Math.max(0, sale.totalAmount - totalCobranza);
 
             return {
                 'F.E.': date,
@@ -252,12 +274,18 @@ export default function SalesPage() {
                 'DEPOSITO 1': dep1,
                 'DEPOSITO 2': dep2,
                 'TOTAL COBRANZA': totalCobranza,
-                'SALDO': saldo
+                'SALDO': saldo,
+                'ESTADO COBRO': getSalePaymentStatus(sale)
             };
         });
     };
 
     const exportToExcel = () => {
+        if (filteredSales.length === 0) {
+            toast.error('No hay ventas para exportar con el filtro seleccionado');
+            return;
+        }
+
         const summaryData = getSummaryExportData();
         const wsSummary = XLSX.utils.json_to_sheet(summaryData);
 
@@ -273,7 +301,10 @@ export default function SalesPage() {
 
     const exportToPDF = () => {
         const data = getExportData();
-        if (data.length === 0) return;
+        if (data.length === 0) {
+            toast.error('No hay ventas para exportar con el filtro seleccionado');
+            return;
+        }
         const doc = new jsPDF('landscape');
         
         doc.setFontSize(14);
@@ -446,13 +477,29 @@ export default function SalesPage() {
                         <div className="flex items-center gap-2">
                              <Filter className="w-5 h-5 text-gray-400" />
                              <select 
-                                className="bg-gray-50 border-none rounded-2xl px-4 py-3.5 font-bold text-gray-700 outline-none"
+                                className="bg-gray-50 border-none rounded-2xl px-4 py-3.5 font-bold text-gray-700 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition"
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                              >
                                 <option value="ALL">Todos los Estados</option>
                                 <option value="COMPLETADO">Completado</option>
                                 <option value="ANULADO">Anulado</option>
+                                <option value="CANCELADO">Pagados</option>
+                                <option value="PARCIAL">Parcial</option>
+                                <option value="PENDIENTE">Pendientes</option>
+                             </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             <Wallet className="w-5 h-5 text-gray-400" />
+                             <select 
+                                className="bg-gray-50 border-none rounded-2xl px-4 py-3.5 font-bold text-gray-700 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition"
+                                value={paymentStatusFilter}
+                                onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                             >
+                                <option value="ALL">Todos los Cobros</option>
+                                <option value="CANCELADO">Pagados</option>
+                                <option value="PARCIAL">Parcial</option>
+                                <option value="PENDIENTE">Pendientes</option>
                              </select>
                         </div>
                         <button 
