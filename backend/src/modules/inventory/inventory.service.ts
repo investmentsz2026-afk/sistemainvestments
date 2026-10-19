@@ -60,6 +60,8 @@ export class InventoryService implements OnModuleInit {
 
       await this.prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS "idx_inventory_audits_period_type" ON "inventory_audits"("period", "inventory_type");
+      `);
+      await this.prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS "idx_inventory_audit_items_audit" ON "inventory_audit_items"("audit_id");
       `);
     } catch (err) {

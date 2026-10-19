@@ -9,41 +9,70 @@ export class ProductsService {
   constructor(private prisma: PrismaService) { }
 
   async create(userId: string, createProductDto: CreateProductDto) {
-    // Obtener el último contador para generar SKU
-    const lastProduct = await this.prisma.product.findFirst({
-      orderBy: { createdAt: 'desc' },
-    });
+    // Generar SKU principal único del producto si no se proporciona uno manual
+    let sku = createProductDto.sku?.trim();
+    if (sku) {
+      const existingProduct = await this.prisma.product.findUnique({
+        where: { sku },
+      });
+      if (existingProduct) {
+        throw new BadRequestException(`El SKU "${sku}" ya está registrado en otro producto.`);
+      }
+    } else {
+      const totalProducts = await this.prisma.product.count();
+      let counter = Math.max(1, totalProducts + 1);
 
-    let counter = 1;
-    if (lastProduct) {
-      const lastSKU = lastProduct.sku;
-      const lastCounter = parseInt(lastSKU.slice(-4));
-      counter = isNaN(lastCounter) ? 1 : lastCounter + 1;
-    }
+      if (
+        createProductDto.inventoryType === 'AVIOS' ||
+        createProductDto.inventoryType === 'MERCHAN_DESIGN' ||
+        createProductDto.inventoryType === 'MATERIALES'
+      ) {
+        let avioCorr = createProductDto.correlative
+          ? parseInt(String(createProductDto.correlative).replace(/\D/g, ''), 10)
+          : counter;
+        if (isNaN(avioCorr) || avioCorr <= 0) avioCorr = counter;
 
-    // Generar SKU principal del producto si no se proporciona uno manual
-    let sku = createProductDto.sku;
-    if (!sku) {
-      if (createProductDto.inventoryType === 'AVIOS' || createProductDto.inventoryType === 'MERCHAN_DESIGN' || createProductDto.inventoryType === 'MATERIALES') {
-        sku = generateAvioSKU({
-          name: createProductDto.name,
-          category: createProductDto.category,
-          size: (createProductDto.sizes && createProductDto.sizes[0]) || '01',
-          color: (createProductDto.colors && createProductDto.colors[0]) || 'UN',
-          location: (createProductDto.location && createProductDto.location.trim()) ? createProductDto.location.trim().toUpperCase() : 'A1',
-          correlative: createProductDto.correlative || counter,
-        });
+        while (true) {
+          const candidateSku = generateAvioSKU({
+            name: createProductDto.name,
+            category: createProductDto.category,
+            size: (createProductDto.sizes && createProductDto.sizes[0]) || '01',
+            color: (createProductDto.colors && createProductDto.colors[0]) || 'UN',
+            location: (createProductDto.location && createProductDto.location.trim())
+              ? createProductDto.location.trim().toUpperCase()
+              : 'A1',
+            correlative: avioCorr,
+          });
+          const existing = await this.prisma.product.findUnique({
+            where: { sku: candidateSku },
+          });
+          if (!existing) {
+            sku = candidateSku;
+            break;
+          }
+          avioCorr++;
+        }
       } else {
-        sku = generateSKU(
-          createProductDto.category,
-          '00', // SKU base sin talla específica
-          '000', // SKU base sin color específico
-          counter
-        );
+        while (true) {
+          const candidateSku = generateSKU(
+            createProductDto.category,
+            '00', // SKU base sin talla específica
+            '000', // SKU base sin color específico
+            counter
+          );
+          const existing = await this.prisma.product.findUnique({
+            where: { sku: candidateSku },
+          });
+          if (!existing) {
+            sku = candidateSku;
+            break;
+          }
+          counter++;
+        }
       }
     }
 
-    // Crear producto
+    // Crear producto de manera segura
     const product = await this.prisma.product.create({
       data: {
         sku,
@@ -54,11 +83,11 @@ export class ProductsService {
         op: createProductDto.op,
         unit: createProductDto.unit || 'UND',
         entalle: createProductDto.entalle,
-        purchasePrice: createProductDto.purchasePrice,
-        sellingPrice: createProductDto.sellingPrice,
-        realPrice: createProductDto.realPrice || 0.0,
-        minStock: createProductDto.minStock || 5,
-        weight: createProductDto.weight !== undefined ? createProductDto.weight : null,
+        purchasePrice: Number(createProductDto.purchasePrice) || 0,
+        sellingPrice: Number(createProductDto.sellingPrice) || 0,
+        realPrice: Number(createProductDto.realPrice) || 0.0,
+        minStock: Number(createProductDto.minStock) || 5,
+        weight: createProductDto.weight !== undefined && createProductDto.weight !== null ? Number(createProductDto.weight) : null,
         location: (createProductDto.location && createProductDto.location.trim()) ? createProductDto.location.trim().toUpperCase() : 'A1',
         sizes: createProductDto.sizes || [],
         colors: createProductDto.colors || [],
@@ -151,6 +180,15 @@ export class ProductsService {
         );
       }
     }
+
+    // Garantizar que variantSku sea verdaderamente único en la base de datos
+    let candidateVariantSku = variantSku;
+    let vCounter = 1;
+    while (await this.prisma.productVariant.findUnique({ where: { variantSku: candidateVariantSku } })) {
+      candidateVariantSku = `${variantSku}-${vCounter}`;
+      vCounter++;
+    }
+    variantSku = candidateVariantSku;
 
     const variant = await this.prisma.productVariant.create({
       data: {

@@ -55,12 +55,14 @@ export class CreateProductDto {
   entalle?: string;
 
   @IsNumber()
+  @IsOptional()
   @Min(0)
-  purchasePrice: number;
+  purchasePrice?: number;
 
   @IsNumber()
+  @IsOptional()
   @Min(0)
-  sellingPrice: number;
+  sellingPrice?: number;
 
   @IsNumber()
   @IsOptional()
