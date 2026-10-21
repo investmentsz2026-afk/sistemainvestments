@@ -19,7 +19,14 @@ import {
   User,
   ShoppingBag,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Search,
+  FileText,
+  Check,
+  RotateCcw,
+  Receipt,
+  X,
+  ChevronDown
 } from 'lucide-react';
 
 export default function ReturnsPage() {
@@ -37,7 +44,22 @@ export default function ReturnsPage() {
   // Create / Edit Form State
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [creationMode, setCreationMode] = useState<'INVOICE' | 'MANUAL'>('INVOICE');
+
+  // Searchable Client State
   const [formClientId, setFormClientId] = useState('');
+  const [selectedClient, setSelectedClient] = useState<any | null>(null);
+  const [clientSearch, setClientSearch] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+
+  // Searchable Invoice State
+  const [clientSales, setClientSales] = useState<any[]>([]);
+  const [isLoadingSales, setIsLoadingSales] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [isInvoiceDropdownOpen, setIsInvoiceDropdownOpen] = useState(false);
+  const [selectedInvoiceItems, setSelectedInvoiceItems] = useState<Record<string, { selected: boolean; returnQty: number; item: any }>>({});
+
   const [formReason, setFormReason] = useState('');
   const [formEvidenceUrl, setFormEvidenceUrl] = useState('');
   const [formItems, setFormItems] = useState<any[]>([
@@ -144,21 +166,215 @@ export default function ReturnsPage() {
     setFormItems(formItems.filter((_, i) => i !== idx));
   };
 
+  // Helper to fetch sales for a specific client
+  const fetchSalesForClient = async (clientId: string) => {
+    if (!clientId) {
+      setClientSales([]);
+      return;
+    }
+    setIsLoadingSales(true);
+    try {
+      const resp = await api.get('/sales', { params: { clientId } });
+      const list = Array.isArray(resp.data) ? resp.data : [];
+      setClientSales(list);
+    } catch (err) {
+      console.error('Error fetching client sales:', err);
+      toast.error('Error al cargar ventas del cliente');
+      setClientSales([]);
+    } finally {
+      setIsLoadingSales(false);
+    }
+  };
+
+  const handleSelectClient = (client: any) => {
+    setFormClientId(client.id);
+    setSelectedClient(client);
+    setClientSearch('');
+    setIsClientDropdownOpen(false);
+    setSelectedInvoice(null);
+    setInvoiceSearch('');
+    setSelectedInvoiceItems({});
+    fetchSalesForClient(client.id);
+  };
+
+  const handleClearClient = () => {
+    setFormClientId('');
+    setSelectedClient(null);
+    setClientSearch('');
+    setClientSales([]);
+    setSelectedInvoice(null);
+    setInvoiceSearch('');
+    setSelectedInvoiceItems({});
+  };
+
+  const handleSelectSale = async (sale: any) => {
+    setSelectedInvoice(sale);
+    setIsInvoiceDropdownOpen(false);
+    setInvoiceSearch('');
+
+    let saleWithItems = sale;
+    if (!sale.items || sale.items.length === 0 || !sale.items[0]?.variant) {
+      try {
+        const resp = await api.get(`/sales/${sale.id}`);
+        if (resp.data) {
+          saleWithItems = resp.data;
+          setSelectedInvoice(resp.data);
+        }
+      } catch (err) {
+        console.error('Error fetching sale details:', err);
+      }
+    }
+
+    const initialSelected: Record<string, { selected: boolean; returnQty: number; item: any }> = {};
+    (saleWithItems.items || []).forEach((item: any) => {
+      initialSelected[item.id] = {
+        selected: false,
+        returnQty: item.quantity || 1,
+        item
+      };
+    });
+    setSelectedInvoiceItems(initialSelected);
+  };
+
+  const handleClearInvoice = () => {
+    setSelectedInvoice(null);
+    setInvoiceSearch('');
+    setSelectedInvoiceItems({});
+  };
+
+  const toggleSelectInvoiceItem = (itemId: string) => {
+    setSelectedInvoiceItems(prev => {
+      const current = prev[itemId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          selected: !current.selected,
+          returnQty: current.returnQty > 0 ? current.returnQty : (current.item.quantity || 1)
+        }
+      };
+    });
+  };
+
+  const updateItemReturnQty = (itemId: string, qty: number) => {
+    setSelectedInvoiceItems(prev => {
+      const current = prev[itemId];
+      if (!current) return prev;
+      const max = current.item.quantity || 1;
+      const validQty = Math.max(1, Math.min(max, isNaN(qty) ? 1 : qty));
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          returnQty: validQty
+        }
+      };
+    });
+  };
+
+  const selectAllInvoiceItems = (select: boolean) => {
+    setSelectedInvoiceItems(prev => {
+      const next: Record<string, any> = {};
+      Object.entries(prev).forEach(([id, val]) => {
+        next[id] = {
+          ...val,
+          selected: select,
+          returnQty: val.returnQty > 0 ? val.returnQty : (val.item.quantity || 1)
+        };
+      });
+      return next;
+    });
+  };
+
+  const getSizeField = (rawSize: string): string => {
+    if (!rawSize) return 's28';
+    const clean = rawSize.toString().trim().toUpperCase();
+    if (clean === '28' || clean === 'S') return 's28';
+    if (clean === '30' || clean === 'M') return 'm30';
+    if (clean === '32' || clean === 'L') return 'l32';
+    if (clean === '34' || clean === 'XL') return 'xl34';
+    if (clean === '36' || clean === 'XXL' || clean === '2XL') return 'xxl36';
+    if (clean === '38' || clean === 'XXXL' || clean === '3XL') return 'size38';
+    if (clean === '40') return 'size40';
+    if (clean === '42') return 'size42';
+    if (clean === '44') return 'size44';
+    if (clean === '46') return 'size46';
+    if (clean === '48') return 'size48';
+    if (clean === '50') return 'size50';
+    if (clean === '52') return 'size52';
+
+    const num = parseInt(clean);
+    if (!isNaN(num)) {
+      if (num <= 28) return 's28';
+      if (num <= 30) return 'm30';
+      if (num <= 32) return 'l32';
+      if (num <= 34) return 'xl34';
+      if (num <= 36) return 'xxl36';
+      if (num <= 38) return 'size38';
+      if (num <= 40) return 'size40';
+      if (num <= 42) return 'size42';
+      if (num <= 44) return 'size44';
+      if (num <= 46) return 'size46';
+      if (num <= 48) return 'size48';
+      if (num <= 50) return 'size50';
+      return 'size52';
+    }
+    return 's28';
+  };
+
   // Submit create or edit form
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formClientId) return toast.error('Selecciona un cliente');
-    if (!formReason) return toast.error('Ingresa una explicación de la devolución');
+    if (!formReason.trim()) return toast.error('Ingresa una explicación o motivo de la devolución');
 
-    // Filter out rows without model
-    const filteredItems = formItems.filter(item => item.modelName);
-    if (filteredItems.length === 0) return toast.error('Agrega al menos una prenda con modelo válido');
+    let filteredItems: any[] = [];
+
+    if (creationMode === 'INVOICE' && selectedInvoice) {
+      const selectedList = Object.values(selectedInvoiceItems).filter(x => x.selected && x.returnQty > 0);
+      if (selectedList.length === 0) {
+        return toast.error('Debes seleccionar al menos una prenda de la factura para devolver');
+      }
+
+      // Group by modelName and color
+      const grouped: Record<string, any> = {};
+      selectedList.forEach(({ item, returnQty }) => {
+        const modelName = (item.variant?.product?.name || item.name || 'Prenda').trim();
+        const color = (item.variant?.color || 'UN').trim().toUpperCase();
+        const rawSize = item.variant?.size || '28';
+        const sizeField = getSizeField(rawSize);
+
+        const key = `${modelName.toUpperCase()}___${color.toUpperCase()}`;
+        if (!grouped[key]) {
+          grouped[key] = {
+            modelName,
+            color,
+            s28: 0, m30: 0, l32: 0, xl34: 0, xxl36: 0, size38: 0, size40: 0, size42: 0, size44: 0, size46: 0, size48: 0, size50: 0, size52: 0
+          };
+        }
+        grouped[key][sizeField] = (grouped[key][sizeField] || 0) + returnQty;
+      });
+
+      filteredItems = Object.values(grouped);
+    } else {
+      // Manual mode
+      filteredItems = formItems.filter(item => item.modelName);
+      if (filteredItems.length === 0) return toast.error('Agrega al menos una prenda con modelo válido');
+    }
 
     setIsSubmitting(true);
     try {
+      const invoicePrefix = selectedInvoice?.invoiceNumber
+        ? `[Comprobante: ${selectedInvoice.invoiceNumber}] `
+        : '';
+      const finalReason = formReason.startsWith('[Comprobante:')
+        ? formReason
+        : `${invoicePrefix}${formReason}`.trim();
+
       const payload = {
         clientId: formClientId,
-        reason: formReason,
+        reason: finalReason,
         evidenceUrl: formEvidenceUrl,
         items: filteredItems
       };
@@ -186,6 +402,15 @@ export default function ReturnsPage() {
     setIsEditing(false);
     setEditId(null);
     setFormClientId('');
+    setSelectedClient(null);
+    setClientSearch('');
+    setIsClientDropdownOpen(false);
+    setClientSales([]);
+    setSelectedInvoice(null);
+    setInvoiceSearch('');
+    setIsInvoiceDropdownOpen(false);
+    setSelectedInvoiceItems({});
+    setCreationMode('INVOICE');
     setFormReason('');
     setFormEvidenceUrl('');
     setFormItems([
@@ -197,6 +422,12 @@ export default function ReturnsPage() {
     setIsEditing(true);
     setEditId(req.id);
     setFormClientId(req.clientId);
+    const client = clients.find(c => c.id === req.clientId);
+    setSelectedClient(client || null);
+    if (client) {
+      fetchSalesForClient(client.id);
+    }
+    setCreationMode('MANUAL');
     setFormReason(req.reason);
     setFormEvidenceUrl(req.evidenceUrl || '');
     setFormItems(req.items.map((item: any) => ({
@@ -367,7 +598,15 @@ export default function ReturnsPage() {
                       const totalQty = req.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
                       return (
                         <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4 font-black text-slate-900 tracking-tight uppercase">{req.returnNumber}</td>
+                          <td className="px-6 py-4">
+                            <span className="font-black text-slate-900 tracking-tight uppercase block">{req.returnNumber}</span>
+                            {req.reason && req.reason.match(/\[Comprobante:\s*([^\]]+)\]/i) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md mt-1">
+                                <Receipt className="w-3 h-3 text-indigo-500" />
+                                {req.reason.match(/\[Comprobante:\s*([^\]]+)\]/i)?.[1]}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 truncate max-w-[200px] uppercase">{req.client?.name}</td>
                           <td className="px-6 py-4 text-slate-500 uppercase">{req.seller?.name}</td>
                           <td className="px-6 py-4 text-slate-500">{new Date(req.createdAt).toLocaleDateString()}</td>
@@ -409,44 +648,610 @@ export default function ReturnsPage() {
         {/* CREATE / EDIT MODAL */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-slate-950/60 z-50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-[2.5rem] w-full max-w-4xl p-6 md:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight border-b border-slate-100 pb-4 mb-6">
-                {isEditing ? 'Editar y Corregir Devolución' : 'Registrar Nueva Devolución'}
-              </h2>
-
-              <form onSubmit={handleFormSubmit} className="space-y-6">
-                {/* Client & Reason */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Cliente que devuelve</label>
-                    <select
-                      value={formClientId}
-                      onChange={(e) => setFormClientId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs"
-                      required
-                    >
-                      <option value="">Seleccione el Cliente</option>
-                      {clients.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} - RUC: {c.documentNumber}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Motivo / Descargo de la Devolución</label>
-                    <textarea
-                      value={formReason}
-                      onChange={(e) => setFormReason(e.target.value)}
-                      placeholder="Explique el motivo detallado de la devolución..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs min-h-[60px]"
-                      required
-                    />
-                  </div>
+            <div className="bg-white rounded-[2.5rem] w-full max-w-4xl p-6 md:p-8 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4 mb-6">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <RefreshCw className="w-6 h-6 text-indigo-600" />
+                    {isEditing ? 'Editar y Corregir Devolución' : 'Registrar Nueva Devolución'}
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium mt-1">
+                    Selecciona el cliente y la factura de venta para cargar las prendas vendidas automáticamente.
+                  </p>
                 </div>
 
-                {/* Evidence Image Upload */}
+                {!isEditing && (
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl self-start sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('INVOICE')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                        creationMode === 'INVOICE'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      🧾 Por Factura / Boleta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('MANUAL')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                        creationMode === 'MANUAL'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      ✍️ Ingreso Manual
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleFormSubmit} className="space-y-6">
+                {/* ── 1. BUSCADOR DE CLIENTE ── */}
+                <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                      <User className="w-3.5 h-3.5 text-indigo-600" />
+                      1. Cliente que devuelve <span className="text-rose-500">*</span>
+                    </label>
+                    {selectedClient && (
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Cliente Seleccionado
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedClient ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-indigo-200 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+                          <Check className="w-5 h-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 uppercase">{selectedClient.name}</p>
+                          <p className="text-[11px] text-slate-500 font-bold">
+                            {selectedClient.documentType || 'RUC/DNI'}: {selectedClient.documentNumber}
+                            {selectedClient.zone && ` • Zona: ${selectedClient.zone}`}
+                          </p>
+                        </div>
+                      </div>
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          onClick={handleClearClient}
+                          className="flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-all self-end sm:self-center"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Cambiar Cliente
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Escribe el nombre o RUC/DNI del cliente para buscar..."
+                          value={clientSearch}
+                          onChange={(e) => {
+                            setClientSearch(e.target.value);
+                            setIsClientDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsClientDropdownOpen(true)}
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all text-xs"
+                        />
+                        {clientSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setClientSearch('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Dropdown de Clientes */}
+                      {isClientDropdownOpen && (
+                        <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                          {clients
+                            .filter(c =>
+                              !clientSearch.trim() ||
+                              (c.name || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+                              (c.documentNumber || '').toLowerCase().includes(clientSearch.toLowerCase())
+                            )
+                            .slice(0, 30)
+                            .map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => handleSelectClient(c)}
+                                className="w-full text-left px-4 py-3 hover:bg-indigo-50/70 transition-colors flex items-center justify-between gap-3 group"
+                              >
+                                <div>
+                                  <p className="text-xs font-black text-slate-800 group-hover:text-indigo-600 uppercase">
+                                    {c.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                    {c.documentType || 'RUC/DNI'}: {c.documentNumber}
+                                  </p>
+                                </div>
+                                {c.zone && (
+                                  <span className="text-[9px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full uppercase">
+                                    {c.zone}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                          }
+                          {clients.filter(c =>
+                            !clientSearch.trim() ||
+                            (c.name || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+                            (c.documentNumber || '').toLowerCase().includes(clientSearch.toLowerCase())
+                          ).length === 0 && (
+                            <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
+                              No se encontraron clientes con "{clientSearch}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 2. BUSCADOR DE FACTURA / BOLETA (MODO FACTURA) ── */}
+                {creationMode === 'INVOICE' && selectedClient && (
+                  <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                        2. Factura o Boleta de Venta <span className="text-rose-500">*</span>
+                      </label>
+                      {selectedInvoice && (
+                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                          Factura Vinculada
+                        </span>
+                      )}
+                    </div>
+
+                    {isLoadingSales ? (
+                      <div className="flex items-center justify-center py-6 gap-2 text-indigo-600 font-bold text-xs bg-white rounded-xl border border-slate-200">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Buscando facturas y boletas del cliente...
+                      </div>
+                    ) : clientSales.length === 0 ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-amber-800 flex items-center justify-between gap-3 text-xs">
+                        <span>Este cliente no tiene facturas o boletas registradas en el sistema.</span>
+                        <button
+                          type="button"
+                          onClick={() => setCreationMode('MANUAL')}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs"
+                        >
+                          Usar Modo Manual
+                        </button>
+                      </div>
+                    ) : selectedInvoice ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-indigo-200 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+                            <FileText className="w-5 h-5 text-indigo-600" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-black text-slate-900 uppercase">
+                                {selectedInvoice.invoiceNumber || `Comprobante #${selectedInvoice.id.slice(0, 8)}`}
+                              </p>
+                              {selectedInvoice.paymentStatus && (
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                                  selectedInvoice.paymentStatus === 'CANCELADO'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {selectedInvoice.paymentStatus}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 font-bold mt-0.5">
+                              Fecha: {new Date(selectedInvoice.createdAt).toLocaleDateString()} • Total Venta: S/ {(selectedInvoice.totalAmount || 0).toFixed(2)} • {selectedInvoice.items?.reduce((sum: number, it: any) => sum + (it.quantity || 0), 0) || 0} prendas
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearInvoice}
+                          className="flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-all self-end sm:self-center"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Cambiar Factura
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Escribe el N° de factura, boleta o fecha (ej: F001-000123)..."
+                            value={invoiceSearch}
+                            onChange={(e) => {
+                              setInvoiceSearch(e.target.value);
+                              setIsInvoiceDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsInvoiceDropdownOpen(true)}
+                            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all text-xs"
+                          />
+                          {invoiceSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setInvoiceSearch('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Lista de Facturas del Cliente */}
+                        <div className="bg-white border border-slate-200 rounded-2xl max-h-56 overflow-y-auto divide-y divide-slate-100 shadow-sm">
+                          {clientSales
+                            .filter(s =>
+                              !invoiceSearch.trim() ||
+                              (s.invoiceNumber || '').toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+                              new Date(s.createdAt).toLocaleDateString().includes(invoiceSearch)
+                            )
+                            .map((sale) => {
+                              const totalQty = sale.items?.reduce((sum: number, it: any) => sum + (it.quantity || 0), 0) || 0;
+                              return (
+                                <button
+                                  key={sale.id}
+                                  type="button"
+                                  onClick={() => handleSelectSale(sale)}
+                                  className="w-full text-left px-4 py-3 hover:bg-indigo-50/70 transition-colors flex items-center justify-between gap-3 group"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                      <Receipt className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-black text-slate-900 group-hover:text-indigo-600 uppercase">
+                                        {sale.invoiceNumber || `Comprobante #${sale.id.slice(0, 8)}`}
+                                      </p>
+                                      <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                        Fecha: {new Date(sale.createdAt).toLocaleDateString()} • {totalQty} prendas vendidas
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs font-black text-slate-900">
+                                      S/ {(sale.totalAmount || 0).toFixed(2)}
+                                    </p>
+                                    <span className="text-[9px] font-bold text-slate-400">
+                                      {sale.paymentStatus || 'Emitido'}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          }
+                          {clientSales.filter(s =>
+                            !invoiceSearch.trim() ||
+                            (s.invoiceNumber || '').toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+                            new Date(s.createdAt).toLocaleDateString().includes(invoiceSearch)
+                          ).length === 0 && (
+                            <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
+                              No se encontraron comprobantes con "{invoiceSearch}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── 3. LISTADO DE PRENDAS DE LA FACTURA (MODO FACTURA) ── */}
+                {creationMode === 'INVOICE' && selectedInvoice && (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2">
+                      <div>
+                        <h3 className="text-sm font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-indigo-600" />
+                          Prendas de la Factura a Devolver
+                        </h3>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          Marca las prendas que el cliente devuelve y especifica cuántas unidades regresa:
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => selectAllInvoiceItems(true)}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded bg-indigo-50"
+                        >
+                          Seleccionar todas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => selectAllInvoiceItems(false)}
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1 rounded bg-slate-100"
+                        >
+                          Deseleccionar
+                        </button>
+                      </div>
+                    </div>
+
+                    {(!selectedInvoice.items || selectedInvoice.items.length === 0) ? (
+                      <div className="p-6 bg-slate-50 rounded-2xl text-center text-xs text-slate-400 font-medium">
+                        Esta factura no tiene prendas detalladas. Puedes usar el modo manual.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                        {selectedInvoice.items.map((item: any) => {
+                          const sel = selectedInvoiceItems[item.id] || { selected: false, returnQty: item.quantity || 1, item };
+                          const isChecked = sel.selected;
+                          const productName = item.variant?.product?.name || item.name || 'Prenda';
+                          const size = item.variant?.size || 'UN';
+                          const color = item.variant?.color || 'UN';
+                          const sku = item.variant?.variantSku || item.variant?.product?.sku || 'S/SKU';
+                          const maxQty = item.quantity || 1;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                isChecked
+                                  ? 'bg-indigo-50/50 border-indigo-300 shadow-sm'
+                                  : 'bg-white border-slate-200 hover:border-slate-300 opacity-80'
+                              }`}
+                            >
+                              <div
+                                className="flex items-center gap-3 cursor-pointer flex-1"
+                                onClick={() => toggleSelectInvoiceItem(item.id)}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleSelectInvoiceItem(item.id)}
+                                  className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <div>
+                                  <p className="text-xs font-black text-slate-900 uppercase">
+                                    {productName}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="px-2 py-0.5 bg-slate-100 font-black text-slate-700 rounded-md text-[10px]">
+                                      Talla: {size}
+                                    </span>
+                                    <span className="px-2 py-0.5 bg-indigo-100/70 text-indigo-700 font-black rounded-md text-[10px] uppercase">
+                                      Color: {color}
+                                    </span>
+                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 font-mono rounded-md text-[9px]">
+                                      SKU: {sku}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-bold ml-1">
+                                      (Vendidas: {maxQty} unds)
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Cantidad a devolver */}
+                              <div className="flex items-center gap-2 self-end sm:self-center">
+                                {isChecked ? (
+                                  <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-indigo-200 shadow-sm">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateItemReturnQty(item.id, (sel.returnQty || 1) - 1)}
+                                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 font-black text-xs text-slate-700 flex items-center justify-center transition-colors"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={maxQty}
+                                      value={sel.returnQty || 1}
+                                      onChange={(e) => updateItemReturnQty(item.id, parseInt(e.target.value) || 1)}
+                                      className="w-12 text-center font-black text-xs text-slate-900 outline-none"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateItemReturnQty(item.id, (sel.returnQty || 1) + 1)}
+                                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 font-black text-xs text-slate-700 flex items-center justify-center transition-colors"
+                                    >
+                                      +
+                                    </button>
+                                    <span className="text-[10px] font-bold text-slate-400 ml-1">
+                                      / máx {maxQty}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-bold italic">
+                                    No seleccionada
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Resumen de Selección */}
+                    {Object.values(selectedInvoiceItems).filter(x => x.selected && x.returnQty > 0).length > 0 && (
+                      <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-800">
+                        <span className="flex items-center gap-1.5">
+                          <Check className="w-4 h-4 text-emerald-600" />
+                          {Object.values(selectedInvoiceItems).filter(x => x.selected && x.returnQty > 0).length} prenda(s) seleccionada(s) de la factura
+                        </span>
+                        <span className="font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-[11px]">
+                          Total: {Object.values(selectedInvoiceItems).filter(x => x.selected && x.returnQty > 0).reduce((sum, x) => sum + x.returnQty, 0)} unidades a devolver
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── 4. MODO MANUAL DE PRENDAS (RESPALDO / EDICIÓN) ── */}
+                {(creationMode === 'MANUAL' || isEditing) && (
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-slate-500 tracking-wider mb-4 border-b pb-2">
+                      Prendas a Devolver (Ingreso Manual)
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      {formItems.map((item, idx) => (
+                        <div key={idx} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200 relative space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">Modelo</label>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Buscar modelo..."
+                                  value={activeSearchIdx === idx ? searchQuery : item.modelName}
+                                  onFocus={() => {
+                                    setActiveSearchIdx(idx);
+                                    setSearchQuery(item.modelName || '');
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      setActiveSearchIdx(null);
+                                    }, 250);
+                                  }}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSearchQuery(val);
+                                    handleItemChange(idx, 'modelName', val);
+                                  }}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs uppercase"
+                                  required={creationMode === 'MANUAL'}
+                                />
+                                {activeSearchIdx === idx && searchQuery.trim() !== '' && (
+                                  <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                                    {products
+                                      .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                      .map(p => (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          onClick={() => {
+                                            handleItemChange(idx, 'modelName', p.name);
+                                            setActiveSearchIdx(null);
+                                          }}
+                                          className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors uppercase"
+                                        >
+                                          {p.name}
+                                        </button>
+                                      ))
+                                    }
+                                    {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                                      <div className="px-4 py-2 text-xs text-slate-400 font-medium">No se encontraron modelos</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">Color</label>
+                              {getAvailableColorsForModel(item.modelName).length > 0 ? (
+                                <select
+                                  value={item.color}
+                                  onChange={(e) => handleItemChange(idx, 'color', e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs"
+                                  required={creationMode === 'MANUAL'}
+                                >
+                                  <option value="">Seleccione Color</option>
+                                  {getAvailableColorsForModel(item.modelName).map((color) => (
+                                    <option key={color} value={color}>{color.toUpperCase()}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  placeholder="Escribe Color..."
+                                  value={item.color}
+                                  onChange={(e) => handleItemChange(idx, 'color', e.target.value)}
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs uppercase"
+                                  required={creationMode === 'MANUAL'}
+                                  disabled={!item.modelName}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Sizes Matrix */}
+                          <div>
+                            <label className="block text-[9px] font-black uppercase text-slate-400 mb-2">Cantidad por Tallas</label>
+                            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                              {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'].map((size) => {
+                                const labelMap: Record<string, string> = {
+                                  s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
+                                  size38: '38', size40: '40', size42: '42', size44: '44', size46: '46',
+                                  size48: '48', size50: '50', size52: '52'
+                                };
+                                return (
+                                  <div key={size} className="text-center">
+                                    <label className="block text-[9px] font-black text-slate-500 mb-1">{labelMap[size]}</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={item[size] || 0}
+                                      onChange={(e) => handleItemChange(idx, size, parseInt(e.target.value) || 0)}
+                                      className="w-full text-center bg-white border border-slate-200 rounded-lg py-1 font-bold text-xs"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeFormRow(idx)}
+                            className="absolute top-2 right-2 text-rose-500 hover:text-rose-700 text-xs font-black"
+                            disabled={formItems.length === 1}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={addFormRow}
+                      className="mt-4 text-xs font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 active:scale-95"
+                    >
+                      + Agregar otra prenda
+                    </button>
+                  </div>
+                )}
+
+                {/* ── MOTIVO / DESCARGO ── */}
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Imagen de Evidencia (Opcional)</label>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-2">
+                    Motivo / Descargo de la Devolución <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    value={formReason}
+                    onChange={(e) => setFormReason(e.target.value)}
+                    placeholder="Explique el motivo detallado de la devolución (ej: falla de costura en pretina, cambio de talla, prenda descosida, etc.)..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all text-xs min-h-[70px]"
+                    required
+                  />
+                </div>
+
+                {/* ── EVIDENCIA FOTOGRÁFICA ── */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider mb-2">
+                    Imagen de Evidencia (Opcional)
+                  </label>
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all shadow-sm">
                       <Upload className="w-4 h-4" />
@@ -462,139 +1267,6 @@ export default function ReturnsPage() {
                   </div>
                 </div>
 
-                {/* Items Matrix */}
-                <div>
-                  <h3 className="text-sm font-black uppercase text-slate-500 tracking-wider mb-4 border-b pb-2">Prendas a Devolver</h3>
-                  
-                  <div className="space-y-4">
-                    {formItems.map((item, idx) => (
-                      <div key={idx} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200 relative space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">Modelo</label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="Buscar modelo..."
-                                value={activeSearchIdx === idx ? searchQuery : item.modelName}
-                                onFocus={() => {
-                                  setActiveSearchIdx(idx);
-                                  setSearchQuery(item.modelName || '');
-                                }}
-                                onBlur={() => {
-                                  setTimeout(() => {
-                                    setActiveSearchIdx(null);
-                                  }, 250);
-                                }}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setSearchQuery(val);
-                                  handleItemChange(idx, 'modelName', val);
-                                }}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs uppercase"
-                                required
-                              />
-                              {activeSearchIdx === idx && searchQuery.trim() !== '' && (
-                                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
-                                  {products
-                                    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                    .map(p => (
-                                      <button
-                                        key={p.id}
-                                        type="button"
-                                        onClick={() => {
-                                          handleItemChange(idx, 'modelName', p.name);
-                                          setActiveSearchIdx(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors uppercase"
-                                      >
-                                        {p.name}
-                                      </button>
-                                    ))
-                                  }
-                                  {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                                    <div className="px-4 py-2 text-xs text-slate-400 font-medium">No se encontraron modelos</div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                           <div>
-                            <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">Color</label>
-                            {getAvailableColorsForModel(item.modelName).length > 0 ? (
-                              <select
-                                value={item.color}
-                                onChange={(e) => handleItemChange(idx, 'color', e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs"
-                                required
-                              >
-                                <option value="">Seleccione Color</option>
-                                {getAvailableColorsForModel(item.modelName).map((color) => (
-                                  <option key={color} value={color}>{color.toUpperCase()}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                placeholder="Escribe Color..."
-                                value={item.color}
-                                onChange={(e) => handleItemChange(idx, 'color', e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 outline-none text-xs uppercase"
-                                required
-                                disabled={!item.modelName}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Sizes Matrix */}
-                        <div>
-                          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2">Cantidad por Tallas</label>
-                          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-                            {['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'].map((size) => {
-                              const labelMap: Record<string, string> = {
-                                s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
-                                size38: '38', size40: '40', size42: '42', size44: '44', size46: '46',
-                                size48: '48', size50: '50', size52: '52'
-                              };
-                              return (
-                                <div key={size} className="text-center">
-                                  <label className="block text-[9px] font-black text-slate-500 mb-1">{labelMap[size]}</label>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={item[size] || 0}
-                                    onChange={(e) => handleItemChange(idx, size, parseInt(e.target.value) || 0)}
-                                    className="w-full text-center bg-white border border-slate-200 rounded-lg py-1 font-bold text-xs"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeFormRow(idx)}
-                          className="absolute top-2 right-2 text-rose-500 hover:text-rose-700 text-xs font-black"
-                          disabled={formItems.length === 1}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={addFormRow}
-                    className="mt-4 text-xs font-black text-indigo-600 hover:text-indigo-800 flex items-center gap-1 active:scale-95"
-                  >
-                    + Agregar otra prenda
-                  </button>
-                </div>
-
                 {/* Footer buttons */}
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                   <button
@@ -606,11 +1278,11 @@ export default function ReturnsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-2.5 rounded-xl text-xs transition-all shadow-md"
-                    disabled={isSubmitting}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    disabled={isSubmitting || (creationMode === 'INVOICE' && !selectedInvoice && !isEditing)}
                   >
                     {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Confirmar Envió
+                    Confirmar Envío
                   </button>
                 </div>
               </form>
@@ -658,10 +1330,18 @@ export default function ReturnsPage() {
                 </div>
 
                 {/* Reason description */}
-                <div>
-                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Explicación de la Devolución (Descargo)</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Explicación de la Devolución (Descargo)</h3>
+                    {selectedRequest.reason && selectedRequest.reason.match(/\[Comprobante:\s*([^\]]+)\]/i) && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg">
+                        <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                        Comprobante: {selectedRequest.reason.match(/\[Comprobante:\s*([^\]]+)\]/i)?.[1]}
+                      </span>
+                    )}
+                  </div>
                   <div className="bg-slate-50 p-4 rounded-xl border font-medium text-xs text-slate-700 italic break-all break-words whitespace-pre-wrap">
-                    "{selectedRequest.reason}"
+                    "{selectedRequest.reason ? selectedRequest.reason.replace(/\[Comprobante:\s*([^\]]+)\]\s*/i, '') : ''}"
                   </div>
                 </div>
 
