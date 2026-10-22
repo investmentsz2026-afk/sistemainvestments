@@ -8,6 +8,7 @@ import { Layout } from '../../../../components/common/Layout';
 import { ProductForm } from '../../../../components/products/ProductForm';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import api from '../../../../lib/axios';
 
 export default function EditProductPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -16,15 +17,26 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [product, setProduct] = useState<any>(null);
 
   useEffect(() => {
-    if (products) {
-      const found = products.find(p => p.id === params.id);
-      if (found) {
-        setProduct(found);
-      } else {
-        setError('Producto no encontrado');
+    const fetchProduct = async () => {
+      try {
+        const resp = await api.get(`/products/${params.id}`);
+        if (resp.data) {
+          setProduct(resp.data);
+        } else {
+          setError('Producto no encontrado');
+        }
+      } catch (err: any) {
+        console.error('Error fetching product for edit:', err);
+        // Fallback al cache de products
+        if (products) {
+          const found = products.find(p => p.id === params.id);
+          if (found) setProduct(found);
+          else setError('Producto no encontrado');
+        }
       }
-    }
-  }, [products, params.id]);
+    };
+    fetchProduct();
+  }, [params.id]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -51,6 +63,14 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       </Layout>
     );
   }
+
+  // Extraer todos los colores presentes tanto en product.colors como en todas sus variantes
+  const variantColors = (product.variants || [])
+    .map((v: any) => v.color)
+    .filter((c: string) => c && c.trim() && c.trim() !== 'ÚNICO');
+  const existingColors = (product.colors || [])
+    .filter((c: string) => c && c.trim() && c.trim() !== 'ÚNICO');
+  const allProductColors = Array.from(new Set([...existingColors, ...variantColors]));
 
   return (
     <Layout>
@@ -95,12 +115,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           minStock: product.minStock,
           imageUrl: product.imageUrl || '',
           sizes: product.sizes || [],
-          colors: (product.colors || []).filter((c: string) => c !== 'ÚNICO'),
+          colors: allProductColors,
           variants: (product.variants || []).map((v: any) => ({
             id: v.id,
             size: v.size,
             color: v.color,
-            initialStock: v.stock,
+            initialStock: v.stock !== undefined ? v.stock : 0,
+            stock: v.stock !== undefined ? v.stock : 0,
             variantSku: v.variantSku,
             location: v.location || product.location || ''
           }))

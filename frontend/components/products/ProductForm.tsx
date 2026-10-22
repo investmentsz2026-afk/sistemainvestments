@@ -295,6 +295,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           const varSize = initialData.variants?.[0]?.size;
           dataToReset.sizes = varSize ? [varSize] : ['ESTÁNDAR'];
         }
+        // Asegurar que todos los colores de las variantes existentes aparezcan en los chips de colores
+        const variantColors = (initialData.variants || [])
+          .map((v: any) => v.color)
+          .filter((c: string) => c && c.trim() && c.trim() !== 'ÚNICO');
+        dataToReset.colors = Array.from(new Set([...(dataToReset.colors || []), ...variantColors]));
       }
       reset(dataToReset);
     }
@@ -536,19 +541,145 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     setValue('sizes', currentSizes);
   };
 
+  const addColorVariant = (newColor: string) => {
+    const trimmed = newColor.trim();
+    if (!trimmed) return;
+    if (watchColors.some(c => c.toUpperCase() === trimmed.toUpperCase())) {
+      toast.error(`El color "${trimmed}" ya está agregado`);
+      return;
+    }
+
+    const newColors = [...watchColors, trimmed];
+    setValue('colors', newColors);
+    setColorInput('');
+
+    if (isMaterialOrMachinery) {
+      const userSize = (watchSizes && watchSizes.length > 0 && watchSizes[0]) ? watchSizes[0] : 'ESTÁNDAR';
+      const isSpecialSku = ['AVIOS', 'MERCHAN_DESIGN', 'MATERIALES'].includes(watchInventoryType);
+      const userCorrelative = watchCorrelative && watchCorrelative.trim()
+        ? watchCorrelative.replace(/\D/g, '').padStart(4, '0').slice(-4)
+        : undefined;
+
+      const newVariantSku = isSpecialSku
+        ? generateAvioSKU({
+            name: watchName,
+            category: watchCategory,
+            size: userSize,
+            color: trimmed,
+            location: watchLocation || 'A1',
+            correlative: userCorrelative,
+            existingSku: initialData?.sku
+          })
+        : undefined;
+
+      const currentVariants = (watch('variants') || []).filter((v: any) => v.color !== 'ÚNICO');
+      const exists = currentVariants.some((v: any) => v.color.toUpperCase() === trimmed.toUpperCase());
+      if (!exists) {
+        setValue('variants', [
+          ...currentVariants,
+          {
+            size: userSize,
+            color: trimmed,
+            stock: 0,
+            initialStock: 0,
+            variantSku: newVariantSku,
+            location: watchLocation || 'A1'
+          }
+        ]);
+      }
+    }
+    toast.success(`Color "${trimmed}" agregado`);
+  };
+
   const handleColorAdd = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const val = colorInput.trim();
-      if (val && !watchColors.includes(val)) {
-        setValue('colors', [...watchColors, val]);
-        setColorInput('');
-      }
+      addColorVariant(colorInput);
     }
   };
 
   const handleColorRemove = (color: string) => {
-    setValue('colors', watchColors.filter(c => c !== color));
+    const updatedColors = watchColors.filter(c => c !== color);
+    setValue('colors', updatedColors);
+
+    // Remover también la variante de ese color de la lista de variantes
+    const currentVariants = watch('variants') || [];
+    const remainingVariants = currentVariants.filter((v: any) => v.color !== color);
+
+    if (remainingVariants.length === 0 && isMaterialOrMachinery) {
+      const userSize = (watchSizes && watchSizes.length > 0 && watchSizes[0]) ? watchSizes[0] : 'ESTÁNDAR';
+      const isSpecialSku = ['AVIOS', 'MERCHAN_DESIGN', 'MATERIALES'].includes(watchInventoryType);
+      const userCorrelative = watchCorrelative && watchCorrelative.trim()
+        ? watchCorrelative.replace(/\D/g, '').padStart(4, '0').slice(-4)
+        : undefined;
+      const baseSku = isSpecialSku
+        ? generateAvioSKU({
+            name: watchName,
+            category: watchCategory,
+            size: userSize,
+            color: 'UN',
+            location: watchLocation || 'A1',
+            correlative: userCorrelative,
+            existingSku: initialData?.sku
+          })
+        : (watch('sku') || undefined);
+      setValue('variants', [{
+        size: userSize,
+        color: 'ÚNICO',
+        stock: 0,
+        initialStock: 0,
+        variantSku: baseSku,
+        location: watchLocation || 'A1'
+      }]);
+    } else {
+      setValue('variants', remainingVariants);
+    }
+
+    toast.success(`Color "${color}" y su variante eliminados`);
+  };
+
+  const handleVariantRemove = (idxToRemove: number, variantColor: string) => {
+    const currentVariants = [...(watch('variants') || [])];
+    if (idxToRemove < 0 || idxToRemove >= currentVariants.length) return;
+
+    currentVariants.splice(idxToRemove, 1);
+
+    // Si ya no quedan variantes con ese color, quitarlo también de watchColors
+    const stillHasColor = currentVariants.some((v: any) => v.color === variantColor);
+    if (!stillHasColor) {
+      setValue('colors', watchColors.filter(c => c !== variantColor));
+    }
+
+    if (currentVariants.length === 0 && isMaterialOrMachinery) {
+      const userSize = (watchSizes && watchSizes.length > 0 && watchSizes[0]) ? watchSizes[0] : 'ESTÁNDAR';
+      const isSpecialSku = ['AVIOS', 'MERCHAN_DESIGN', 'MATERIALES'].includes(watchInventoryType);
+      const userCorrelative = watchCorrelative && watchCorrelative.trim()
+        ? watchCorrelative.replace(/\D/g, '').padStart(4, '0').slice(-4)
+        : undefined;
+      const baseSku = isSpecialSku
+        ? generateAvioSKU({
+            name: watchName,
+            category: watchCategory,
+            size: userSize,
+            color: 'UN',
+            location: watchLocation || 'A1',
+            correlative: userCorrelative,
+            existingSku: initialData?.sku
+          })
+        : (watch('sku') || undefined);
+      setValue('variants', [{
+        size: userSize,
+        color: 'ÚNICO',
+        stock: 0,
+        initialStock: 0,
+        variantSku: baseSku,
+        location: watchLocation || 'A1'
+      }]);
+    } else {
+      setValue('variants', currentVariants);
+    }
+
+    toast.success(`Variante (${variantColor}) eliminada`);
   };
 
   const handleFormSubmit = (data: ProductFormData) => {
@@ -584,12 +715,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           data.sku = avioSku;
         }
         data.variants = [{
+          id: data.variants?.[0]?.id,
           size: userSize,
           color: 'ÚNICO',
-          stock: 0,
-          initialStock: 0,
+          stock: data.variants?.[0]?.stock !== undefined ? data.variants[0].stock : (data.variants?.[0]?.initialStock || 0),
+          initialStock: data.variants?.[0]?.initialStock || 0,
           location: data.location || undefined,
-          variantSku: avioSku,
+          variantSku: data.variants?.[0]?.variantSku || avioSku,
         }];
       } else {
         data.colors = validColors;
@@ -608,9 +740,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         if (isSpecialSku) {
           data.sku = baseAvioSku;
         }
-        data.variants = validColors.map(color => {
+
+        const finalVariants: any[] = [];
+        validColors.forEach(color => {
           const existing = existingVariants.find((v: any) => v.color === color);
-          return {
+          finalVariants.push({
             id: existing?.id,
             size: userSize,
             color: color,
@@ -618,18 +752,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             initialStock: existing?.initialStock || 0,
             location: data.location || undefined,
             variantSku: isSpecialSku
-              ? generateAvioSKU({
+              ? (existing?.variantSku || generateAvioSKU({
                   name: data.name,
                   category: data.category,
                   size: userSize,
                   color,
                   location: data.location || 'A1',
                   correlative: userCorrelative,
-                  existingSku: existing?.variantSku || initialData?.sku
-                })
+                  existingSku: initialData?.sku
+                }))
               : (existing?.variantSku || undefined),
-          };
+          });
         });
+
+        // Si existe variante ÚNICO en existingVariants y el usuario no la eliminó:
+        const existingUnico = existingVariants.find((v: any) => v.color === 'ÚNICO');
+        if (existingUnico) {
+          finalVariants.push({
+            id: existingUnico.id,
+            size: userSize,
+            color: 'ÚNICO',
+            stock: existingUnico.stock !== undefined ? existingUnico.stock : (existingUnico.initialStock || 0),
+            initialStock: existingUnico.initialStock || 0,
+            location: data.location || undefined,
+            variantSku: existingUnico.variantSku,
+          });
+        }
+
+        data.variants = finalVariants;
       }
     } else if (data.sizes && data.sizes.length > 0 && data.colors && data.colors.length > 0 && !data.op) {
       // For products with sizes and colors (like 1ra or Correas without OP):
@@ -1420,13 +1570,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               />
               <button
                 type="button"
-                onClick={() => {
-                  const val = colorInput.trim();
-                  if (val && !watchColors.includes(val)) {
-                    setValue('colors', [...watchColors, val]);
-                    setColorInput('');
-                  }
-                }}
+                onClick={() => addColorVariant(colorInput)}
                 className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shrink-0 transition"
               >
                 + Agregar Color
@@ -1463,6 +1607,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <th className="pb-3 font-semibold text-gray-500">Color</th>
                     <th className="pb-3 font-semibold text-gray-500">SKU de Variante</th>
                     <th className="pb-3 font-semibold text-right text-gray-500">Stock Actual</th>
+                    <th className="pb-3 font-semibold text-center text-gray-500 w-24">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -1493,6 +1638,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                           }`}>
                             {stock || 0} uds
                           </span>
+                        </td>
+                        <td className="py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleVariantRemove(idx, variant.color)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title={`Eliminar variante ${variant.color}`}
+                          >
+                            <Trash2 className="w-4 h-4 mx-auto" />
+                          </button>
                         </td>
                       </tr>
                     );

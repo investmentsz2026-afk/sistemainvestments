@@ -38,6 +38,16 @@ export class ProductsController {
     return this.productsService.searchMaterials(query);
   }
 
+  @Get('finished-master')
+  getFinishedMaster(@Query('q') query?: string) {
+    return this.productsService.getFinishedMasterProducts(query);
+  }
+
+  @Get(':id/previous-materials')
+  getPreviousMaterials(@Param('id') id: string) {
+    return this.productsService.getPreviousMaterials(id);
+  }
+
   @Get('low-stock')
   getLowStock() {
     return this.productsService.getLowStockProducts();

@@ -408,6 +408,13 @@ export class ProductsService {
       );
 
       for (const variant of variantsToDelete) {
+        await this.prisma.purchaseItem.updateMany({
+          where: { variantId: variant.id },
+          data: { variantId: null },
+        });
+        await this.prisma.movement.deleteMany({
+          where: { variantId: variant.id },
+        });
         await this.prisma.productVariant.delete({
           where: { id: variant.id },
         });
@@ -465,6 +472,166 @@ export class ProductsService {
       },
       take: 10,
     });
+  }
+
+  async getFinishedMasterProducts(query?: string) {
+    const where: any = {
+      isActive: true,
+      inventoryType: 'TERMINADOS',
+    };
+
+    if (query && query.trim()) {
+      where.OR = [
+        { name: { contains: query.trim(), mode: 'insensitive' } },
+        { sku: { contains: query.trim(), mode: 'insensitive' } },
+        { category: { contains: query.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where,
+      include: {
+        variants: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const masterMap = new Map<string, any>();
+
+    for (const prod of products) {
+      const key = prod.name.trim().toUpperCase();
+      if (!masterMap.has(key)) {
+        masterMap.set(key, {
+          id: prod.id,
+          name: prod.name.trim(),
+          category: prod.category,
+          sku: prod.sku,
+          description: prod.description,
+          imageUrl: prod.imageUrl,
+          entalle: prod.entalle,
+          sizes: Array.from(new Set(prod.sizes || [])),
+          colors: Array.from(new Set(prod.colors || [])),
+          skus: [prod.sku].filter(Boolean),
+          ops: [prod.op].filter(Boolean),
+          totalStock: prod.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0,
+          purchasePrice: prod.purchasePrice || 0,
+          sellingPrice: prod.sellingPrice || 0,
+        });
+      } else {
+        const existing = masterMap.get(key);
+        if (prod.sku && !existing.skus.includes(prod.sku)) existing.skus.push(prod.sku);
+        if (prod.op && !existing.ops.includes(prod.op)) existing.ops.push(prod.op);
+        if (!existing.imageUrl && prod.imageUrl) existing.imageUrl = prod.imageUrl;
+        if (!existing.entalle && prod.entalle) existing.entalle = prod.entalle;
+        if (prod.sizes) {
+          existing.sizes = Array.from(new Set([...existing.sizes, ...prod.sizes]));
+        }
+        if (prod.colors) {
+          existing.colors = Array.from(new Set([...existing.colors, ...prod.colors]));
+        }
+        existing.totalStock += prod.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0;
+      }
+    }
+
+    return Array.from(masterMap.values());
+  }
+
+  async getPreviousMaterials(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { variants: true },
+    });
+
+    if (!product) return [];
+
+    // 1. Buscar en muestras por nombre similar, por OP o por código
+    const sample = await this.prisma.productSample.findFirst({
+      where: {
+        OR: [
+          { name: { equals: product.name, mode: 'insensitive' } },
+          ...(product.op ? [{ op: product.op }] : []),
+          { code: product.sku },
+        ],
+        materials: { some: {} },
+      },
+      include: {
+        materials: {
+          include: {
+            product: {
+              include: { variants: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (sample && sample.materials && sample.materials.length > 0) {
+      return sample.materials.map(sm => ({
+        productId: sm.productId,
+        variantId: null,
+        name: sm.product?.name || sm.customMaterial || 'Material',
+        imageUrl: sm.product?.imageUrl || null,
+        sku: sm.product?.sku || '',
+        quantity: sm.quantity || 1,
+        unitPriceAtTime: sm.unitPriceAtTime || sm.product?.purchasePrice || 0,
+        customMaterial: sm.customMaterial || null,
+      }));
+    }
+
+    // 2. Si hay compras asociadas a la OP de este producto o de productos con el mismo nombre
+    const allOps = await this.prisma.product.findMany({
+      where: {
+        name: { equals: product.name, mode: 'insensitive' },
+        op: { not: null },
+      },
+      select: { op: true },
+    });
+
+    const opList = Array.from(new Set([product.op, ...allOps.map(p => p.op)].filter(Boolean))) as string[];
+
+    if (opList.length > 0) {
+      const purchases = await this.prisma.purchase.findMany({
+        where: {
+          op: { in: opList },
+          type: { not: 'SERVICE' },
+        },
+        include: {
+          items: {
+            include: { product: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const materialsFound: any[] = [];
+      const seenKeys = new Set<string>();
+
+      for (const pur of purchases) {
+        for (const item of pur.items) {
+          const key = item.productId || item.name;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            materialsFound.push({
+              productId: item.productId || null,
+              variantId: item.variantId || null,
+              name: item.name || item.product?.name || 'Insumo',
+              imageUrl: item.product?.imageUrl || null,
+              sku: item.product?.sku || '',
+              quantity: item.quantity || 1,
+              unitPriceAtTime: item.price || item.product?.purchasePrice || 0,
+              customMaterial: item.productId ? null : item.name,
+            });
+          }
+        }
+      }
+
+      if (materialsFound.length > 0) {
+        return materialsFound;
+      }
+    }
+
+    return [];
   }
 
   async getLowStockProducts() {

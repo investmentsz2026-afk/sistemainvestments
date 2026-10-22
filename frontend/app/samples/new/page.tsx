@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../lib/axios';
@@ -18,7 +18,10 @@ import {
     FileText,
     Settings,
     Upload,
-    Loader2
+    Loader2,
+    Check,
+    RotateCcw,
+    Sparkles
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -42,6 +45,14 @@ export default function NewSamplePage() {
         images: [] as string[]
     });
 
+    // Master finished products state (for existing sample reproduction)
+    const [masterProducts, setMasterProducts] = useState<any[]>([]);
+    const [isLoadingMasterProducts, setIsLoadingMasterProducts] = useState(false);
+    const [selectedMasterProduct, setSelectedMasterProduct] = useState<any | null>(null);
+    const [productSearch, setProductSearch] = useState('');
+    const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+    const [isLoadingPreviousMaterials, setIsLoadingPreviousMaterials] = useState(false);
+
     const [materials, setMaterials] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -49,6 +60,86 @@ export default function NewSamplePage() {
     const [customMatName, setCustomMatName] = useState('');
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [pendingVariantProduct, setPendingVariantProduct] = useState<any>(null);
+
+    useEffect(() => {
+        if (isExisting) {
+            fetchFinishedMasterProducts();
+        }
+    }, [isExisting]);
+
+    const fetchFinishedMasterProducts = async (q?: string) => {
+        setIsLoadingMasterProducts(true);
+        try {
+            const resp = await api.get('/products/finished-master', {
+                params: q ? { q } : {}
+            });
+            setMasterProducts(resp.data || []);
+        } catch (err) {
+            console.error('Error fetching finished master products:', err);
+            // Fallback to /products if needed
+            try {
+                const fallbackResp = await api.get('/products');
+                const list = (fallbackResp.data || []).filter((p: any) => p.inventoryType === 'TERMINADOS' && p.isActive);
+                setMasterProducts(list);
+            } catch (fallbackErr) {
+                console.error('Fallback error:', fallbackErr);
+            }
+        } finally {
+            setIsLoadingMasterProducts(false);
+        }
+    };
+
+    const handleSelectMasterProduct = async (prod: any) => {
+        setSelectedMasterProduct(prod);
+        setIsProductDropdownOpen(false);
+        setProductSearch('');
+
+        const autoCode = prod.sku ? (prod.sku.startsWith('SMP-') ? prod.sku : `SMP-${prod.sku}`) : `SMP-${Math.floor(1000 + Math.random() * 9000)}`;
+        const techSpecs = [
+            `Categoría: ${prod.category || 'Confección'}`,
+            prod.sizes && prod.sizes.length > 0 ? `Tallas oficiales: ${prod.sizes.join(', ')}` : '',
+            prod.colors && prod.colors.length > 0 ? `Colores: ${prod.colors.join(', ')}` : '',
+            prod.entalle ? `Entalle: ${prod.entalle}` : '',
+            prod.description ? `Detalles: ${prod.description}` : ''
+        ].filter(Boolean).join(' • ');
+
+        setFormData(prev => ({
+            ...prev,
+            name: prod.name,
+            code: autoCode,
+            characteristics: techSpecs || prev.characteristics,
+            description: `Muestra basada en producto terminado de catálogo: ${prod.name} (SKU: ${prod.sku || 'S/N'})`,
+            images: prod.imageUrl ? (prev.images.includes(prod.imageUrl) ? prev.images : [prod.imageUrl, ...prev.images]) : prev.images
+        }));
+
+        // Buscar si este producto terminado tiene materiales previos registrados
+        setIsLoadingPreviousMaterials(true);
+        try {
+            const resp = await api.get(`/products/${prod.id}/previous-materials`);
+            const prevMats = resp.data || [];
+            if (prevMats.length > 0) {
+                setMaterials(prevMats);
+                toast.success(`Se vincularon ${prevMats.length} materiales usados anteriormente por este producto`, {
+                    icon: '📦',
+                    duration: 4000
+                });
+            } else {
+                toast('No se encontraron materiales previos registrados. Puedes buscarlos y agregarlos en la sección de Requerimientos.', {
+                    icon: 'ℹ️',
+                    duration: 5000
+                });
+            }
+        } catch (err) {
+            console.error('Error fetching previous materials:', err);
+        } finally {
+            setIsLoadingPreviousMaterials(false);
+        }
+    };
+
+    const handleClearMasterProduct = () => {
+        setSelectedMasterProduct(null);
+        setProductSearch('');
+    };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -238,6 +329,172 @@ export default function NewSamplePage() {
 
                 <form onSubmit={handleSubmit} className={cardClass}>
                     <div className={isExisting ? 'space-y-4' : 'space-y-8'}>
+                        {/* ── SELECTOR DE PRODUCTO TERMINADO EN INVENTARIO (MAESTRO) ── */}
+                        {isExisting && (
+                            <div className="bg-slate-50/80 p-5 md:p-6 rounded-2xl border border-indigo-100/80 space-y-3.5 shadow-sm">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-black uppercase text-indigo-900 tracking-wider">
+                                            <Box className="w-4 h-4 text-indigo-600" />
+                                            1. Seleccionar Producto Terminado de Inventario (Maestro)
+                                        </label>
+                                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                            Selecciona la prenda existente que vas a reproducir para auto-completar sus datos y cargar los materiales que utilizó:
+                                        </p>
+                                    </div>
+                                    {selectedMasterProduct && (
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full uppercase self-start sm:self-auto">
+                                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                            Prenda Seleccionada
+                                        </span>
+                                    )}
+                                </div>
+
+                                {selectedMasterProduct ? (
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-indigo-200 shadow-sm">
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            <div className="w-14 h-14 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center overflow-hidden shrink-0">
+                                                {selectedMasterProduct.imageUrl ? (
+                                                    <img src={getImageUrl(selectedMasterProduct.imageUrl)} alt={selectedMasterProduct.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Box className="w-7 h-7 text-indigo-400" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="text-sm font-black text-slate-900 uppercase truncate">
+                                                        {selectedMasterProduct.name}
+                                                    </p>
+                                                    <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase">
+                                                        {selectedMasterProduct.category || 'Confección'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 font-bold mt-0.5">
+                                                    SKU: <span className="font-mono text-slate-800">{selectedMasterProduct.sku}</span>
+                                                    {selectedMasterProduct.totalStock !== undefined && ` • Stock en almacén: ${selectedMasterProduct.totalStock} unds`}
+                                                </p>
+                                                {selectedMasterProduct.sizes && selectedMasterProduct.sizes.length > 0 && (
+                                                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                                        Tallas: {selectedMasterProduct.sizes.join(', ')} {selectedMasterProduct.colors && selectedMasterProduct.colors.length > 0 && `• Colores: ${selectedMasterProduct.colors.join(', ')}`}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                            {isLoadingPreviousMaterials && (
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200">
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    <span>Cargando insumos...</span>
+                                                </div>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={handleClearMasterProduct}
+                                                className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-2 rounded-xl transition shadow-sm"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                Cambiar Producto
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <div className="relative">
+                                            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                            <input
+                                                type="text"
+                                                placeholder="Escribe el nombre o SKU de la prenda terminada en inventario para buscar..."
+                                                value={productSearch}
+                                                onChange={(e) => {
+                                                    setProductSearch(e.target.value);
+                                                    setIsProductDropdownOpen(true);
+                                                }}
+                                                onFocus={() => setIsProductDropdownOpen(true)}
+                                                className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-10 py-3 font-bold text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition text-xs shadow-sm"
+                                            />
+                                            {productSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setProductSearch('')}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Dropdown de Productos Terminados */}
+                                        {isProductDropdownOpen && (
+                                            <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl z-30 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                                                {isLoadingMasterProducts ? (
+                                                    <div className="flex items-center justify-center py-6 gap-2 text-indigo-600 font-bold text-xs">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        Cargando catálogo de productos terminados...
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {masterProducts
+                                                            .filter(p =>
+                                                                !productSearch.trim() ||
+                                                                (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+                                                                (p.sku || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+                                                                (p.category || '').toLowerCase().includes(productSearch.toLowerCase())
+                                                            )
+                                                            .slice(0, 30)
+                                                            .map(p => (
+                                                                <button
+                                                                    key={p.id}
+                                                                    type="button"
+                                                                    onClick={() => handleSelectMasterProduct(p)}
+                                                                    className="w-full text-left px-4 py-3 hover:bg-indigo-50/70 transition flex items-center justify-between gap-3 group"
+                                                                >
+                                                                    <div className="flex items-center gap-3 min-w-0">
+                                                                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                                                            {p.imageUrl ? (
+                                                                                <img src={getImageUrl(p.imageUrl)} alt={p.name} className="w-full h-full object-cover" />
+                                                                            ) : (
+                                                                                <Box className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-xs font-black text-slate-900 group-hover:text-indigo-600 uppercase truncate">
+                                                                                {p.name}
+                                                                            </p>
+                                                                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                                                                SKU: {p.sku} • {p.category || 'Confección'}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="text-right shrink-0">
+                                                                        <span className="text-[10px] font-black bg-slate-100 group-hover:bg-indigo-100 group-hover:text-indigo-700 text-slate-600 px-2.5 py-1 rounded-full uppercase transition">
+                                                                            {p.totalStock !== undefined ? `${p.totalStock} en stock` : 'Seleccionar'}
+                                                                        </span>
+                                                                    </div>
+                                                                </button>
+                                                            ))
+                                                        }
+
+                                                        {masterProducts.filter(p =>
+                                                            !productSearch.trim() ||
+                                                            (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+                                                            (p.sku || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+                                                            (p.category || '').toLowerCase().includes(productSearch.toLowerCase())
+                                                        ).length === 0 && (
+                                                            <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
+                                                                No se encontraron productos terminados con "{productSearch}". Puedes continuar llenando los datos manualmente abajo.
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* NAME */}
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre de la Muestra / Prototipo</label>
