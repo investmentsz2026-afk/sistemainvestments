@@ -111,12 +111,25 @@ export default function AuditDetailPage() {
             setEditObs(a.observations || '');
 
             // Initialize size breakdown
-            if (a.qualitySizeData) {
-                setSizeBreakdown(a.qualitySizeData);
+            if (a.qualitySizeData && a.qualitySizeData.length > 0) {
+                const prodSizes = Array.isArray(a.sample?.productionSizeData) ? a.sample.productionSizeData : [];
+                const cleanData = a.qualitySizeData.map((sz: any) => {
+                    const matched = prodSizes.find((p: any) => String(p.size).trim().toUpperCase() === String(sz.size).trim().toUpperCase());
+                    let cleanSku = sz.sku || matched?.sku || matched?.variantSku || a.sample?.barcode || '';
+                    if (cleanSku && cleanSku.includes('-') && /^\d{12}-\w+$/.test(cleanSku)) {
+                        cleanSku = cleanSku.split('-')[0];
+                    }
+                    return {
+                        ...sz,
+                        sku: cleanSku
+                    };
+                });
+                setSizeBreakdown(cleanData);
             } else if (a.sample?.productionSizeData) {
                 setSizeBreakdown(a.sample.productionSizeData.map((sz: any) => ({
                     size: sz.size,
                     color: sz.color || 'ÚNICO',
+                    sku: sz.sku || sz.variantSku || a.sample?.barcode || '',
                     qGood: sz.quantity || 0, // Default all to good
                     qProcess: 0,
                     qSecond: 0,
@@ -172,6 +185,49 @@ export default function AuditDetailPage() {
         }
     };
 
+    const getGarmentSku = (sz: any) => {
+        // 1. If size item already has a defined pure SKU without artificial suffixes
+        if (sz?.sku && String(sz.sku).trim()) {
+            let s = String(sz.sku).trim();
+            if (s.includes('-') && /^\d{12}-\w+$/.test(s)) {
+                s = s.split('-')[0];
+            }
+            if (!s.endsWith(`-${sz.size}`)) {
+                return s;
+            }
+        }
+        if (sz?.variantSku && String(sz.variantSku).trim()) {
+            return String(sz.variantSku).trim();
+        }
+
+        // 2. Check in sample's productionSizeData (created in Commercial for this OP)
+        const prodSizes = Array.isArray(audit?.sample?.productionSizeData) ? audit.sample.productionSizeData : [];
+        if (prodSizes.length > 0) {
+            const matched = prodSizes.find((p: any) => 
+                String(p.size).trim().toUpperCase() === String(sz?.size).trim().toUpperCase() &&
+                (!sz?.color || !p.color || String(p.color).trim().toUpperCase() === String(sz.color).trim().toUpperCase())
+            ) || prodSizes.find((p: any) => String(p.size).trim().toUpperCase() === String(sz?.size).trim().toUpperCase());
+
+            if (matched?.sku && String(matched.sku).trim()) return String(matched.sku).trim();
+            if (matched?.variantSku && String(matched.variantSku).trim()) return String(matched.variantSku).trim();
+
+            if (prodSizes.length === 1 && (prodSizes[0].sku || prodSizes[0].variantSku)) {
+                return String(prodSizes[0].sku || prodSizes[0].variantSku).trim();
+            }
+        }
+
+        // 3. Fallback to sample.barcode (official OP barcode generated in Commercial, pure 12 digits e.g. 775153521289)
+        if (audit?.sample?.barcode && String(audit.sample.barcode).trim()) {
+            return String(audit.sample.barcode).trim();
+        }
+
+        if (audit?.sample?.code && String(audit.sample.code).trim()) {
+            return String(audit.sample.code).trim();
+        }
+
+        return String(audit?.op || '').trim();
+    };
+
     const openFinalizeModal = () => {
         const totalAudited = qGood + qProcess + qSecond;
         if (totalAudited !== audit.totalQuantity) {
@@ -183,6 +239,7 @@ export default function AuditDetailPage() {
         if (sizeBreakdown.length === 1) {
             setSizeBreakdown([{
                 ...sizeBreakdown[0],
+                sku: getGarmentSku(sizeBreakdown[0]),
                 qGood: qGood,
                 qProcess: qProcess,
                 qSecond: qSecond,
@@ -216,6 +273,7 @@ export default function AuditDetailPage() {
                     row.qSecond = takeSec;
                     remSec -= takeSec;
 
+                    row.sku = getGarmentSku(row);
                     newB[i] = row;
                 }
                 setSizeBreakdown(newB);
@@ -235,11 +293,15 @@ export default function AuditDetailPage() {
         setIsUpdating(true);
         try {
             const result = qGood > 0 && qSecond === 0 ? 'CONFORME' : qSecond > 0 ? 'OBSERVACION' : 'PENDIENTE';
+            const finalizedSizeData = sizeBreakdown.map(sz => ({
+                ...sz,
+                sku: getGarmentSku(sz)
+            }));
             await api.patch(`/process-audits/${auditId}/finalize`, {
                 quantityGood: qGood,
                 quantityProcess: qProcess,
                 quantitySecond: qSecond,
-                qualitySizeData: sizeBreakdown,
+                qualitySizeData: finalizedSizeData,
                 observations: editObs,
                 result,
             });
@@ -1044,7 +1106,7 @@ export default function AuditDetailPage() {
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {sizeBreakdown.map((sz, idx) => {
-                                                const itemSku = sz.sku || (audit.sample?.barcode ? `${audit.sample.barcode}-${sz.size}` : audit.sample?.code ? `${audit.sample.code}-${sz.size}` : `${audit.op}-${sz.size}`);
+                                                const itemSku = getGarmentSku(sz);
                                                 return (
                                                     <tr key={idx} className="hover:bg-white transition-colors">
                                                         <td className="px-4 py-3">
@@ -1208,7 +1270,7 @@ export default function AuditDetailPage() {
                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">SKUs asignados por prenda:</span>
                                     <div className="flex flex-wrap gap-1">
                                         {sizeBreakdown.map((sz: any, i: number) => {
-                                            const itemSku = sz.sku || (audit.sample?.barcode ? `${audit.sample.barcode}-${sz.size}` : audit.sample?.code ? `${audit.sample.code}-${sz.size}` : `${audit.op}-${sz.size}`);
+                                            const itemSku = getGarmentSku(sz);
                                             return (
                                                 <span key={i} className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
                                                     Talla {sz.size}: {itemSku}
