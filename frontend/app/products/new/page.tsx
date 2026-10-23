@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useProducts } from '../../../hooks/useProducts';
 import { Layout } from '../../../components/common/Layout';
 import { ProductForm } from '../../../components/products/ProductForm';
-import { ArrowLeft, Package, Sparkles, ShoppingCart, Search, X, Calendar, User, Tag, Clock, Plus, ClipboardCheck, CheckCircle2, AlertCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Package, Sparkles, ShoppingCart, Search, X, Calendar, User, Tag, Clock, Plus, PlusCircle, ClipboardCheck, CheckCircle2, AlertCircle, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../../lib/axios';
@@ -625,6 +625,15 @@ export default function NewProductPage() {
                         <div className="flex items-center gap-4">
                           <span className="font-black text-indigo-600 uppercase tracking-widest font-mono">OP: {audit.op}</span>
                           <span className="px-2 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-700 capitalize">{audit.process}</span>
+                          {audit.isExisting ? (
+                            <span className="px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wider">
+                              ⭐ Producto Maestro
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-800 text-[10px] uppercase tracking-wider">
+                              ✨ Nueva Muestra
+                            </span>
+                          )}
                           <span className="flex items-center gap-1.5 text-gray-500"><Calendar className="w-3.5 h-3.5" /> {new Date(audit.auditDate).toLocaleDateString('es-PE')}</span>
                           <span className="flex items-center gap-1.5 text-gray-500"><User className="w-3.5 h-3.5" /> {audit.inspector}</span>
                         </div>
@@ -677,12 +686,31 @@ export default function NewProductPage() {
                           </div>
                         </div>
                         
-                        <button
-                          onClick={() => { setSelectedAudit(audit); setShowAuditDetailModal(true); setShowAuditModal(false); }}
-                          className="px-5 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg hover:bg-black transition-all flex items-center gap-2 ml-4"
-                        >
-                          <Eye className="w-4 h-4" /> Ver Detalles
-                        </button>
+                        {audit.isExisting ? (
+                          <div className="flex items-center gap-2 ml-4">
+                            <button
+                              onClick={() => {
+                                router.push(`/production-orders?autoOp=${audit.op}&productId=${audit.productId || audit.masterProduct?.id || ''}&productName=${encodeURIComponent(audit.sampleName)}&cost=${audit.totalUnitCost || audit.servicePrice || 0}&auditId=${audit.id}`);
+                              }}
+                              className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 whitespace-nowrap"
+                            >
+                              <PlusCircle className="w-4 h-4" /> Registrar esta OP en Inventario
+                            </button>
+                            <button
+                              onClick={() => { setSelectedAudit(audit); setShowAuditDetailModal(true); setShowAuditModal(false); }}
+                              className="px-3 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                            >
+                              <Eye className="w-4 h-4" /> Ver
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setSelectedAudit(audit); setShowAuditDetailModal(true); setShowAuditModal(false); }}
+                            className="px-5 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-lg hover:bg-black transition-all flex items-center gap-2 ml-4"
+                          >
+                            <Eye className="w-4 h-4" /> Ver Detalles
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -721,6 +749,26 @@ export default function NewProductPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-8 text-center scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                {selectedAudit.isExisting && (
+                  <div className="p-4 bg-indigo-50 border-2 border-indigo-200 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white">Lote de Producto Maestro</span>
+                        <span className="text-xs font-bold text-indigo-700">OP #{selectedAudit.op}</span>
+                      </div>
+                      <p className="font-black text-gray-900 text-sm mt-1">{selectedAudit.sampleName}</p>
+                      <p className="text-xs text-gray-500">Este lote fue originado de un producto existente. Puedes registrar directamente la OP y sus variantes en el Inventario.</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        router.push(`/production-orders?autoOp=${selectedAudit.op}&productId=${selectedAudit.productId || selectedAudit.masterProduct?.id || ''}&productName=${encodeURIComponent(selectedAudit.sampleName)}&cost=${selectedAudit.totalUnitCost || selectedAudit.servicePrice || 0}&auditId=${selectedAudit.id}`);
+                      }}
+                      className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-200 flex items-center gap-2 shrink-0 transition-all"
+                    >
+                      <PlusCircle className="w-4 h-4" /> Registrar esta OP en el Inventario
+                    </button>
+                  </div>
+                )}
                 {/* QUANTITY CARDS */}
                 <div className="grid grid-cols-3 gap-6">
                   <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 flex flex-col items-center">

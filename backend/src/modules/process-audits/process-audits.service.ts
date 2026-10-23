@@ -496,40 +496,96 @@ export class ProcessAuditsService {
         };
     }
 
-    // Para Logística: Solo las aprobadas por Admin y que no han sido recibidas
+    // Para Logística: Auditorías finalizadas por UDP listas para inventario
     async getFinalizedAudits() {
         const audits = await (this.prisma as any).processAudit.findMany({
             where: { 
                 status: 'FINALIZADO',
-                adminStatus: 'APROBADO',
                 logisticsStatus: 'PENDIENTE'
             },
             include: {
                 sample: true,
+                product: true,
                 inspector: { select: { name: true } },
             },
             orderBy: { updatedAt: 'desc' },
         });
 
-        return audits.map((a: any) => ({
-            id: a.id,
-            sampleName: a.sample?.name || 'Desconocido',
-            sampleId: a.sampleId,
-            op: a.op,
-            process: a.process,
-            externalCompany: a.externalCompany,
-            inspector: a.inspector?.name,
-            auditDate: a.auditDate,
-            result: a.result,
-            quantityGood: a.quantityGood,
-            quantityProcess: a.quantityProcess,
-            quantitySecond: a.quantitySecond,
-            totalQuantity: a.totalQuantity,
-            productionColor: a.sample?.productionColor,
-            productionSizeData: a.sample?.productionSizeData,
-            qualitySizeData: a.qualitySizeData,
-            udpRequirements: a.sample?.udpRequirements,
-            barcode: a.sample?.barcode,
+        const results = await Promise.all(audits.map(async (a: any) => {
+            let masterProd = a.product || null;
+            if (!masterProd && a.sample?.name) {
+                try {
+                    masterProd = await (this.prisma as any).product.findFirst({
+                        where: { 
+                            name: { equals: a.sample.name, mode: 'insensitive' },
+                            inventoryType: 'TERMINADOS'
+                        },
+                        include: { variants: true }
+                    });
+                } catch (e) {
+                    console.error('Error finding master product for audit sample:', e);
+                }
+            }
+
+            // Extraer costo unitario y total de fabricación
+            let totalUnitCost = Number(a.servicePrice) || 0;
+            const history = Array.isArray(a.processHistory) ? a.processHistory : [];
+            const finalStep = history.find((h: any) => h.action === 'FINALIZADO_POR_UDP' && h.totalUnitCost !== undefined);
+            if (finalStep) {
+                totalUnitCost = Number(finalStep.totalUnitCost) || totalUnitCost;
+            } else {
+                // Sumar de los procesos en el historial si no hay paso final
+                const pMap: Record<string, number> = {};
+                history.forEach((h: any) => {
+                    if (h.process && h.servicePrice) pMap[h.process] = Number(h.servicePrice) || 0;
+                });
+                if (a.process && a.servicePrice) pMap[a.process] = Number(a.servicePrice) || 0;
+                const sum = Object.values(pMap).reduce((acc, v) => acc + v, 0);
+                if (sum > 0) totalUnitCost = sum;
+            }
+
+            const isExisting = Boolean(a.sample?.isExisting || masterProd || a.productId);
+
+            return {
+                id: a.id,
+                sampleName: a.sample?.name || masterProd?.name || 'Desconocido',
+                sampleId: a.sampleId,
+                productId: masterProd?.id || a.productId || null,
+                masterProduct: masterProd ? {
+                    id: masterProd.id,
+                    name: masterProd.name,
+                    sku: masterProd.sku,
+                    category: masterProd.category,
+                    sizes: masterProd.sizes || [],
+                    colors: masterProd.colors || [],
+                    purchasePrice: masterProd.purchasePrice,
+                    sellingPrice: masterProd.sellingPrice,
+                    realPrice: masterProd.realPrice
+                } : null,
+                isExisting,
+                op: a.op,
+                process: a.process,
+                externalCompany: a.externalCompany,
+                inspector: a.inspector?.name,
+                auditDate: a.auditDate,
+                result: a.result,
+                quantityGood: a.quantityGood,
+                quantityProcess: a.quantityProcess,
+                quantitySecond: a.quantitySecond,
+                totalQuantity: a.totalQuantity,
+                totalUnitCost,
+                totalLotCost: totalUnitCost * (a.totalQuantity || 0),
+                productionColor: a.sample?.productionColor,
+                productionSizeData: a.sample?.productionSizeData,
+                qualitySizeData: a.qualitySizeData,
+                udpRequirements: a.sample?.udpRequirements,
+                barcode: a.sample?.barcode,
+                adminStatus: a.adminStatus,
+                servicePrice: a.servicePrice,
+                processHistory: a.processHistory,
+            };
         }));
+
+        return results;
     }
 }

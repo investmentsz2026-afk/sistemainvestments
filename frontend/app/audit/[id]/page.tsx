@@ -71,6 +71,7 @@ export default function AuditDetailPage() {
     const [adminReviewStatus, setAdminReviewStatus] = useState<'APROBADO' | 'RECHAZADO' | null>(null);
     const [sizeBreakdown, setSizeBreakdown] = useState<any[]>([]);
     const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+    const [showSentToLogisticsModal, setShowSentToLogisticsModal] = useState(false);
     
     // Process change cost modal
     const [showCostModal, setShowCostModal] = useState(false);
@@ -171,6 +172,59 @@ export default function AuditDetailPage() {
         }
     };
 
+    const openFinalizeModal = () => {
+        const totalAudited = qGood + qProcess + qSecond;
+        if (totalAudited !== audit.totalQuantity) {
+            toast.error(`Debes asignar las ${audit.totalQuantity} unidades del lote antes de finalizar. Actualmente tienes ${totalAudited} uds.`);
+            return;
+        }
+
+        // Sincronizar desglose con las cantidades ingresadas por el usuario
+        if (sizeBreakdown.length === 1) {
+            setSizeBreakdown([{
+                ...sizeBreakdown[0],
+                qGood: qGood,
+                qProcess: qProcess,
+                qSecond: qSecond,
+                total: audit.totalQuantity
+            }]);
+        } else if (sizeBreakdown.length > 1) {
+            const currentTotalGood = sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0);
+            const currentTotalSec = sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0);
+            const currentTotalProc = sizeBreakdown.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0);
+            if (currentTotalGood !== qGood || currentTotalSec !== qSecond || currentTotalProc !== qProcess) {
+                const newB = [...sizeBreakdown];
+                let remGood = qGood;
+                let remProc = qProcess;
+                let remSec = qSecond;
+
+                for (let i = 0; i < newB.length; i++) {
+                    const row = { ...newB[i] };
+                    const rowTotal = row.total || (row.qGood + row.qProcess + row.qSecond) || 1;
+                    
+                    const takeGood = Math.min(rowTotal, remGood);
+                    row.qGood = takeGood;
+                    remGood -= takeGood;
+
+                    const availAfterGood = rowTotal - takeGood;
+                    const takeProc = Math.min(availAfterGood, remProc);
+                    row.qProcess = takeProc;
+                    remProc -= takeProc;
+
+                    const availAfterProc = availAfterGood - takeProc;
+                    const takeSec = Math.min(availAfterProc, remSec);
+                    row.qSecond = takeSec;
+                    remSec -= takeSec;
+
+                    newB[i] = row;
+                }
+                setSizeBreakdown(newB);
+            }
+        }
+
+        setShowFinalizeModal(true);
+    };
+
     const handleFinalize = async () => {
         const totalAudited = qGood + qProcess + qSecond;
         if (totalAudited !== audit.totalQuantity) {
@@ -189,8 +243,9 @@ export default function AuditDetailPage() {
                 observations: editObs,
                 result,
             });
-            toast.success('✅ Auditoría finalizada. Notificación enviada al Administrador.');
+            toast.success('✅ Auditoría finalizada y enviada a Logística con éxito.');
             setShowFinalizeModal(false);
+            setShowSentToLogisticsModal(true);
             fetchAudit();
         } catch (error: any) {
             console.error('Error finalizing audit:', error);
@@ -727,13 +782,7 @@ export default function AuditDetailPage() {
                                     </div>
                                 )}
                                 <button
-                                    onClick={() => {
-                                        if ((qGood + qProcess + qSecond) !== audit.totalQuantity) {
-                                            toast.error(`Debes completar las ${audit.totalQuantity} unidades del lote.`);
-                                            return;
-                                        }
-                                        setShowFinalizeModal(true);
-                                    }}
+                                    onClick={openFinalizeModal}
                                     className={`w-full py-6 rounded-[2rem] font-black text-xl flex items-center justify-center gap-3 shadow-2xl transition active:scale-95 ${
                                         (qGood + qProcess + qSecond) === audit.totalQuantity 
                                         ? 'bg-gray-900 text-white hover:bg-black' 
@@ -987,71 +1036,86 @@ export default function AuditDetailPage() {
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-gray-100/50">
                                             <tr>
-                                                <th className="px-4 py-3 font-black text-gray-500 uppercase text-[10px]">Talla</th>
+                                                <th className="px-4 py-3 font-black text-gray-500 uppercase text-[10px]">Prenda / SKU / Talla</th>
                                                 <th className="px-4 py-3 font-black text-emerald-600 uppercase text-[10px]">1ra Calidad</th>
                                                 <th className="px-4 py-3 font-black text-amber-600 uppercase text-[10px]">En Proceso</th>
                                                 <th className="px-4 py-3 font-black text-rose-600 uppercase text-[10px]">2da Calidad</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
-                                            {sizeBreakdown.map((sz, idx) => (
-                                                <tr key={idx} className="hover:bg-white transition-colors">
-                                                    <td className="px-4 py-3 font-black text-gray-900">{sz.size}</td>
-                                                    <td className="px-2 py-3">
-                                                        <div className="w-full px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl font-black text-emerald-700 text-center">
-                                                            {sz.qGood}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-2 py-3">
-                                                        <input 
-                                                            type="number" 
-                                                            min="0"
-                                                            max={sz.total - sz.qSecond}
-                                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl font-bold text-amber-700 focus:ring-2 focus:ring-amber-500 outline-none transition"
-                                                            value={sz.qProcess}
-                                                            onChange={(e) => {
-                                                                const val = Math.max(0, Number(e.target.value));
-                                                                const newB = [...sizeBreakdown];
-                                                                const row = newB[idx];
-                                                                
-                                                                // Ensure we don't exceed total
-                                                                const finalProcess = Math.min(val, row.total - row.qSecond);
-                                                                row.qProcess = finalProcess;
-                                                                row.qGood = row.total - finalProcess - row.qSecond;
-                                                                
-                                                                setSizeBreakdown(newB);
-                                                                setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
-                                                                setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
-                                                                setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="px-2 py-3">
-                                                        <input 
-                                                            type="number" 
-                                                            min="0"
-                                                            max={sz.total - sz.qProcess}
-                                                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl font-bold text-rose-700 focus:ring-2 focus:ring-rose-500 outline-none transition"
-                                                            value={sz.qSecond}
-                                                            onChange={(e) => {
-                                                                const val = Math.max(0, Number(e.target.value));
-                                                                const newB = [...sizeBreakdown];
-                                                                const row = newB[idx];
-                                                                
-                                                                // Ensure we don't exceed total
-                                                                const finalSecond = Math.min(val, row.total - row.qProcess);
-                                                                row.qSecond = finalSecond;
-                                                                row.qGood = row.total - row.qProcess - finalSecond;
-                                                                
-                                                                setSizeBreakdown(newB);
-                                                                setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
-                                                                setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
-                                                                setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
-                                                            }}
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {sizeBreakdown.map((sz, idx) => {
+                                                const itemSku = sz.sku || (audit.sample?.barcode ? `${audit.sample.barcode}-${sz.size}` : audit.sample?.code ? `${audit.sample.code}-${sz.size}` : `${audit.op}-${sz.size}`);
+                                                return (
+                                                    <tr key={idx} className="hover:bg-white transition-colors">
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-black text-gray-900 text-sm">Talla {sz.size}</span>
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase">{sz.color || audit.sample?.productionColor || 'Único'}</span>
+                                                                <span className="inline-block mt-1 text-[9px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded w-fit border border-indigo-100">
+                                                                    SKU: {itemSku}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-2 py-3">
+                                                            <input 
+                                                                type="number" 
+                                                                min="0"
+                                                                max={sz.total}
+                                                                className="w-full px-3 py-2 bg-emerald-50/70 border border-emerald-200 rounded-xl font-black text-emerald-800 text-center focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                                                                value={sz.qGood}
+                                                                onChange={(e) => {
+                                                                    const val = Math.max(0, Number(e.target.value));
+                                                                    const newB = [...sizeBreakdown];
+                                                                    const row = newB[idx];
+                                                                    row.qGood = val;
+                                                                    setSizeBreakdown(newB);
+                                                                    setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
+                                                                    setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
+                                                                    setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="px-2 py-3">
+                                                            <input 
+                                                                type="number" 
+                                                                min="0"
+                                                                max={sz.total}
+                                                                className="w-full px-3 py-2 bg-amber-50/70 border border-amber-200 rounded-xl font-bold text-amber-800 text-center focus:ring-2 focus:ring-amber-500 outline-none transition"
+                                                                value={sz.qProcess}
+                                                                onChange={(e) => {
+                                                                    const val = Math.max(0, Number(e.target.value));
+                                                                    const newB = [...sizeBreakdown];
+                                                                    const row = newB[idx];
+                                                                    row.qProcess = val;
+                                                                    setSizeBreakdown(newB);
+                                                                    setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
+                                                                    setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
+                                                                    setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="px-2 py-3">
+                                                            <input 
+                                                                type="number" 
+                                                                min="0"
+                                                                max={sz.total}
+                                                                className="w-full px-3 py-2 bg-rose-50/70 border border-rose-200 rounded-xl font-bold text-rose-800 text-center focus:ring-2 focus:ring-rose-500 outline-none transition"
+                                                                value={sz.qSecond}
+                                                                onChange={(e) => {
+                                                                    const val = Math.max(0, Number(e.target.value));
+                                                                    const newB = [...sizeBreakdown];
+                                                                    const row = newB[idx];
+                                                                    row.qSecond = val;
+                                                                    setSizeBreakdown(newB);
+                                                                    setQGood(newB.reduce((acc, curr) => acc + (Number(curr.qGood) || 0), 0));
+                                                                    setQProcess(newB.reduce((acc, curr) => acc + (Number(curr.qProcess) || 0), 0));
+                                                                    setQSecond(newB.reduce((acc, curr) => acc + (Number(curr.qSecond) || 0), 0));
+                                                                }}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1090,6 +1154,91 @@ export default function AuditDetailPage() {
                                     ⚠️ La suma de unidades ({qGood + qProcess + qSecond}) debe ser igual al total del lote ({audit.totalQuantity})
                                 </p>
                             )}
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {/* MODAL AUDITORÍA FINALIZADA Y ENVIADA A LOGÍSTICA */}
+                {showSentToLogisticsModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[2.5rem] p-8 md:p-10 max-w-xl w-full shadow-2xl relative overflow-hidden text-center"
+                        >
+                            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-100">
+                                <CheckCircle2 className="w-10 h-10" />
+                            </div>
+
+                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-200">
+                                Auditoría Finalizada
+                            </span>
+
+                            <h3 className="text-2xl font-black text-gray-900 mt-2">¡Información Enviada a Logística!</h3>
+                            <p className="text-gray-500 font-medium text-xs mt-1 mb-6">
+                                Este lote de producción está listo para ingresar al inventario general.
+                            </p>
+
+                            <div className="bg-gray-50/70 p-5 rounded-2xl border border-gray-100 text-left space-y-3 mb-6">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400 font-bold uppercase">Orden de Producción:</span>
+                                    <span className="font-mono font-black text-indigo-600">OP {audit.op}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400 font-bold uppercase">Prenda / Producto:</span>
+                                    <span className="font-bold text-gray-900">{audit.sample?.name || audit.product?.name || 'Prenda'}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400 font-bold uppercase">Desglose Confirmado:</span>
+                                    <span className="font-bold text-gray-800">
+                                        <span className="text-emerald-600">{qGood} en 1ra</span> · <span className="text-rose-600">{qSecond} en 2da</span> {qProcess > 0 && `· ${qProcess} en proc.`}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-400 font-bold uppercase">Costo Total Fabricación:</span>
+                                    <span className="font-black text-emerald-600">S/. {processCostsSummary.totalLotCost.toFixed(2)}</span>
+                                </div>
+                                <div className="pt-2 border-t border-gray-100">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">SKUs asignados por prenda:</span>
+                                    <div className="flex flex-wrap gap-1">
+                                        {sizeBreakdown.map((sz: any, i: number) => {
+                                            const itemSku = sz.sku || (audit.sample?.barcode ? `${audit.sample.barcode}-${sz.size}` : audit.sample?.code ? `${audit.sample.code}-${sz.size}` : `${audit.op}-${sz.size}`);
+                                            return (
+                                                <span key={i} className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-gray-200 text-gray-700">
+                                                    Talla {sz.size}: {itemSku}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-left mb-6">
+                                <p className="text-xs text-indigo-900 font-medium">
+                                    💡 <strong>En Logística:</strong> En la sección <strong>Productos &gt; Importar de OP</strong>, Logística ya puede importar esta OP para registrar el producto maestro y cargar el stock con código de barras al inventario.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowSentToLogisticsModal(false)}
+                                    className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition"
+                                >
+                                    Cerrar
+                                </button>
+                                <button
+                                    onClick={() => router.push('/audit')}
+                                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition shadow-lg"
+                                >
+                                    Ir a Auditorías
+                                </button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

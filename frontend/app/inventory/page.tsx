@@ -1576,6 +1576,7 @@ export default function InventoryPage() {
                     <option value="">Seleccionar motivo</option>
                     {movementType === 'ENTRY' ? (
                       <>
+                        <option value="Producido por Orden de Producción">Producido por Orden de Producción</option>
                         <option value="Compra">Compra a proveedor</option>
                         <option value="Devolución">Devolución de cliente</option>
                         <option value="Ajuste">Ajuste de inventario</option>

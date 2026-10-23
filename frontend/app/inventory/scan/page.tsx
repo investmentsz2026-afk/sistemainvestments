@@ -229,9 +229,22 @@ export default function ScanPage() {
   useEffect(() => {
     const sampleIdParam = searchParams.get('sampleId');
     const modeParam = searchParams.get('mode');
+    const opParam = searchParams.get('op');
+    const reasonParam = searchParams.get('reason');
 
     if (modeParam === 'EXIT' || modeParam === 'ENTRY') {
       setMovementType(modeParam);
+    }
+
+    if (opParam) {
+      setMovementType('ENTRY');
+      setReference(`OP #${opParam}`);
+      if (reasonParam) {
+        setReason(reasonParam);
+      } else {
+        setReason('Producido por Orden de Producción');
+      }
+      toast.success(`Ingreso a inventario preparado para OP #${opParam}`);
     }
 
     if (sampleIdParam) {
@@ -1221,6 +1234,7 @@ export default function ScanPage() {
                     <option value="">Seleccionar motivo</option>
                     {movementType === 'ENTRY' ? (
                       <>
+                        <option value="Producido por Orden de Producción">Producido por Orden de Producción</option>
                         <option value="Compra">Compra a proveedor</option>
                         <option value="Devolución">Devolución de cliente</option>
                         <option value="Ajuste">Ajuste de inventario</option>

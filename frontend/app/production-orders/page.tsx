@@ -1,18 +1,22 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Layout } from '../../components/common/Layout';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/axios';
 import {
   Plus, Search, X, Loader2, ClipboardCheck, Tag, Palette, Ruler, 
-  Eye, CheckCircle2, AlertCircle, Calendar, Hash, ArrowRight, Package
+  Eye, CheckCircle2, AlertCircle, Calendar, Hash, ArrowRight, Package,
+  Barcode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useQueryClient } from 'react-query';
 
 export default function ProductionOrdersPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [productionOrders, setProductionOrders] = useState<any[]>([]);
@@ -22,6 +26,8 @@ export default function ProductionOrdersPage() {
   // Form Modals
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [registeredOpInfo, setRegisteredOpInfo] = useState<{ opNumber: string; productName: string; productId: string } | null>(null);
   const [selectedOp, setSelectedOp] = useState<any>(null);
 
   // Form State
@@ -46,6 +52,66 @@ export default function ProductionOrdersPage() {
   useEffect(() => {
     fetchProductionOrders();
   }, []);
+
+  // Pre-load from URL query parameters (e.g. from Logistics Import of Finalized Audit)
+  useEffect(() => {
+    const autoOp = searchParams.get('autoOp');
+    const productId = searchParams.get('productId');
+    const productName = searchParams.get('productName');
+    const cost = searchParams.get('cost');
+
+    if (autoOp) {
+      setOpNumber(autoOp);
+      if (cost) {
+        setOpCost(parseFloat(cost) || 0);
+      }
+
+      const loadAndSelectProduct = async () => {
+        try {
+          let productToSelect: any = null;
+          if (productId) {
+            try {
+              const res = await api.get(`/products/${productId}`);
+              productToSelect = res.data;
+            } catch (e) {
+              console.warn('Product not found by id, searching by name', e);
+            }
+          }
+
+          if (!productToSelect && productName) {
+            const res = await api.get(`/products/search?q=${encodeURIComponent(productName)}`);
+            if (res.data && res.data.length > 0) {
+              productToSelect = res.data[0];
+            }
+          }
+
+          if (productToSelect) {
+            setSelectedProduct(productToSelect);
+            setProductSearch(productToSelect.name);
+
+            const initialMap: Record<string, string[]> = {};
+            const allColors = productToSelect.colors || [];
+            (productToSelect.sizes || []).forEach((size: string) => {
+              initialMap[size] = [...allColors];
+            });
+            setSelectedVariants(initialMap);
+
+            setOpPrice(productToSelect.sellingPrice || 0);
+            if (cost) setOpCost(parseFloat(cost) || 0);
+            else setOpCost(productToSelect.purchasePrice || 0);
+            setOpRealPrice(productToSelect.realPrice || 0);
+          }
+          setShowFormModal(true);
+          toast.success(`Datos cargados para OP #${autoOp}`);
+        } catch (err) {
+          console.error('Error pre-selecting product:', err);
+          setShowFormModal(true);
+        }
+      };
+
+      loadAndSelectProduct();
+    }
+  }, [searchParams]);
 
   // Handle clicking outside product search dropdown
   useEffect(() => {
@@ -206,9 +272,21 @@ export default function ProductionOrdersPage() {
       });
       toast.success('Orden de Producción registrada y variantes generadas exitosamente');
       queryClient.invalidateQueries('products');
+      
+      const savedOpNumber = opNumber.trim();
+      const savedProductName = selectedProduct.name;
+      const savedProductId = selectedProduct.id;
+
       setShowFormModal(false);
       resetForm();
       fetchProductionOrders();
+
+      setRegisteredOpInfo({
+        opNumber: savedOpNumber,
+        productName: savedProductName,
+        productId: savedProductId
+      });
+      setShowStockModal(true);
     } catch (error: any) {
       console.error('Error creating OP:', error);
       const msg = error.response?.data?.message || 'Error al guardar la orden de producción';
@@ -698,6 +776,70 @@ export default function ProductionOrdersPage() {
                   className="px-8 py-3.5 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition text-xs uppercase tracking-widest active:scale-95"
                 >
                   Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== AGREGAR STOCK MODAL ===== */}
+      <AnimatePresence>
+        {showStockModal && registeredOpInfo && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/60 backdrop-blur-md"
+              onClick={() => setShowStockModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden p-8 border border-white text-center"
+            >
+              <div className="w-16 h-16 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-5 text-emerald-600 shadow-lg shadow-emerald-200">
+                <CheckCircle2 className="w-9 h-9" />
+              </div>
+
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full font-black text-xs uppercase tracking-widest font-mono">
+                OP #{registeredOpInfo.opNumber}
+              </span>
+
+              <h2 className="text-2xl font-black text-gray-900 mt-3">
+                ¡Orden de Producción Registrada!
+              </h2>
+
+              <p className="text-sm text-gray-600 mt-2">
+                Se asoció el producto <span className="font-black text-gray-900">{registeredOpInfo.productName}</span> y se autogeneraron sus códigos SKU para las variantes seleccionadas.
+              </p>
+
+              <div className="my-6 p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-left flex items-start gap-3">
+                <Package className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                <p className="text-xs text-emerald-800 leading-relaxed font-medium">
+                  ¿Deseas ingresar ahora el stock producido de esta OP al inventario con escaneo de código de barras?
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowStockModal(false)}
+                  className="flex-1 py-3.5 px-5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-black text-xs transition"
+                >
+                  Más Tarde
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStockModal(false);
+                    router.push(`/inventory/scan?op=${registeredOpInfo.opNumber}&reason=${encodeURIComponent('Producido por Orden de Producción')}`);
+                  }}
+                  className="flex-1 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  <Barcode className="w-4 h-4" /> Agregar Stock
                 </button>
               </div>
             </motion.div>
