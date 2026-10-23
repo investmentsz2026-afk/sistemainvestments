@@ -32,7 +32,10 @@ import {
     Barcode,
     Printer,
     DollarSign,
-    X
+    X,
+    Briefcase,
+    Sparkles,
+    Tag
 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -76,9 +79,25 @@ export default function AuditDetailPage() {
     const [newExternalCompany, setNewExternalCompany] = useState('');
     const [showBarcode, setShowBarcode] = useState(false);
 
+    // Logistics services
+    const [services, setServices] = useState<any[]>([]);
+    const [selectedServiceForProcess, setSelectedServiceForProcess] = useState<any | null>(null);
+    const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+    const [showServiceSearchInModal, setShowServiceSearchInModal] = useState(false);
+
     useEffect(() => {
         fetchAudit();
+        fetchServices();
     }, [auditId]);
+
+    const fetchServices = async () => {
+        try {
+            const resp = await api.get('/purchases/services/available');
+            setServices(resp.data.data || []);
+        } catch (error) {
+            console.error('Error fetching services:', error);
+        }
+    };
 
     const fetchAudit = async () => {
         try {
@@ -110,11 +129,15 @@ export default function AuditDetailPage() {
         }
     };
 
-    const handleUpdateProgress = async (nextProcess?: string, cost?: number, company?: string) => {
+    const handleUpdateProgress = async (nextProcess?: string, cost?: number, company?: string, servicePurchaseId?: string) => {
         // Enforce cost on process change
         if (nextProcess && nextProcess !== audit.process && !cost && !showCostModal) {
             setPendingProcess(nextProcess);
             setNewExternalCompany(audit.externalCompany || '');
+            setNewProcessCost(0);
+            setSelectedServiceForProcess(null);
+            setServiceSearchQuery(audit.op || '');
+            setShowServiceSearchInModal(false);
             setShowCostModal(true);
             return;
         }
@@ -129,6 +152,7 @@ export default function AuditDetailPage() {
                 nextProcess: nextProcess || audit.process,
                 servicePrice: cost !== undefined ? cost : undefined,
                 externalCompany: company !== undefined ? company : undefined,
+                servicePurchaseId: servicePurchaseId || selectedServiceForProcess?.id || undefined,
                 stepNotes: nextProcess && nextProcess !== audit.process 
                     ? `Pasó de ${audit.process} a ${nextProcess}${cost ? ` (Costo: S/. ${cost})` : ''}` 
                     : undefined
@@ -136,7 +160,9 @@ export default function AuditDetailPage() {
             toast.success(nextProcess && nextProcess !== audit.process ? `Paso a ${nextProcess} registrado` : 'Avance guardado');
             setShowCostModal(false);
             setNewProcessCost(0);
+            setSelectedServiceForProcess(null);
             fetchAudit();
+            fetchServices();
         } catch (error: any) {
             console.error('Error updating progress:', error);
             toast.error(error.response?.data?.message || 'Error al actualizar');
@@ -239,6 +265,73 @@ export default function AuditDetailPage() {
     const isFinalized = audit.status === 'FINALIZADO' && audit.adminStatus !== 'RECHAZADO';
     const proc = PROCESS_INFO[audit.process] || { color: 'bg-gray-100 text-gray-700', icon: Box };
     const ProcIcon = proc.icon;
+
+    // Summary of manufacturing costs across all processes
+    const processCostsSummary = (() => {
+        if (!audit) return { processes: [], totalUnitCost: 0, totalLotCost: 0 };
+
+        const processMap: Record<string, { process: string; price: number; company: string; date?: string }> = {};
+
+        // 1. Process history
+        const history = Array.isArray(audit.processHistory) ? audit.processHistory : [];
+        history.forEach((h: any) => {
+            if (h.process && (h.servicePrice !== undefined || h.externalCompany)) {
+                processMap[h.process] = {
+                    process: h.process,
+                    price: Number(h.servicePrice) || 0,
+                    company: h.externalCompany || '',
+                    date: h.date
+                };
+            }
+        });
+
+        // 2. Current active process if price or company exists
+        if (audit.process) {
+            if (!processMap[audit.process] || (audit.servicePrice !== undefined && audit.servicePrice > 0)) {
+                processMap[audit.process] = {
+                    process: audit.process,
+                    price: Number(audit.servicePrice) || processMap[audit.process]?.price || 0,
+                    company: audit.externalCompany || processMap[audit.process]?.company || '',
+                    date: processMap[audit.process]?.date || audit.updatedAt
+                };
+            }
+        }
+
+        const processes = Object.values(processMap);
+        const totalUnitCost = processes.reduce((acc, p) => acc + p.price, 0);
+        const totalLotCost = totalUnitCost * (audit.totalQuantity || 0);
+
+        return {
+            processes,
+            totalUnitCost,
+            totalLotCost
+        };
+    })();
+
+    // Filter services for modal search
+    const matchingServicesForPendingProcess = (services || []).filter(s => {
+        if (s.isUsed) return false;
+        const matchesOp = audit?.op && s.op && s.op.toLowerCase().trim() === audit.op.toLowerCase().trim();
+        const pendingNormalized = pendingProcess?.toLowerCase().trim();
+        const matchesProcess = !pendingNormalized || 
+            s.op?.toLowerCase().includes(pendingNormalized) ||
+            s.notes?.toLowerCase().includes(pendingNormalized) ||
+            s.items?.some((i: any) => i.name?.toLowerCase().includes(pendingNormalized));
+        return matchesOp && matchesProcess;
+    });
+    const suggestedServicesForModal = matchingServicesForPendingProcess.length > 0
+        ? matchingServicesForPendingProcess
+        : (services || []).filter(s => !s.isUsed && audit?.op && s.op && s.op.toLowerCase().trim() === audit.op.toLowerCase().trim());
+
+    const filteredModalServices = (services || []).filter(s => {
+        if (!serviceSearchQuery) return true;
+        const q = serviceSearchQuery.toLowerCase();
+        const matchesOp = s.op?.toLowerCase().includes(q);
+        const matchesSupplier = s.supplier?.name?.toLowerCase().includes(q);
+        const matchesItem = s.items?.some((i: any) => i.name?.toLowerCase().includes(q));
+        const matchesRef = s.invoiceNumber?.toLowerCase().includes(q);
+        return matchesOp || matchesSupplier || matchesItem || matchesRef;
+    });
 
     return (
         <Layout>
@@ -652,6 +745,96 @@ export default function AuditDetailPage() {
                             </div>
                         )}
 
+                        {/* REGISTRO DE COSTOS DE FABRICACIÓN DEL LOTE */}
+                        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20">
+                            <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm">
+                                        <DollarSign className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Registro de Costos de Fabricación del Lote</h3>
+                                        <p className="text-xs text-gray-400 font-semibold">Costos de servicios por proceso para este lote ({audit.totalQuantity} prendas)</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-2xl text-right">
+                                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-wider block">Costo Total Lote</span>
+                                        <span className="text-xl font-black text-emerald-700">S/. {processCostsSummary.totalLotCost.toFixed(2)}</span>
+                                    </div>
+                                    <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-2xl text-right">
+                                        <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider block">Costo x Prenda</span>
+                                        <span className="text-xl font-black text-indigo-700">S/. {processCostsSummary.totalUnitCost.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* GRID DE PROCESOS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {['Corte', 'Confección', 'Lavado', 'Acabados'].map(procName => {
+                                    const procData = processCostsSummary.processes.find((p: any) => p.process === procName);
+                                    const info = PROCESS_INFO[procName] || { color: 'bg-gray-100 text-gray-700', icon: Box };
+                                    const Icon = info.icon;
+                                    const isCurrent = audit.process === procName;
+                                    const isRecorded = Boolean(procData && procData.price > 0);
+
+                                    return (
+                                        <div 
+                                            key={procName}
+                                            className={`p-4 rounded-2xl border transition-all ${
+                                                isRecorded 
+                                                    ? 'bg-white border-emerald-100 shadow-sm' 
+                                                    : isCurrent 
+                                                        ? 'bg-indigo-50/40 border-indigo-200 shadow-sm' 
+                                                        : 'bg-gray-50/50 border-gray-100 opacity-60'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${info.color}`}>
+                                                        <Icon className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <span className="font-bold text-gray-900 text-xs">{procName}</span>
+                                                </div>
+                                                {isRecorded ? (
+                                                    <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                                                        ✓ Registrado
+                                                    </span>
+                                                ) : isCurrent ? (
+                                                    <span className="text-[9px] font-black uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full animate-pulse">
+                                                        En Proceso
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                                        Pendiente
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-baseline text-xs">
+                                                    <span className="text-gray-400 font-medium">Unitario:</span>
+                                                    <span className="font-black text-gray-900">
+                                                        {isRecorded && procData ? `S/. ${procData.price.toFixed(2)}` : 'S/. 0.00'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-baseline text-xs">
+                                                    <span className="text-gray-400 font-medium">Subtotal ({audit.totalQuantity} uds):</span>
+                                                    <span className="font-black text-emerald-600">
+                                                        {isRecorded && procData ? `S/. ${(procData.price * (audit.totalQuantity || 0)).toFixed(2)}` : 'S/. 0.00'}
+                                                    </span>
+                                                </div>
+                                                <div className="pt-2 border-t border-gray-50 text-[10px] text-gray-500 truncate">
+                                                    <Building2 className="w-3 h-3 inline mr-1 text-gray-400" />
+                                                    {procData?.company || 'Taller no asignado'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         {/* PROCESS HISTORY (TIMELINE) */}
                         <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20">
                             <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-8 flex items-center gap-2">
@@ -974,7 +1157,7 @@ export default function AuditDetailPage() {
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl relative overflow-hidden"
+                            className="bg-white rounded-[2.5rem] p-8 md:p-10 max-w-xl w-full shadow-2xl relative overflow-hidden"
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
@@ -982,26 +1165,197 @@ export default function AuditDetailPage() {
                             </div>
 
                             <div className="relative z-10">
-                                <h3 className="text-3xl font-black text-gray-900 mb-2 leading-tight">Costo de {pendingProcess}</h3>
-                                <p className="text-gray-500 font-medium mb-8">
-                                    Antes de cambiar a <strong>{pendingProcess}</strong>, debes ingresar el costo del servicio y la empresa responsable.
+                                <h3 className="text-2xl md:text-3xl font-black text-gray-900 mb-2 leading-tight">Costo de {pendingProcess}</h3>
+                                <p className="text-gray-500 font-medium mb-6 text-sm">
+                                    Antes de cambiar a <strong>{pendingProcess}</strong>, puedes vincular un servicio registrado en Logística o ingresar el costo y taller manualmente.
                                 </p>
 
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
+                                {/* SELECTOR DE SERVICIO DE LOGÍSTICA */}
+                                <div className="mb-6 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Briefcase className="w-3.5 h-3.5 text-indigo-600" /> Servicio de Logística (Opcional / Auto-completado)
+                                        </label>
+                                        {selectedServiceForProcess && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setSelectedServiceForProcess(null)}
+                                                className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
+                                            >
+                                                <X className="w-3.5 h-3.5" /> Desvincular
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {selectedServiceForProcess ? (
+                                        <div className="p-4 bg-indigo-50/70 border-2 border-indigo-200 rounded-2xl flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-gray-900 text-sm">
+                                                            {selectedServiceForProcess.selectedItem?.name || selectedServiceForProcess.items?.[0]?.name || 'Servicio registrado'}
+                                                        </span>
+                                                        {selectedServiceForProcess.op && (
+                                                            <span className="text-[10px] bg-indigo-100 text-indigo-800 font-mono font-bold px-2 py-0.5 rounded">
+                                                                OP: {selectedServiceForProcess.op}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        Proveedor: <span className="font-semibold text-gray-700">{selectedServiceForProcess.supplier?.name || selectedServiceForProcess.notes || 'Externo'}</span> · Costo: <span className="font-black text-emerald-600">S/. {(Number(selectedServiceForProcess.selectedItem?.price || selectedServiceForProcess.totalAmount) || 0).toFixed(2)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-xl shadow-sm border border-indigo-100">
+                                                ✓ Se marcará Utilizado
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {suggestedServicesForModal.length > 0 && (
+                                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                        <span className="text-xs font-bold text-emerald-800">
+                                                            Se encontró servicio para OP {audit.op} en Logística: <span className="font-semibold text-emerald-900">{suggestedServicesForModal[0].items?.[0]?.name || suggestedServicesForModal[0].notes || 'Servicio'}</span>
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const srv = suggestedServicesForModal[0];
+                                                            const item = srv.items?.[0];
+                                                            setSelectedServiceForProcess({ ...srv, selectedItem: item });
+                                                            if (srv.supplier?.name || srv.notes) setNewExternalCompany(srv.supplier?.name || srv.notes || '');
+                                                            const price = Number(item?.price || srv.totalAmount) || 0;
+                                                            if (price) setNewProcessCost(price);
+                                                        }}
+                                                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm shrink-0"
+                                                    >
+                                                        Vincular
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            <div className="relative">
+                                                <div className="relative flex items-center">
+                                                    <Search className="w-4 h-4 text-gray-400 absolute left-4" />
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Buscar servicio registrado en Logística por nombre, OP o proveedor..."
+                                                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200/60 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition"
+                                                        value={serviceSearchQuery}
+                                                        onFocus={() => setShowServiceSearchInModal(true)}
+                                                        onChange={(e) => {
+                                                            setServiceSearchQuery(e.target.value);
+                                                            setShowServiceSearchInModal(true);
+                                                        }}
+                                                    />
+                                                    {showServiceSearchInModal && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setShowServiceSearchInModal(false)}
+                                                            className="absolute right-4 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                                                        >
+                                                            Cerrar
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <AnimatePresence>
+                                                    {showServiceSearchInModal && (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 10 }}
+                                                            className="absolute z-40 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl p-3 max-h-56 overflow-y-auto"
+                                                        >
+                                                            {filteredModalServices.length === 0 ? (
+                                                                <div className="p-3 text-center">
+                                                                    <p className="text-gray-400 text-xs font-bold">No se encontraron servicios disponibles en Logística</p>
+                                                                    <p className="text-gray-400 text-[11px] mt-1">Puedes ingresar el taller y costo manualmente abajo</p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {filteredModalServices.map(srv => {
+                                                                        const item = srv.items?.[0];
+                                                                        const isForCurrentOp = audit.op && srv.op && srv.op.toLowerCase().trim() === audit.op.toLowerCase().trim();
+                                                                        const isAlreadyUsed = srv.isUsed;
+
+                                                                        return (
+                                                                            <button 
+                                                                                key={srv.id}
+                                                                                type="button"
+                                                                                disabled={isAlreadyUsed}
+                                                                                onClick={() => {
+                                                                                    setSelectedServiceForProcess({ ...srv, selectedItem: item });
+                                                                                    if (srv.supplier?.name || srv.notes) setNewExternalCompany(srv.supplier?.name || srv.notes || '');
+                                                                                    const price = Number(item?.price || srv.totalAmount) || 0;
+                                                                                    if (price) setNewProcessCost(price);
+                                                                                    setShowServiceSearchInModal(false);
+                                                                                }}
+                                                                                className={`w-full p-2.5 text-left rounded-xl transition flex items-center justify-between ${
+                                                                                    isAlreadyUsed
+                                                                                        ? 'opacity-50 bg-gray-50 cursor-not-allowed'
+                                                                                        : isForCurrentOp 
+                                                                                            ? 'bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200' 
+                                                                                            : 'hover:bg-gray-50 border border-transparent'
+                                                                                }`}
+                                                                            >
+                                                                                <div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="font-bold text-gray-900 text-xs">{item?.name || 'Servicio'}</span>
+                                                                                        {srv.op && (
+                                                                                            <span className={`text-[10px] font-mono font-black px-1.5 py-0.2 rounded ${isForCurrentOp ? 'bg-indigo-200 text-indigo-900' : 'bg-gray-100 text-gray-700'}`}>
+                                                                                                OP: {srv.op}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                                                                        {srv.supplier?.name || srv.notes || 'Externo'}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div className="text-right">
+                                                                                    <span className="text-xs font-black text-emerald-600 block">
+                                                                                        S/. {(Number(item?.price || srv.totalAmount) || 0).toFixed(2)}
+                                                                                    </span>
+                                                                                    {isAlreadyUsed ? (
+                                                                                        <span className="text-[9px] font-bold text-purple-600">Ya utilizado</span>
+                                                                                    ) : (
+                                                                                        <span className="text-[9px] font-bold text-indigo-600 hover:underline">Seleccionar</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                                            <Building2 className="w-3.5 h-3.5" /> Empresa del Proceso
+                                            <Building2 className="w-3.5 h-3.5" /> Empresa del Proceso / Taller
                                         </label>
                                         <input 
                                             type="text" 
                                             placeholder="Nombre del taller o empresa..."
-                                            className="w-full px-6 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 transition shadow-inner"
+                                            className="w-full px-5 py-3.5 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 text-sm transition shadow-inner"
                                             value={newExternalCompany}
                                             onChange={(e) => setNewExternalCompany(e.target.value)}
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
+                                    <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                                             <span className="text-emerald-500 font-black">S/.</span> Costo Unitario (por prenda)
                                         </label>
@@ -1009,7 +1363,7 @@ export default function AuditDetailPage() {
                                             type="number" 
                                             step="0.01"
                                             placeholder="Ej: 2.50"
-                                            className="w-full px-6 py-4 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-black text-gray-900 text-2xl transition shadow-inner"
+                                            className="w-full px-5 py-3.5 bg-gray-50 border border-transparent rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 font-black text-gray-900 text-xl transition shadow-inner"
                                             value={newProcessCost || ''}
                                             onChange={(e) => setNewProcessCost(parseFloat(e.target.value) || 0)}
                                             autoFocus
@@ -1017,19 +1371,19 @@ export default function AuditDetailPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 mt-10">
+                                <div className="flex gap-4 mt-8">
                                     <button
                                         onClick={() => setShowCostModal(false)}
-                                        className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition"
+                                        className="flex-1 py-3.5 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition text-sm"
                                     >
                                         Atrás
                                     </button>
                                     <button
-                                        onClick={() => handleUpdateProgress(pendingProcess, newProcessCost, newExternalCompany)}
+                                        onClick={() => handleUpdateProgress(pendingProcess, newProcessCost, newExternalCompany, selectedServiceForProcess?.id)}
                                         disabled={!newProcessCost || isSaving}
-                                        className="flex-[2] py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition shadow-xl shadow-gray-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                                        className="flex-[2] py-3.5 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition shadow-xl shadow-gray-200 disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
-                                        <Check className="w-5 h-5" />
+                                        <Check className="w-4 h-4" />
                                         {isSaving ? 'Actualizando...' : 'Confirmar Cambio'}
                                     </button>
                                 </div>

@@ -205,11 +205,52 @@ export class ProcessAuditsService {
                     date: new Date(),
                     action: 'CAMBIO_PROCESO',
                     previousProcess: audit.process,
-                    servicePrice: data.servicePrice,
-                    externalCompany: data.externalCompany,
+                    servicePrice: data.servicePrice !== undefined ? data.servicePrice : 0,
+                    externalCompany: data.externalCompany || null,
+                    servicePurchaseId: data.servicePurchaseId || null,
                     notes: data.stepNotes || `Paso a ${data.nextProcess}`
                 }
             ];
+        }
+
+        // Si se vinculó un servicio de compras/servicios de logística:
+        if (data.servicePurchaseId) {
+            try {
+                const purchase = await (this.prisma as any).purchase.findUnique({
+                    where: { id: data.servicePurchaseId }
+                });
+                if (purchase) {
+                    let metadata: any = {};
+                    let userNotes = purchase.notes || '';
+                    if (userNotes.includes('__USAGE_METADATA__:')) {
+                        const parts = userNotes.split('__USAGE_METADATA__:');
+                        userNotes = parts[0].trim();
+                        try { metadata = JSON.parse(parts[1]); } catch (e) {}
+                    }
+                    metadata = {
+                        ...metadata,
+                        isUsed: true,
+                        status: 'UTILIZADO',
+                        usedAt: new Date().toISOString(),
+                        usedInOp: audit.op,
+                        usedInAuditId: audit.id,
+                        usedProcess: data.nextProcess || audit.process,
+                        usedByName: audit.inspector?.name || 'UDP'
+                    };
+                    const updatedNotes = userNotes 
+                        ? `${userNotes}\n\n__USAGE_METADATA__:${JSON.stringify(metadata)}`
+                        : `__USAGE_METADATA__:${JSON.stringify(metadata)}`;
+                    await (this.prisma as any).purchase.update({
+                        where: { id: data.servicePurchaseId },
+                        data: {
+                            status: 'UTILIZADO',
+                            notes: updatedNotes
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Error marking service purchase as used in updateProgress:', err);
+            }
         }
 
         if (data.findings) {
@@ -258,6 +299,33 @@ export class ProcessAuditsService {
             throw new BadRequestException('Esta auditoría ya está pendiente de revisión por el Administrador.');
         }
 
+        // Consolidar registro completo de costos de fabricación del lote
+        const processMap: Record<string, { process: string; price: number; company: string; servicePurchaseId?: string | null; date?: any }> = {};
+        const history = Array.isArray(audit.processHistory) ? audit.processHistory : [];
+        history.forEach((h: any) => {
+            if (h.process && (h.servicePrice !== undefined || h.externalCompany)) {
+                processMap[h.process] = {
+                    process: h.process,
+                    price: Number(h.servicePrice) || 0,
+                    company: h.externalCompany || '',
+                    servicePurchaseId: h.servicePurchaseId || null,
+                    date: h.date
+                };
+            }
+        });
+        if (audit.process) {
+            processMap[audit.process] = {
+                process: audit.process,
+                price: Number(audit.servicePrice) || processMap[audit.process]?.price || 0,
+                company: audit.externalCompany || processMap[audit.process]?.company || '',
+                servicePurchaseId: processMap[audit.process]?.servicePurchaseId || null,
+                date: processMap[audit.process]?.date || new Date()
+            };
+        }
+        const processesList = Object.values(processMap);
+        const totalUnitCost = processesList.reduce((acc, p) => acc + p.price, 0);
+        const totalLotCost = totalUnitCost * (audit.totalQuantity || 0);
+
         // Para cualquier otro caso (EN_PROCESO o RECHAZADO), permitimos finalizar.
         const updated = await (this.prisma as any).processAudit.update({
             where: { id },
@@ -271,8 +339,15 @@ export class ProcessAuditsService {
                 observations: data.observations || audit.observations,
                 qualitySizeData: data.qualitySizeData || audit.qualitySizeData,
                 processHistory: [
-                   ...(Array.isArray(audit.processHistory) ? audit.processHistory : []),
-                   { action: 'FINALIZADO_POR_UDP', date: new Date() }
+                   ...history,
+                   { 
+                       action: 'FINALIZADO_POR_UDP', 
+                       date: new Date(),
+                       totalUnitCost,
+                       totalLotCost,
+                       totalQuantity: audit.totalQuantity,
+                       manufacturingCosts: processesList
+                   }
                 ]
             },
             include: { sample: true },
