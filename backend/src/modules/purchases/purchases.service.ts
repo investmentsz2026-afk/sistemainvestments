@@ -13,6 +13,7 @@ export class PurchasesService {
         return this.prisma.$transaction(async (prisma) => {
             const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+            const initialStatus = type === 'SERVICE' ? 'DISPONIBLE' : 'EN_CALIDAD';
             const purchase = await prisma.purchase.create({
                 data: {
                     type: type || 'PURCHASE',
@@ -21,7 +22,7 @@ export class PurchasesService {
                     supplierId: supplierId || null,
                     notes,
                     totalAmount,
-                    status: 'EN_CALIDAD',
+                    status: initialStatus,
                     userId,
                     items: {
                         create: items.map((item) => ({
@@ -33,7 +34,7 @@ export class PurchasesService {
                             price: item.price,
                             productId: item.productId || null,
                             variantId: item.variantId || null,
-                            status: 'EN_CALIDAD',
+                            status: initialStatus,
                         })),
                     },
                 },
@@ -49,7 +50,7 @@ export class PurchasesService {
     }
 
     async findAll() {
-        return this.prisma.purchase.findMany({
+        const records = await this.prisma.purchase.findMany({
             include: {
                 items: {
                     include: {
@@ -62,6 +63,25 @@ export class PurchasesService {
                 supplier: true,
             },
             orderBy: { createdAt: 'desc' },
+        });
+
+        return records.map((p) => {
+            let usageInfo: any = null;
+            let displayNotes = p.notes || '';
+            if (p.notes && p.notes.includes('__USAGE_METADATA__:')) {
+                const parts = p.notes.split('__USAGE_METADATA__:');
+                displayNotes = parts[0].trim();
+                try {
+                    usageInfo = JSON.parse(parts[1]);
+                } catch (e) {}
+            }
+            return {
+                ...p,
+                notes: displayNotes,
+                rawNotes: p.notes,
+                usageInfo,
+                isUsed: p.status === 'UTILIZADO' || !!usageInfo?.isUsed,
+            };
         });
     }
 
@@ -81,7 +101,66 @@ export class PurchasesService {
             },
         });
         if (!purchase) throw new NotFoundException('Compra no encontrada');
-        return purchase;
+
+        let usageInfo: any = null;
+        let displayNotes = purchase.notes || '';
+        if (purchase.notes && purchase.notes.includes('__USAGE_METADATA__:')) {
+            const parts = purchase.notes.split('__USAGE_METADATA__:');
+            displayNotes = parts[0].trim();
+            try {
+                usageInfo = JSON.parse(parts[1]);
+            } catch (e) {}
+        }
+
+        return {
+            ...purchase,
+            notes: displayNotes,
+            rawNotes: purchase.notes,
+            usageInfo,
+            isUsed: purchase.status === 'UTILIZADO' || !!usageInfo?.isUsed,
+        };
+    }
+
+    async markServiceUsed(id: string, usageData: { op: string; auditId: string; process: string; inspectorName: string }) {
+        const purchase = await this.prisma.purchase.findUnique({ where: { id } });
+        if (!purchase) throw new NotFoundException('Servicio no encontrado');
+
+        let metadata: any = {};
+        let userNotes = purchase.notes || '';
+        if (userNotes.includes('__USAGE_METADATA__:')) {
+            const parts = userNotes.split('__USAGE_METADATA__:');
+            userNotes = parts[0].trim();
+            try {
+                metadata = JSON.parse(parts[1]);
+            } catch (e) {}
+        }
+
+        metadata = {
+            ...metadata,
+            isUsed: true,
+            status: 'UTILIZADO',
+            usedAt: new Date().toISOString(),
+            usedInOp: usageData.op,
+            usedInAuditId: usageData.auditId,
+            usedProcess: usageData.process,
+            usedByName: usageData.inspectorName
+        };
+
+        const updatedNotes = userNotes 
+            ? `${userNotes}\n\n__USAGE_METADATA__:${JSON.stringify(metadata)}`
+            : `__USAGE_METADATA__:${JSON.stringify(metadata)}`;
+
+        return this.prisma.purchase.update({
+            where: { id },
+            data: {
+                status: 'UTILIZADO',
+                notes: updatedNotes
+            },
+            include: {
+                items: true,
+                supplier: true
+            }
+        });
     }
 
     async update(id: string, dto: CreatePurchaseDto) {

@@ -21,7 +21,20 @@ export class ProcessAuditsService {
             throw new BadRequestException(`Ya existe una auditoría en proceso para la OP ${data.op}`);
         }
 
-        return (this.prisma as any).processAudit.create({
+        // Validate that UDP has received materials conforme for this sample
+        if (data.sampleId) {
+            const sample = await (this.prisma as any).productSample.findUnique({
+                where: { id: data.sampleId },
+                select: { materialReceiptStatus: true, udpRequirements: true }
+            });
+            const isConforme = sample?.materialReceiptStatus === 'RECIBIDO_CONFORME' || 
+                (sample?.udpRequirements?.opDispatches && sample.udpRequirements.opDispatches.some((d: any) => d.status === 'CONFORME'));
+            if (!isConforme) {
+                throw new BadRequestException('Falta que logística envíe los materiales para poder hacer la auditoría');
+            }
+        }
+
+        const audit = await (this.prisma as any).processAudit.create({
             data: {
                 productId: data.productId || null,
                 sampleId: data.sampleId || null,
@@ -46,7 +59,7 @@ export class ProcessAuditsService {
                         action: 'INICIO_AUDITORIA',
                         servicePrice: data.servicePrice || 0,
                         externalCompany: data.externalCompany || null,
-                        notes: 'Auditoría iniciada'
+                        notes: data.servicePurchaseId ? `Auditoría iniciada con servicio vinculado de Logística` : 'Auditoría iniciada'
                     }
                 ],
             },
@@ -55,6 +68,52 @@ export class ProcessAuditsService {
                 inspector: { select: { name: true } },
             },
         });
+
+        // If a service purchase was linked, mark it as UTILIZADO with usage metadata
+        if (data.servicePurchaseId) {
+            try {
+                const inspector = await (this.prisma as any).user.findUnique({
+                    where: { id: userId },
+                    select: { name: true }
+                });
+                const purchase = await (this.prisma as any).purchase.findUnique({
+                    where: { id: data.servicePurchaseId }
+                });
+                if (purchase) {
+                    let metadata: any = {};
+                    let userNotes = purchase.notes || '';
+                    if (userNotes.includes('__USAGE_METADATA__:')) {
+                        const parts = userNotes.split('__USAGE_METADATA__:');
+                        userNotes = parts[0].trim();
+                        try { metadata = JSON.parse(parts[1]); } catch (e) {}
+                    }
+                    metadata = {
+                        ...metadata,
+                        isUsed: true,
+                        status: 'UTILIZADO',
+                        usedAt: new Date().toISOString(),
+                        usedInOp: data.op,
+                        usedInAuditId: audit.id,
+                        usedProcess: data.process,
+                        usedByName: inspector?.name || 'UDP'
+                    };
+                    const updatedNotes = userNotes 
+                        ? `${userNotes}\n\n__USAGE_METADATA__:${JSON.stringify(metadata)}`
+                        : `__USAGE_METADATA__:${JSON.stringify(metadata)}`;
+                    await (this.prisma as any).purchase.update({
+                        where: { id: data.servicePurchaseId },
+                        data: {
+                            status: 'UTILIZADO',
+                            notes: updatedNotes
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Error marking service purchase as used:', err);
+            }
+        }
+
+        return audit;
     }
 
     async findAll(query: any) {
@@ -335,22 +394,30 @@ export class ProcessAuditsService {
                 op: true, 
                 productionQuantity: true,
                 productionColor: true,
-                productionSizeData: true
+                productionSizeData: true,
+                materialReceiptStatus: true,
+                udpRequirements: true
             },
         });
 
         return {
             products: [],
-            samples: samples.map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                sku: `SAMP-${s.id.slice(-4).toUpperCase()}`,
-                type: 'SAMPLE',
-                op: s.op,
-                productionQuantity: s.productionQuantity,
-                productionColor: s.productionColor,
-                productionSizeData: s.productionSizeData,
-            })),
+            samples: samples.map((s: any) => {
+                const isConforme = s.materialReceiptStatus === 'RECIBIDO_CONFORME' || 
+                    (s.udpRequirements?.opDispatches && s.udpRequirements.opDispatches.some((d: any) => d.status === 'CONFORME'));
+                return {
+                    id: s.id,
+                    name: s.name,
+                    sku: `SAMP-${s.id.slice(-4).toUpperCase()}`,
+                    type: 'SAMPLE',
+                    op: s.op,
+                    productionQuantity: s.productionQuantity,
+                    productionColor: s.productionColor,
+                    productionSizeData: s.productionSizeData,
+                    materialReceiptStatus: s.materialReceiptStatus,
+                    materialsReceived: isConforme,
+                };
+            }),
         };
     }
 

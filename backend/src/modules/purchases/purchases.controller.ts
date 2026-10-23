@@ -1,5 +1,5 @@
 // backend/src/modules/purchases/purchases.controller.ts
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,7 +23,7 @@ export class PurchasesController {
     }
 
     @Get()
-    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD', 'UDP')
     async findAll() {
         try {
             const result = await this.purchasesService.findAll();
@@ -33,8 +33,31 @@ export class PurchasesController {
         }
     }
 
+    @Get('services/available')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD', 'UDP')
+    async getAvailableServices() {
+        try {
+            const all = await this.purchasesService.findAll();
+            const services = all.filter((p: any) => p.type === 'SERVICE');
+            return { success: true, data: services };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    @Patch(':id/mark-used')
+    @Roles('UDP', 'LOGISTICA', 'ADMIN')
+    async markUsed(@Param('id') id: string, @Body() body: any) {
+        try {
+            const result = await this.purchasesService.markServiceUsed(id, body);
+            return { success: true, data: result };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
     @Get(':id')
-    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD', 'UDP')
     async findOne(@Param('id') id: string) {
         try {
             const result = await this.purchasesService.findOne(id);

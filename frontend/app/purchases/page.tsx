@@ -109,13 +109,27 @@ export default function PurchasesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [moduleType, setModuleType] = useState<'PURCHASE' | 'SERVICE'>('PURCHASE');
     const [statusFilter, setStatusFilter] = useState<'EN_CALIDAD' | 'RECIBIDO_EN_PROCESO' | 'RECIBIDO' | 'RECHAZADO'>('EN_CALIDAD');
+    const [serviceUsageFilter, setServiceUsageFilter] = useState<'ALL' | 'AVAILABLE' | 'USED'>('ALL');
 
-    // Filter by type and status
+    // Counts for services
+    const allServices = useMemo(() => allRecords.filter(r => r.type === 'SERVICE'), [allRecords]);
+    const availableServicesCount = useMemo(() => allServices.filter(r => r.status !== 'UTILIZADO' && !r.isUsed).length, [allServices]);
+    const usedServicesCount = useMemo(() => allServices.filter(r => r.status === 'UTILIZADO' || r.isUsed).length, [allServices]);
+
+    // Filter by type and status or service usage
     const purchases = useMemo(() => {
         let filtered = allRecords.filter(r => (r.type || 'PURCHASE') === moduleType);
-        filtered = filtered.filter(r => r.status === statusFilter);
+        if (moduleType === 'PURCHASE') {
+            filtered = filtered.filter(r => r.status === statusFilter);
+        } else {
+            if (serviceUsageFilter === 'AVAILABLE') {
+                filtered = filtered.filter(r => r.status !== 'UTILIZADO' && !r.isUsed);
+            } else if (serviceUsageFilter === 'USED') {
+                filtered = filtered.filter(r => r.status === 'UTILIZADO' || r.isUsed);
+            }
+        }
         return filtered;
-    }, [allRecords, moduleType, statusFilter]);
+    }, [allRecords, moduleType, statusFilter, serviceUsageFilter]);
 
     // Toast
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -391,32 +405,55 @@ export default function PurchasesPage() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl self-start overflow-x-auto max-w-full no-scrollbar">
-                        <button
-                            onClick={() => { setStatusFilter('EN_CALIDAD'); setCurrentPage(1); }}
-                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'EN_CALIDAD' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:bg-white hover:text-blue-500'}`}
-                        >
-                            <Truck className="w-3 h-3 inline mr-1.5" /> Enviadas
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter('RECIBIDO_EN_PROCESO'); setCurrentPage(1); }}
-                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECIBIDO_EN_PROCESO' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-gray-400 hover:bg-white hover:text-orange-500'}`}
-                        >
-                            <Clock className="w-3 h-3 inline mr-1.5" /> En Revisión
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter('RECIBIDO'); setCurrentPage(1); }}
-                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECIBIDO' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-gray-400 hover:bg-white hover:text-emerald-500'}`}
-                        >
-                            <CheckCircle className="w-3 h-3 inline mr-1.5" /> Registradas
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter('RECHAZADO'); setCurrentPage(1); }}
-                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECHAZADO' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-gray-400 hover:bg-white hover:text-red-500'}`}
-                        >
-                            <XCircle className="w-3 h-3 inline mr-1.5" /> Rechazadas
-                        </button>
-                    </div>
+                    {moduleType === 'PURCHASE' ? (
+                        <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl self-start overflow-x-auto max-w-full no-scrollbar">
+                            <button
+                                onClick={() => { setStatusFilter('EN_CALIDAD'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'EN_CALIDAD' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-400 hover:bg-white hover:text-blue-500'}`}
+                            >
+                                <Truck className="w-3 h-3 inline mr-1.5" /> Enviadas
+                            </button>
+                            <button
+                                onClick={() => { setStatusFilter('RECIBIDO_EN_PROCESO'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECIBIDO_EN_PROCESO' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-gray-400 hover:bg-white hover:text-orange-500'}`}
+                            >
+                                <Clock className="w-3 h-3 inline mr-1.5" /> En Revisión
+                            </button>
+                            <button
+                                onClick={() => { setStatusFilter('RECIBIDO'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECIBIDO' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-gray-400 hover:bg-white hover:text-emerald-500'}`}
+                            >
+                                <CheckCircle className="w-3 h-3 inline mr-1.5" /> Registradas
+                            </button>
+                            <button
+                                onClick={() => { setStatusFilter('RECHAZADO'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${statusFilter === 'RECHAZADO' ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-gray-400 hover:bg-white hover:text-red-500'}`}
+                            >
+                                <XCircle className="w-3 h-3 inline mr-1.5" /> Rechazadas
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl self-start overflow-x-auto max-w-full no-scrollbar">
+                            <button
+                                onClick={() => { setServiceUsageFilter('ALL'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${serviceUsageFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-gray-400 hover:bg-white hover:text-indigo-600'}`}
+                            >
+                                <Briefcase className="w-3 h-3 inline mr-1.5" /> Todos ({allServices.length})
+                            </button>
+                            <button
+                                onClick={() => { setServiceUsageFilter('AVAILABLE'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${serviceUsageFilter === 'AVAILABLE' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-gray-400 hover:bg-white hover:text-emerald-600'}`}
+                            >
+                                <CheckCircle className="w-3 h-3 inline mr-1.5" /> Por Usar / Disponibles ({availableServicesCount})
+                            </button>
+                            <button
+                                onClick={() => { setServiceUsageFilter('USED'); setCurrentPage(1); }}
+                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${serviceUsageFilter === 'USED' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-white hover:text-purple-600'}`}
+                            >
+                                <Clock className="w-3 h-3 inline mr-1.5" /> Usados en Auditoría ({usedServicesCount})
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
@@ -503,12 +540,37 @@ export default function PurchasesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${p.status === 'RECIBIDO' ? 'bg-emerald-100 text-emerald-700' :
-                                                    p.status === 'RECHAZADO' ? 'bg-red-100 text-red-700' :
-                                                        'bg-blue-100 text-blue-700'
-                                                    }`}>
-                                                    {p.status === 'EN_CALIDAD' ? 'En Calidad' : p.status}
-                                                </span>
+                                                {moduleType === 'SERVICE' ? (
+                                                    p.isUsed || p.status === 'UTILIZADO' ? (
+                                                        <div>
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 inline-flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" /> Utilizado
+                                                            </span>
+                                                            <span className="text-[11px] text-gray-700 font-bold block mt-1">
+                                                                OP: {p.usageInfo?.usedInOp || p.op || '-'} {p.usageInfo?.usedProcess ? `· ${p.usageInfo.usedProcess}` : ''}
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400 block font-medium">
+                                                                {p.usageInfo?.usedAt ? `${fmtDate(p.usageInfo.usedAt)} ${fmtTime(p.usageInfo.usedAt)}` : fmtDate(p.updatedAt)}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" /> Por Usar / Disponible
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400 block mt-1 font-medium">
+                                                                Listo para auditoría UDP
+                                                            </span>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${p.status === 'RECIBIDO' ? 'bg-emerald-100 text-emerald-700' :
+                                                        p.status === 'RECHAZADO' ? 'bg-red-100 text-red-700' :
+                                                            'bg-blue-100 text-blue-700'
+                                                        }`}>
+                                                        {p.status === 'EN_CALIDAD' ? 'En Calidad' : p.status}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className={`text-lg font-black ${moduleType === 'PURCHASE' ? 'text-gray-900' : 'text-indigo-900'}`}>S/ {p.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -516,7 +578,7 @@ export default function PurchasesPage() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-1">
                                                     <button onClick={() => openDetails(p)} className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition" title="Ver detalles"><Eye className="w-4 h-4" /></button>
-                                                    {p.status === 'EN_CALIDAD' && (
+                                                    {((p.status === 'EN_CALIDAD') || (moduleType === 'SERVICE' && !p.isUsed && p.status !== 'UTILIZADO')) && (
                                                         <>
                                                             <button onClick={() => openEditPurchase(p)} className="p-2 rounded-lg hover:bg-amber-50 text-gray-400 hover:text-amber-600 transition" title="Editar"><Edit2 className="w-4 h-4" /></button>
                                                             <button onClick={() => openDelete(p.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
@@ -617,6 +679,43 @@ export default function PurchasesPage() {
                                             </p>
                                         )}
                                         {selectedPurchase.notes && <p className="text-sm text-yellow-800 italic">{selectedPurchase.notes}</p>}
+                                    </div>
+                                )}
+
+                                {moduleType === 'SERVICE' && (
+                                    <div className={`p-4 rounded-xl border ${selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? 'bg-purple-50/70 border-purple-200' : 'bg-emerald-50/70 border-emerald-200'}`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className={`text-[10px] uppercase font-black tracking-wider ${selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? 'text-purple-700' : 'text-emerald-700'}`}>
+                                                {selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? '✓ Servicio Utilizado en Auditoría de OP' : '✓ Servicio Disponible / Por Usar'}
+                                            </p>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? 'bg-purple-200 text-purple-900' : 'bg-emerald-200 text-emerald-900'}`}>
+                                                {selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? 'UTILIZADO' : 'DISPONIBLE'}
+                                            </span>
+                                        </div>
+                                        {selectedPurchase.isUsed || selectedPurchase.status === 'UTILIZADO' ? (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mt-2">
+                                                <div>
+                                                    <span className="text-gray-500 font-bold block">OP Utilizada:</span>
+                                                    <span className="font-mono font-black text-purple-900">{selectedPurchase.usageInfo?.usedInOp || selectedPurchase.op || '-'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 font-bold block">Proceso Auditado:</span>
+                                                    <span className="font-bold text-gray-800">{selectedPurchase.usageInfo?.usedProcess || 'N/A'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 font-bold block">Fecha de Uso:</span>
+                                                    <span className="font-semibold text-gray-800">{selectedPurchase.usageInfo?.usedAt ? fmtDate(selectedPurchase.usageInfo.usedAt) : fmtDate(selectedPurchase.updatedAt)}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 font-bold block">Hora de Uso:</span>
+                                                    <span className="font-semibold text-gray-800">{selectedPurchase.usageInfo?.usedAt ? fmtTime(selectedPurchase.usageInfo.usedAt) : fmtTime(selectedPurchase.updatedAt)}</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-emerald-800 font-medium">
+                                                Este servicio se encuentra disponible para ser asignado en una auditoría de OP en el módulo de UDP.
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                                 <div>
