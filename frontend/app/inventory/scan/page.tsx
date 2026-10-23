@@ -244,7 +244,112 @@ export default function ScanPage() {
       } else {
         setReason('Producido por Orden de Producción');
       }
-      toast.success(`Ingreso a inventario preparado para OP #${opParam}`);
+
+      // Pre-cargar automáticamente el producto y variantes producidas en esta OP
+      const loadOpProducts = async () => {
+        try {
+          const cleanOp = opParam.replace(/\D/g, '');
+          let opProduct: any = null;
+
+          try {
+            const poRes = await api.get('/production-orders');
+            const foundPo = (poRes.data || []).find((po: any) =>
+              String(po.opNumber).trim() === String(opParam).trim() ||
+              (cleanOp && String(po.opNumber).replace(/\D/g, '') === cleanOp)
+            );
+            if (foundPo?.product) {
+              opProduct = foundPo.product;
+            }
+            if ((!opProduct || !opProduct.variants || opProduct.variants.length === 0) && foundPo?.productId) {
+              const pDetail = await api.get(`/products/${foundPo.productId}`);
+              opProduct = pDetail.data;
+            }
+          } catch (e) {
+            console.warn('Error fetching production order for scan:', e);
+          }
+
+          if (!opProduct) {
+            try {
+              const pRes = await api.get('/products');
+              const prods = pRes.data?.data || pRes.data || [];
+              const matched = prods.find((p: any) =>
+                String(p.op).trim() === String(opParam).trim() ||
+                (cleanOp && String(p.op).replace(/\D/g, '') === cleanOp) ||
+                (p.variants && p.variants.some((v: any) =>
+                  String(v.op).trim() === String(opParam).trim() ||
+                  (cleanOp && String(v.op).replace(/\D/g, '') === cleanOp)
+                ))
+              );
+              if (matched) opProduct = matched;
+            } catch (e) {
+              console.warn('Error fetching products by op:', e);
+            }
+          }
+
+          // Obtener la cantidad de 1ra calidad auditada para esta OP
+          let foundAudit: any = null;
+          let qtyToSet = 1;
+          try {
+            const auditRes = await api.get('/process-audits/finalized-audits');
+            foundAudit = (auditRes.data || []).find((a: any) =>
+              String(a.op).trim() === String(opParam).trim() ||
+              (cleanOp && String(a.op).replace(/\D/g, '') === cleanOp)
+            );
+            if (foundAudit && foundAudit.quantityGood > 0) {
+              qtyToSet = foundAudit.quantityGood;
+            }
+          } catch (e) {
+            console.warn('Error fetching finalized audit for scan:', e);
+          }
+
+          if (opProduct && opProduct.variants && opProduct.variants.length > 0) {
+            const opVariants = opProduct.variants.filter((v: any) =>
+              !v.op ||
+              String(v.op).trim() === String(opParam).trim() ||
+              (cleanOp && String(v.op).replace(/\D/g, '') === cleanOp)
+            );
+            const targetVariants = opVariants.length > 0 ? opVariants : opProduct.variants;
+
+            const items: ScannedItem[] = targetVariants.map((v: any) => {
+              let itemQty = qtyToSet;
+              if (foundAudit && Array.isArray(foundAudit.qualitySizeData)) {
+                const matchedSz = foundAudit.qualitySizeData.find((q: any) =>
+                  String(q.size).trim().toUpperCase() === String(v.size).trim().toUpperCase() &&
+                  (!v.color || !q.color || String(q.color).trim().toUpperCase() === String(v.color).trim().toUpperCase())
+                ) || foundAudit.qualitySizeData.find((q: any) =>
+                  String(q.size).trim().toUpperCase() === String(v.size).trim().toUpperCase()
+                );
+                if (matchedSz && matchedSz.qGood !== undefined) {
+                  itemQty = Number(matchedSz.qGood) || 0;
+                }
+              }
+
+              return {
+                id: v.id,
+                variantSku: v.variantSku || opProduct.sku,
+                productName: opProduct.name,
+                size: v.size || 'ESTÁNDAR',
+                color: v.color || 'ÚNICO',
+                stock: v.stock || 0,
+                unit: opProduct.unit || 'uds',
+                inventoryType: opProduct.inventoryType || 'TERMINADOS',
+                quantity: itemQty > 0 ? itemQty : qtyToSet,
+                price: opProduct.purchasePrice || 0,
+                timestamp: new Date()
+              };
+            }).filter((it: ScannedItem) => it.quantity > 0);
+
+            if (items.length > 0) {
+              setScannedItems(items);
+              toast.success(`Producto ${opProduct.name} (OP #${opParam}) cargado en la lista para ingreso.`);
+            }
+          }
+        } catch (err) {
+          console.error('Error preloading OP product in scan:', err);
+        }
+      };
+
+      loadOpProducts();
     }
 
     if (sampleIdParam) {

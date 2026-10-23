@@ -544,6 +544,47 @@ export class ProcessAuditsService {
                 if (sum > 0) totalUnitCost = sum;
             }
 
+            // Check if 1ra calidad OP has already been registered in inventory
+            let isOpRegisteredInInventory = false;
+            let registeredOpProduct: any = null;
+            if (a.op) {
+                try {
+                    const cleanOp = a.op.replace(/\D/g, '');
+                    const po = await (this.prisma as any).productionOrder.findFirst({
+                        where: {
+                            OR: [
+                                { opNumber: a.op },
+                                { opNumber: a.op.trim() },
+                                ...(cleanOp ? [{ opNumber: cleanOp }] : [])
+                            ]
+                        },
+                        include: { product: { include: { variants: true } } }
+                    });
+                    if (po?.product) {
+                        isOpRegisteredInInventory = true;
+                        registeredOpProduct = po.product;
+                    } else {
+                        const prodWithOp = await (this.prisma as any).product.findFirst({
+                            where: {
+                                OR: [
+                                    { op: a.op },
+                                    { op: a.op.trim() },
+                                    ...(cleanOp ? [{ op: cleanOp }] : [])
+                                ],
+                                inventoryType: 'TERMINADOS'
+                            },
+                            include: { variants: true }
+                        });
+                        if (prodWithOp) {
+                            isOpRegisteredInInventory = true;
+                            registeredOpProduct = prodWithOp;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error checking isOpRegisteredInInventory:', err);
+                }
+            }
+
             const isExisting = Boolean(a.sample?.isExisting || masterProd || a.productId);
 
             return {
@@ -563,6 +604,13 @@ export class ProcessAuditsService {
                     realPrice: masterProd.realPrice
                 } : null,
                 isExisting,
+                isOpRegisteredInInventory,
+                registeredOpProduct: registeredOpProduct ? {
+                    id: registeredOpProduct.id,
+                    name: registeredOpProduct.name,
+                    sku: registeredOpProduct.sku,
+                    variants: registeredOpProduct.variants || []
+                } : null,
                 op: a.op,
                 process: a.process,
                 externalCompany: a.externalCompany,

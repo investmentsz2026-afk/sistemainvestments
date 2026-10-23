@@ -688,14 +688,20 @@ export default function NewProductPage() {
                         
                         {audit.isExisting ? (
                           <div className="flex items-center gap-2 ml-4">
-                            <button
-                              onClick={() => {
-                                router.push(`/production-orders?autoOp=${audit.op}&productId=${audit.productId || audit.masterProduct?.id || ''}&productName=${encodeURIComponent(audit.sampleName)}&cost=${audit.totalUnitCost || audit.servicePrice || 0}&auditId=${audit.id}`);
-                              }}
-                              className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 whitespace-nowrap"
-                            >
-                              <PlusCircle className="w-4 h-4" /> Registrar esta OP en Inventario
-                            </button>
+                            {audit.isOpRegisteredInInventory ? (
+                              <div className="px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-black flex items-center gap-2 whitespace-nowrap shadow-sm">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> OP Registrada en Inventario
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  router.push(`/production-orders?autoOp=${audit.op}&productId=${audit.productId || audit.masterProduct?.id || ''}&productName=${encodeURIComponent(audit.sampleName)}&cost=${audit.totalUnitCost || audit.servicePrice || 0}&auditId=${audit.id}`);
+                                }}
+                                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-200 transition-all flex items-center gap-2 whitespace-nowrap"
+                              >
+                                <PlusCircle className="w-4 h-4" /> Registrar esta OP en Inventario
+                              </button>
+                            )}
                             <button
                               onClick={() => { setSelectedAudit(audit); setShowAuditDetailModal(true); setShowAuditModal(false); }}
                               className="px-3 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
@@ -750,23 +756,43 @@ export default function NewProductPage() {
 
               <div className="flex-1 overflow-y-auto p-8 space-y-8 text-center scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {selectedAudit.isExisting && (
-                  <div className="p-4 bg-indigo-50 border-2 border-indigo-200 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                  <div className={`p-5 rounded-3xl border-2 flex flex-col sm:flex-row items-center justify-between gap-4 text-left ${
+                    selectedAudit.isOpRegisteredInInventory ? 'bg-emerald-50/70 border-emerald-200' : 'bg-indigo-50 border-indigo-200'
+                  }`}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white">Lote de Producto Maestro</span>
-                        <span className="text-xs font-bold text-indigo-700">OP #{selectedAudit.op}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white ${
+                          selectedAudit.isOpRegisteredInInventory ? 'bg-emerald-600' : 'bg-indigo-600'
+                        }`}>
+                          {selectedAudit.isOpRegisteredInInventory ? 'OP REGISTRADA' : 'Lote de Producto Maestro'}
+                        </span>
+                        <span className={`text-xs font-bold font-mono ${
+                          selectedAudit.isOpRegisteredInInventory ? 'text-emerald-800' : 'text-indigo-700'
+                        }`}>
+                          OP #{selectedAudit.op}
+                        </span>
                       </div>
-                      <p className="font-black text-gray-900 text-sm mt-1">{selectedAudit.sampleName}</p>
-                      <p className="text-xs text-gray-500">Este lote fue originado de un producto existente. Puedes registrar directamente la OP y sus variantes en el Inventario.</p>
+                      <p className="font-black text-gray-900 text-base mt-1">{selectedAudit.sampleName}</p>
+                      <p className="text-xs text-gray-500">
+                        {selectedAudit.isOpRegisteredInInventory
+                          ? 'Esta Orden de Producción de 1ra calidad ya fue creada y registrada en el inventario. Puedes importar los productos de 2da calidad abajo.'
+                          : 'Este lote fue originado de un producto existente. Puedes registrar directamente la OP y sus variantes en el Inventario.'}
+                      </p>
                     </div>
-                    <button
-                      onClick={() => {
-                        router.push(`/production-orders?autoOp=${selectedAudit.op}&productId=${selectedAudit.productId || selectedAudit.masterProduct?.id || ''}&productName=${encodeURIComponent(selectedAudit.sampleName)}&cost=${selectedAudit.totalUnitCost || selectedAudit.servicePrice || 0}&auditId=${selectedAudit.id}`);
-                      }}
-                      className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-200 flex items-center gap-2 shrink-0 transition-all"
-                    >
-                      <PlusCircle className="w-4 h-4" /> Registrar esta OP en el Inventario
-                    </button>
+                    {selectedAudit.isOpRegisteredInInventory ? (
+                      <div className="px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black shadow-md flex items-center gap-2 shrink-0">
+                        <CheckCircle2 className="w-4 h-4" /> 1ra Calidad Registrada
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          router.push(`/production-orders?autoOp=${selectedAudit.op}&productId=${selectedAudit.productId || selectedAudit.masterProduct?.id || ''}&productName=${encodeURIComponent(selectedAudit.sampleName)}&cost=${selectedAudit.totalUnitCost || selectedAudit.servicePrice || 0}&auditId=${selectedAudit.id}`);
+                        }}
+                        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-200 flex items-center gap-2 shrink-0 transition-all"
+                      >
+                        <PlusCircle className="w-4 h-4" /> Registrar esta OP en el Inventario
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* QUANTITY CARDS */}
@@ -797,13 +823,15 @@ export default function NewProductPage() {
                           <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white bg-emerald-500 shadow-lg shadow-emerald-200"><Package className="w-5 h-5" /></div>
                           <div>
                             <h4 className="font-black text-gray-900 text-sm">Subir Productos Terminados (1ra)</h4>
-                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Selecciona las tallas a importar juntas</p>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+                              {selectedAudit.isOpRegisteredInInventory ? 'Lote de 1ra calidad registrado en Inventario' : 'Selecciona las tallas a importar juntas'}
+                            </p>
                           </div>
                         </div>
                       </div>
                       <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : []).map((sz: any) => {
-                        const isSaved = savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
+                        const isSaved = selectedAudit.isOpRegisteredInInventory || savedAuditItems.includes(`${selectedAudit.id}-1RA-${sz.size}`);
                         let exactQty = sz.quantity;
                         if (Array.isArray(selectedAudit.qualitySizeData)) {
                           const bsz = selectedAudit.qualitySizeData.find((b: any) => b.size === sz.size);
@@ -824,9 +852,9 @@ export default function NewProductPage() {
                                 [`1RA-${sz.size}`]: !prev[`1RA-${sz.size}`]
                               }));
                             }}
-                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer select-none relative ${
-                              isSaved ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed' :
-                              isChecked ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-white border-gray-100 hover:border-emerald-300'
+                            className={`flex flex-col items-center p-3 rounded-2xl border transition-all select-none relative ${
+                              isSaved ? 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed' :
+                              isChecked ? 'bg-emerald-50/50 border-emerald-500 shadow-sm cursor-pointer' : 'bg-white border-gray-100 hover:border-emerald-300 cursor-pointer'
                             }`}
                           >
                             {!isSaved && (
@@ -839,13 +867,25 @@ export default function NewProductPage() {
                             )}
                             <span className="text-[10px] font-black text-gray-400 uppercase">Talla {sz.size}</span>
                             <span className="text-sm font-black text-gray-900 uppercase">{exactQty} uds.</span>
-                            <span className="text-[9px] font-bold text-emerald-600 mt-1">{isSaved ? 'AGREGADO' : `S/ ${sz.salePrice || '?' }`}</span>
+                            <span className="text-[9px] font-bold text-emerald-600 mt-1">{isSaved ? 'YA REGISTRADO' : `S/ ${sz.salePrice || '?' }`}</span>
                           </div>
                         );
                       })}
                       </div>
 
-                      {(() => {
+                      {selectedAudit.isOpRegisteredInInventory ? (
+                        <div className="p-4 bg-emerald-50/50 border-t border-emerald-100 flex items-center justify-between">
+                          <span className="text-xs font-black text-emerald-800 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Producto de 1ra Calidad ya creado y registrado con esta OP
+                          </span>
+                          <button
+                            disabled
+                            className="px-5 py-2.5 bg-gray-200 text-gray-400 rounded-xl text-xs font-black cursor-not-allowed"
+                          >
+                            Ya Registrado
+                          </button>
+                        </div>
+                      ) : (() => {
                         const activeSizes = (Array.isArray(selectedAudit.productionSizeData) ? selectedAudit.productionSizeData : [])
                           .filter((sz: any) => {
                             let exactQty = sz.quantity;

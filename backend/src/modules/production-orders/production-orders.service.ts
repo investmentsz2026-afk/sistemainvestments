@@ -19,12 +19,37 @@ export class ProductionOrdersService {
 
     let targetProductId = productId;
 
+    // Buscar si existe una muestra o auditoría para esta OP donde Comercial haya definido los SKUs
+    const cleanOp = opNumber.replace(/\D/g, '');
+    const sample = await this.prisma.productSample.findFirst({
+      where: {
+        OR: [
+          { op: opNumber },
+          { op: opNumber.trim() },
+          ...(cleanOp ? [{ op: cleanOp }] : []),
+          ...(cleanOp ? [{ barcode: { endsWith: cleanOp } }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const audit = await (this.prisma as any).processAudit.findFirst({
+      where: {
+        OR: [
+          { op: opNumber },
+          { op: opNumber.trim() },
+          ...(cleanOp ? [{ op: cleanOp }] : []),
+        ],
+      },
+      include: { sample: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const effectiveSample = sample || audit?.sample;
+
     if (product.op && product.op !== opNumber) {
       // Si el producto ya tiene una OP registrada, creamos un clon para el nuevo lote/OP
-      // Generar un SKU base único para el nuevo clon
       let newProductSku = '';
       let attempts = 0;
-      const cleanOp = opNumber.replace(/\D/g, '');
       const opLen = cleanOp.length;
       const neededRandom = Math.max(0, 12 - opLen);
       
@@ -115,8 +140,65 @@ export class ProductionOrdersService {
       const { size, colors } = vSelection;
 
       for (const color of colors) {
-        // Generar un SKU único de 12 dígitos basado en la OP
-        const variantSku = await this.generateUniqueSku(opNumber);
+        // Obtener el SKU definido en Comercial para esta OP/variante
+        let variantSku = '';
+
+        // 1. Buscar en effectiveSample.productionSizeData (definido en Comercial al crear la OP)
+        const prodSizes = ((effectiveSample as any)?.productionSizeData as any[]) || [];
+        if (Array.isArray(prodSizes) && prodSizes.length > 0) {
+          const found = prodSizes.find((p: any) =>
+            String(p.size).trim().toUpperCase() === String(size).trim().toUpperCase() &&
+            (!p.color || String(p.color).trim().toUpperCase() === String(color).trim().toUpperCase())
+          ) || prodSizes.find((p: any) =>
+            String(p.size).trim().toUpperCase() === String(size).trim().toUpperCase()
+          );
+
+          if (found) {
+            const foundSku = String(found.sku || found.variantSku || '').trim();
+            if (/^\d{12}$/.test(foundSku)) variantSku = foundSku;
+          }
+
+          if (!variantSku && prodSizes.length === 1) {
+            const single = prodSizes[0];
+            const singleSku = String(single?.sku || single?.variantSku || '').trim();
+            if (/^\d{12}$/.test(singleSku)) variantSku = singleSku;
+          }
+        }
+
+        // 2. Buscar en audit.qualitySizeData
+        const auditQualityData = ((audit as any)?.qualitySizeData as any[]) || [];
+        if (!variantSku && Array.isArray(auditQualityData) && auditQualityData.length > 0) {
+          const found = auditQualityData.find((p: any) =>
+            String(p.size).trim().toUpperCase() === String(size).trim().toUpperCase() &&
+            (!p.color || String(p.color).trim().toUpperCase() === String(color).trim().toUpperCase())
+          ) || auditQualityData.find((p: any) =>
+            String(p.size).trim().toUpperCase() === String(size).trim().toUpperCase()
+          );
+
+          if (found) {
+            const foundSku = String(found.sku || found.variantSku || '').trim();
+            if (/^\d{12}$/.test(foundSku)) variantSku = foundSku;
+          }
+
+          if (!variantSku && auditQualityData.length === 1) {
+            const single = auditQualityData[0];
+            const singleSku = String(single?.sku || single?.variantSku || '').trim();
+            if (/^\d{12}$/.test(singleSku)) variantSku = singleSku;
+          }
+        }
+
+        // 3. Fallback de Comercial: barcode de la muestra o de la auditoría (e.g. 775153521289)
+        if (!variantSku && (effectiveSample?.barcode || (audit as any)?.barcode)) {
+          const b = String(effectiveSample?.barcode || (audit as any)?.barcode || '').trim();
+          if (/^\d{12}$/.test(b)) {
+            variantSku = b;
+          }
+        }
+
+        // 4. Si no tiene SKU de Comercial, generar uno único basado en la OP
+        if (!variantSku) {
+          variantSku = await this.generateUniqueSku(opNumber);
+        }
 
         // Verificar si la combinación talla/color ya existe para este producto
         const existingVariant = await this.prisma.productVariant.findFirst({
@@ -127,8 +209,19 @@ export class ProductionOrdersService {
           },
         });
 
+        // Verificar si otra variante ya tiene ese variantSku
+        const otherWithSameSku = await this.prisma.productVariant.findUnique({
+          where: { variantSku },
+        });
+
         if (existingVariant) {
-          // Si existe, actualizamos su SKU con el nuevo basado en la OP y seteamos la OP
+          if (otherWithSameSku && otherWithSameSku.id !== existingVariant.id) {
+            // Liberar variantSku en la otra variante para evitar colisión @unique
+            await this.prisma.productVariant.update({
+              where: { id: otherWithSameSku.id },
+              data: { variantSku: `${otherWithSameSku.variantSku}-DUP-${Date.now()}` },
+            });
+          }
           await this.prisma.productVariant.update({
             where: { id: existingVariant.id },
             data: {
@@ -136,8 +229,17 @@ export class ProductionOrdersService {
               op: opNumber,
             },
           });
+        } else if (otherWithSameSku) {
+          await this.prisma.productVariant.update({
+            where: { id: otherWithSameSku.id },
+            data: {
+              productId: targetProductId,
+              size,
+              color,
+              op: opNumber,
+            },
+          });
         } else {
-          // Si no existe, creamos la variante con stock inicial 0 y el SKU basado en la OP
           await this.prisma.productVariant.create({
             data: {
               productId: targetProductId,
@@ -172,7 +274,11 @@ export class ProductionOrdersService {
   async findAll() {
     return this.prisma.productionOrder.findMany({
       include: {
-        product: true,
+        product: {
+          include: {
+            variants: true
+          }
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
