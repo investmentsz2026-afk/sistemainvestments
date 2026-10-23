@@ -17,6 +17,16 @@ export class SamplesController {
     return this.samplesService.findAll(req.user);
   }
 
+  @Get('op-materials/approved-ops')
+  getApprovedOPsForLogistics() {
+    return this.samplesService.getApprovedOPsForLogistics();
+  }
+
+  @Get('op-materials/all-dispatches')
+  getAllOpDispatches() {
+    return this.samplesService.getAllOpDispatches();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.samplesService.findOne(id);
@@ -70,5 +80,20 @@ export class SamplesController {
   @Patch(':id/udp-requirements')
   saveUdpRequirements(@Param('id') id: string, @Body() body: any) {
     return this.samplesService.saveUdpRequirements(id, body.requirements);
+  }
+
+  @Post(':id/op-materials/dispatch')
+  dischargeAndDispatchOpMaterials(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.samplesService.dischargeAndDispatchOpMaterials(id, body, req.user.id, req.user.name);
+  }
+
+  @Patch(':id/op-materials/confirm')
+  confirmOpMaterialsReceipt(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.samplesService.confirmOpMaterialsReceipt(id, body.dispatchId, req.user);
+  }
+
+  @Patch(':id/op-materials/reject')
+  rejectOpMaterialsReceipt(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.samplesService.rejectOpMaterialsReceipt(id, body, req.user);
   }
 }

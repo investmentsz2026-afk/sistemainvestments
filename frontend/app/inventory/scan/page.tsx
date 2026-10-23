@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import { useInventory } from '../../../hooks/useInventory';
 import { useProducts } from '../../../hooks/useProducts';
+import { useSearchParams, useRouter } from 'next/navigation';
+import api from '../../../lib/axios';
 import { 
   Barcode, 
   Camera, 
@@ -12,6 +14,7 @@ import {
   ArrowUpCircle, 
   ArrowDownCircle,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   AlertCircle,
   Package,
@@ -24,7 +27,11 @@ import {
   Trash2,
   ShoppingCart,
   Truck,
-  RefreshCw
+  RefreshCw,
+  Send,
+  Boxes,
+  Layers,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProductBarcode } from '../../../components/products/Barcode';
@@ -135,6 +142,184 @@ export default function ScanPage() {
   const webcamRef = useRef<Webcam>(null);
   const codeReader = useRef<BrowserMultiFormatReader | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Estados para Descarga de Materiales para Producción de OP
+  const [approvedOps, setApprovedOps] = useState<any[]>([]);
+  const [selectedOpSample, setSelectedOpSample] = useState<any>(null);
+  const [showOpDischargeModal, setShowOpDischargeModal] = useState(false);
+  const [showSendToUdpModal, setShowSendToUdpModal] = useState(false);
+  const [lastDischargedItems, setLastDischargedItems] = useState<any[]>([]);
+  const [isRegisteringOp, setIsRegisteringOp] = useState(false);
+  const [isSendingToUdp, setIsSendingToUdp] = useState(false);
+  const [isLoadingOpSample, setIsLoadingOpSample] = useState(false);
+
+  // Cargar lista de OPs aprobadas
+  useEffect(() => {
+    const fetchApprovedOps = async () => {
+      try {
+        const resp = await api.get('/samples/op-materials/approved-ops');
+        setApprovedOps(resp.data || []);
+      } catch (err) {
+        console.error('Error fetching approved OPs:', err);
+      }
+    };
+    fetchApprovedOps();
+  }, []);
+
+  const loadMaterialsForSample = (sampleData: any) => {
+    setSelectedOpSample(sampleData);
+    setMovementType('EXIT');
+    setReason('Para Producción de OP');
+    setReference(`OP ${sampleData.op}`);
+
+    const prodQty = Number(sampleData.productionQuantity) || 1;
+    const itemsToAdd: ScannedItem[] = [];
+
+    const materials = sampleData.materials || [];
+    materials.forEach((mat: any) => {
+      const neededQty = Number(((Number(mat.quantity) || 1) * prodQty).toFixed(2));
+      const product = mat.product;
+
+      if (product) {
+        const variant = (product.variants && product.variants.length > 0) ? product.variants[0] : null;
+        const currentStock = variant ? (variant.stock ?? 0) : 0;
+        const variantSku = variant?.variantSku || product.sku;
+
+        itemsToAdd.push({
+          id: variant?.id || product.id,
+          variantSku: variantSku,
+          productName: product.name,
+          size: variant?.size || 'ESTÁNDAR',
+          color: variant?.color || 'ÚNICO',
+          stock: currentStock,
+          unit: product.unit || 'uds',
+          inventoryType: product.inventoryType || 'AVIOS',
+          quantity: neededQty,
+          price: mat.unitPriceAtTime || product.purchasePrice || 0,
+          timestamp: new Date()
+        });
+      } else if (mat.customMaterial) {
+        itemsToAdd.push({
+          id: `custom_${mat.id || Date.now()}`,
+          variantSku: `CUSTOM-${(mat.customMaterial || '').slice(0, 8).toUpperCase()}`,
+          productName: mat.customMaterial,
+          size: 'ESTÁNDAR',
+          color: 'ÚNICO',
+          stock: 999,
+          unit: 'uds',
+          quantity: neededQty,
+          price: mat.unitPriceAtTime || 0,
+          timestamp: new Date()
+        });
+      }
+    });
+
+    if (itemsToAdd.length > 0) {
+      setScannedItems(itemsToAdd);
+      toast.success(`Se cargaron ${itemsToAdd.length} insumos de la OP ${sampleData.op} (${prodQty} prendas)`);
+    } else {
+      toast.error(`La OP ${sampleData.op} no tiene materiales registrados en su ficha técnica (BOM)`);
+    }
+  };
+
+  // Detectar si se accede con sampleId en query params (por ejemplo desde la notificación o módulo OP)
+  useEffect(() => {
+    const sampleIdParam = searchParams.get('sampleId');
+    const modeParam = searchParams.get('mode');
+
+    if (modeParam === 'EXIT' || modeParam === 'ENTRY') {
+      setMovementType(modeParam);
+    }
+
+    if (sampleIdParam) {
+      const loadSampleData = async () => {
+        setIsLoadingOpSample(true);
+        try {
+          const resp = await api.get(`/samples/${sampleIdParam}`);
+          if (resp.data) {
+            loadMaterialsForSample(resp.data);
+          }
+        } catch (err) {
+          console.error('Error loading sample for OP discharge:', err);
+          toast.error('No se pudo cargar la información de la OP');
+        } finally {
+          setIsLoadingOpSample(false);
+        }
+      };
+      loadSampleData();
+    }
+  }, [searchParams]);
+
+  const handleConfirmOpDischarge = async () => {
+    if (scannedItems.length === 0) {
+      toast.error('No hay productos para descargar');
+      return;
+    }
+
+    setIsRegisteringOp(true);
+    try {
+      const dischargesPayload = scannedItems.map(item => ({
+        variantId: item.id.startsWith('custom_') ? '' : item.id,
+        productId: item.id.startsWith('custom_') ? undefined : item.id,
+        quantity: item.quantity,
+        name: item.productName,
+        sku: item.variantSku,
+        color: item.color,
+        size: item.size,
+        unit: item.unit,
+        price: item.price
+      }));
+
+      const opNumber = selectedOpSample?.op || (reference.replace(/^OP\s*/i, '').trim());
+      const targetSampleId = selectedOpSample?.id || searchParams.get('sampleId');
+
+      if (targetSampleId) {
+        await api.post(`/samples/${targetSampleId}/op-materials/dispatch`, {
+          discharges: dischargesPayload,
+          op: opNumber,
+          reason: 'Para Producción de OP',
+          notes: `Descarga registrada desde escáner para OP ${opNumber}`
+        });
+      } else {
+        await registerBulkMovement({
+          items: dischargesPayload.filter(d => d.variantId).map(d => ({
+            variantId: d.variantId,
+            quantity: d.quantity
+          })),
+          type: 'EXIT',
+          reason: `Para Producción de OP ${opNumber}`,
+          reference: `OP ${opNumber}`
+        });
+      }
+
+      setLastDischargedItems([...scannedItems]);
+      setShowOpDischargeModal(false);
+      setShowSendToUdpModal(true);
+      toast.success('¡Materiales descargados del inventario y registrados en el Kardex!');
+    } catch (err: any) {
+      console.error('Error discharging OP materials:', err);
+      toast.error(err.response?.data?.message || 'Error al descargar materiales de inventario');
+    } finally {
+      setIsRegisteringOp(false);
+    }
+  };
+
+  const handleSendDispatchedMaterialsToUdp = () => {
+    setIsSendingToUdp(true);
+    setTimeout(() => {
+      setShowSendToUdpModal(false);
+      setIsSendingToUdp(false);
+      setScannedItems([]);
+      setReason('');
+      setReference('');
+      setSelectedOpSample(null);
+      toast.success('Despacho enviado a UDP exitosamente para su revisión física');
+      router.push('/inventory/op-materials');
+    }, 400);
+  };
 
   // Auto-focus en el input para escáner
   useEffect(() => {
@@ -574,6 +759,61 @@ export default function ScanPage() {
         </button>
       </div>
 
+      {/* OP Selection Banner / Selector */}
+      {movementType === 'EXIT' && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 mb-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-500/20">
+                <Boxes className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                  Descarga para Producción (OP)
+                </h3>
+                <p className="text-xs text-gray-600 font-medium">
+                  {selectedOpSample 
+                    ? `OP Seleccionada: ${selectedOpSample.op} • ${selectedOpSample.name} (${selectedOpSample.productionQuantity || 1} prendas)` 
+                    : 'Carga automáticamente los materiales de la ficha técnica (BOM) para una OP autorizada'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedOpSample?.id || ''}
+                onChange={(e) => {
+                  const found = approvedOps.find(op => op.id === e.target.value);
+                  if (found) {
+                    loadMaterialsForSample(found);
+                  } else {
+                    setSelectedOpSample(null);
+                  }
+                }}
+                className="px-3.5 py-2.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 shadow-sm"
+              >
+                <option value="">Seleccionar Orden de Producción...</option>
+                {approvedOps.map((op) => (
+                  <option key={op.id} value={op.id}>
+                    OP {op.op} • {op.name} ({op.productionQuantity || 1} prendas)
+                  </option>
+                ))}
+              </select>
+              {selectedOpSample && (
+                <button
+                  type="button"
+                  onClick={() => loadMaterialsForSample(selectedOpSample)}
+                  className="px-3 py-2.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0"
+                  title="Recargar materiales de BOM"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Recargar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Selector de modo de escaneo */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
@@ -989,6 +1229,7 @@ export default function ScanPage() {
                       </>
                     ) : (
                       <>
+                        <option value="Para Producción de OP">Para Producción de OP</option>
                         <option value="Venta">Venta</option>
                         <option value="Merma">Merma</option>
                         <option value="Ajuste">Ajuste de inventario</option>
@@ -1008,7 +1249,7 @@ export default function ScanPage() {
                     type="text"
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
-                    placeholder={movementType === 'ENTRY' ? 'N° factura, orden...' : 'N° venta, ticket...'}
+                    placeholder={movementType === 'ENTRY' ? 'N° factura, orden...' : 'N° venta, ticket, OP...'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -1039,6 +1280,9 @@ export default function ScanPage() {
                     if (movementType === 'EXIT' && reason === 'Cambio') {
                       setShowConfirmation(false);
                       setIsExchangeModalOpen(true);
+                    } else if (movementType === 'EXIT' && reason === 'Para Producción de OP') {
+                      setShowConfirmation(false);
+                      setShowOpDischargeModal(true);
                     } else {
                       handleSubmitMovements();
                     }
@@ -1055,6 +1299,154 @@ export default function ScanPage() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 1: INFORMACIÓN DETALLADA DE DESCARGA PARA PRODUCCIÓN DE OP */}
+      <AnimatePresence>
+        {showOpDischargeModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                      Descarga de Materiales para Producción
+                    </h3>
+                    <p className="text-xs font-bold text-red-600 uppercase tracking-wider">
+                      OP: {selectedOpSample?.op || reference || 'SIN OP'} {selectedOpSample?.name ? `• ${selectedOpSample.name}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowOpDischargeModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl my-4 text-xs text-amber-900 font-medium leading-relaxed">
+                Vas a descargar del inventario los siguientes avíos y materiales para la orden de producción de la <strong>OP {selectedOpSample?.op || reference}</strong>. Al confirmar, se descontarán automáticamente del stock físico y quedarán registrados en el Kardex.
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 uppercase font-black text-[10px]">
+                      <th className="pb-2">Material / Avío</th>
+                      <th className="pb-2">Color / Talla</th>
+                      <th className="pb-2">SKU</th>
+                      <th className="pb-2 text-center">Cant. a Descargar</th>
+                      <th className="pb-2 text-right">Stock Actual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {scannedItems.map((item) => (
+                      <tr key={item.variantSku} className="hover:bg-gray-50/50">
+                        <td className="py-2.5 font-bold text-gray-800">{item.productName}</td>
+                        <td className="py-2.5 text-gray-600">{item.color} / {item.size}</td>
+                        <td className="py-2.5 font-mono text-blue-600 text-[11px]">{item.variantSku}</td>
+                        <td className="py-2.5 font-black text-center text-red-600">
+                          {item.quantity} {item.unit || 'uds'}
+                        </td>
+                        <td className="py-2.5 text-right font-medium">
+                          <span className={item.stock < item.quantity ? 'text-red-500 font-bold' : 'text-emerald-600'}>
+                            {item.stock} {item.unit || 'uds'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t border-gray-100 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowOpDischargeModal(false)}
+                  className="flex-1 py-3.5 border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmOpDischarge}
+                  disabled={isRegisteringOp}
+                  className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black uppercase tracking-wider transition shadow-lg shadow-red-500/20 disabled:opacity-50"
+                >
+                  {isRegisteringOp ? 'Descargando...' : 'Confirmar Descarga e Inventario'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 2: ENVIAR MATERIALES A UDP PARA AUDITORÍA */}
+      <AnimatePresence>
+        {showSendToUdpModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-gray-100 text-center"
+            >
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
+                ¡Materiales Descargados con Éxito!
+              </h3>
+              <p className="text-xs text-gray-500 font-medium mb-6">
+                Se registraron las salidas en el Kardex para la OP <span className="font-bold text-gray-900">{selectedOpSample?.op || reference}</span>. Ahora envía el despacho a UDP para que el equipo de taller verifique los insumos físicos y comience con la auditoría.
+              </p>
+
+              <div className="p-4 bg-gray-50 rounded-2xl mb-6 text-left max-h-48 overflow-y-auto">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">
+                  Resumen de Insumos Descargados:
+                </p>
+                <div className="space-y-1.5">
+                  {lastDischargedItems.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-xs">
+                      <span className="font-bold text-gray-700">{item.productName || item.name} ({item.color})</span>
+                      <span className="font-black text-emerald-600">{item.quantity} {item.unit || 'uds'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSendToUdpModal(false);
+                    router.push('/inventory/op-materials');
+                  }}
+                  className="flex-1 py-3.5 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition text-xs"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendDispatchedMaterialsToUdp}
+                  disabled={isSendingToUdp}
+                  className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black uppercase tracking-wider transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 text-xs disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" /> {isSendingToUdp ? 'Enviando...' : 'Enviar a UDP'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

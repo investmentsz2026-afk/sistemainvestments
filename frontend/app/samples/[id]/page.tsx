@@ -553,7 +553,7 @@ export default function SampleDetailPage() {
         setIsSaving(true);
         try {
             await api.patch(`/samples/${id}/admin-approve-op`, { notes: 'OP Aprobada por Administrador' });
-            toast.success('OP aprobada con éxito, enviada a auditoría.');
+            toast.success('OP aprobada con éxito. Solicitud enviada a Logística para la descarga de materiales.');
             fetchData();
         } catch (error) {
             console.error('Error approving OP:', error);

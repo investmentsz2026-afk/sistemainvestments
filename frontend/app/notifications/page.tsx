@@ -58,7 +58,13 @@ export default function NotificationsPage() {
     const handleAction = (notification: any) => {
         handleMarkAsRead(notification.id);
         if (notification.referenceId) {
-            if (notification.type.startsWith('AUDIT_')) {
+            if (notification.type === 'OP_APPROVED_FOR_LOGISTICS') {
+                router.push(`/inventory/scan?mode=EXIT&sampleId=${notification.referenceId}`);
+            } else if (notification.type === 'OP_MATERIALS_SENT_TO_UDP') {
+                router.push(`/samples/op-materials?sampleId=${notification.referenceId}`);
+            } else if (notification.type === 'OP_MATERIALS_CONFIRMED' || notification.type === 'OP_MATERIALS_REJECTED') {
+                router.push(`/inventory/op-materials?sampleId=${notification.referenceId}`);
+            } else if (notification.type.startsWith('AUDIT_')) {
                 router.push(`/audit/${notification.referenceId}`);
             } else if (notification.type.startsWith('SAMPLE_')) {
                 router.push(`/samples/${notification.referenceId}`);

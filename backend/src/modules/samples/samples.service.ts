@@ -307,19 +307,339 @@ export class SamplesService {
       where: { id },
       data: {
         adminOpApprovalStatus: 'APROBADO',
-        // Optional: Could store admin notes here if we had a field
+        materialReceiptStatus: 'PENDIENTE_DESCARGA_LOGISTICA',
+        adminMaterialNotes: notes || sample.adminMaterialNotes,
+      }
+    });
+
+    // Enviar notificación a Logística para la descarga de materiales en inventario
+    await this.notifications.create({
+      title: `OP ${sample.op} Aprobada - Descarga Requerida`,
+      message: `Administración aprobó la OP ${sample.op} (${sample.name}). Ingresa a Salida de Productos para descargar los materiales del inventario.`,
+      type: 'OP_APPROVED_FOR_LOGISTICS',
+      referenceId: id,
+      targetRole: 'LOGISTICA',
+    });
+
+    return updated;
+  }
+
+  async getApprovedOPsForLogistics() {
+    return await (this.prisma as any).productSample.findMany({
+      where: {
+        adminOpApprovalStatus: 'APROBADO',
+        op: { not: null },
+      },
+      include: {
+        materials: {
+          include: {
+            product: {
+              include: { variants: true }
+            }
+          }
+        },
+        udp: { select: { name: true, email: true } },
+        commercial: { select: { name: true, email: true } },
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+  }
+
+  async getAllOpDispatches() {
+    const samples = await (this.prisma as any).productSample.findMany({
+      where: {
+        op: { not: null },
+      },
+      include: {
+        materials: {
+          include: {
+            product: {
+              include: { variants: true }
+            }
+          }
+        },
+        udp: { select: { name: true } },
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    const allDispatches: any[] = [];
+
+    for (const sample of samples) {
+      const requirements = (sample.udpRequirements as any) || {};
+      const dispatches = Array.isArray(requirements.opDispatches) ? requirements.opDispatches : [];
+
+      if (dispatches.length > 0) {
+        dispatches.forEach((disp: any) => {
+          allDispatches.push({
+            ...disp,
+            sampleId: sample.id,
+            sampleName: sample.name,
+            sampleCode: sample.code,
+            op: sample.op,
+            productionQuantity: sample.productionQuantity || 1,
+            materialReceiptStatus: sample.materialReceiptStatus,
+            materialsCount: disp.items?.length || 0,
+            udpName: sample.udp?.name || 'UDP',
+          });
+        });
+      } else if (sample.adminOpApprovalStatus === 'APROBADO') {
+        allDispatches.push({
+          id: `pending_${sample.id}`,
+          sampleId: sample.id,
+          sampleName: sample.name,
+          sampleCode: sample.code,
+          op: sample.op,
+          productionQuantity: sample.productionQuantity || 1,
+          dispatchedAt: null,
+          dispatchedByName: null,
+          status: 'PENDIENTE_DESCARGA',
+          materialReceiptStatus: sample.materialReceiptStatus || 'PENDIENTE_DESCARGA_LOGISTICA',
+          items: sample.materials?.map((m: any) => ({
+            name: m.product?.name || m.customMaterial || 'Material',
+            sku: m.product?.variants?.[0]?.variantSku || m.product?.sku || '',
+            quantity: (m.quantity || 1) * (sample.productionQuantity || 1),
+            unit: m.product?.unit || 'uds',
+          })) || [],
+          materialsCount: sample.materials?.length || 0,
+          udpName: sample.udp?.name || 'UDP',
+        });
+      }
+    }
+
+    return allDispatches.sort((a, b) => {
+      const dateA = a.dispatchedAt ? new Date(a.dispatchedAt).getTime() : 0;
+      const dateB = b.dispatchedAt ? new Date(b.dispatchedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }
+
+  async dischargeAndDispatchOpMaterials(
+    id: string,
+    payload: {
+      discharges: Array<{
+        variantId: string;
+        quantity: number;
+        productId?: string;
+        name?: string;
+        sku?: string;
+        color?: string;
+        size?: string;
+        unit?: string;
+        price?: number;
+      }>;
+      op?: string;
+      reason?: string;
+      notes?: string;
+    },
+    userId: string,
+    userName?: string
+  ) {
+    const sample = await this.findOne(id);
+    const op = payload.op || sample.op || 'OP';
+    const reasonText = payload.reason || `Para Producción de OP ${op}`;
+
+    return await this.prisma.$transaction(async (tx) => {
+      const savedItems: any[] = [];
+
+      for (const item of payload.discharges) {
+        let variant: any = null;
+        if (item.variantId) {
+          variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            include: { product: true }
+          });
+        }
+        
+        const qty = Number(item.quantity);
+        if (variant) {
+          if (variant.stock < qty) {
+            throw new BadRequestException(`Stock insuficiente para ${variant.variantSku}. Stock actual: ${variant.stock}`);
+          }
+
+          const newStock = variant.stock - qty;
+
+          await tx.movement.create({
+            data: {
+              type: 'EXIT',
+              quantity: qty,
+              reason: reasonText,
+              previousStock: variant.stock,
+              newStock: newStock,
+              variantId: variant.id,
+              userId: userId,
+              reference: `OP ${op}`,
+            }
+          });
+
+          await tx.productVariant.update({
+            where: { id: variant.id },
+            data: { stock: newStock }
+          });
+
+          savedItems.push({
+            variantId: variant.id,
+            productId: variant.productId,
+            name: variant.product?.name || item.name || 'Material',
+            sku: variant.variantSku || item.sku || '',
+            color: variant.color || item.color || 'ÚNICO',
+            size: variant.size || item.size || 'ESTÁNDAR',
+            quantity: qty,
+            unit: variant.product?.unit || item.unit || 'uds',
+            price: item.price || variant.product?.purchasePrice || 0,
+          });
+        } else {
+          savedItems.push({
+            name: item.name || 'Material',
+            sku: item.sku || '',
+            color: item.color || 'ÚNICO',
+            size: item.size || 'ESTÁNDAR',
+            quantity: qty,
+            unit: item.unit || 'uds',
+            price: item.price || 0,
+          });
+        }
+      }
+
+      const newDispatch = {
+        id: `disp_${Date.now()}`,
+        op: op,
+        sampleId: sample.id,
+        sampleName: sample.name,
+        sampleCode: sample.code || null,
+        productionQuantity: sample.productionQuantity || 1,
+        dispatchedAt: new Date().toISOString(),
+        dispatchedById: userId,
+        dispatchedByName: userName || 'Logística',
+        status: 'ENVIADO',
+        reason: reasonText,
+        items: savedItems,
+        notes: payload.notes || null,
+        receivedAt: null,
+        receivedByName: null,
+        rejectionReason: null,
+      };
+
+      const existingRequirements = (sample.udpRequirements as any) || {};
+      const existingDispatches = Array.isArray(existingRequirements.opDispatches) ? existingRequirements.opDispatches : [];
+
+      const updatedSample = await (tx as any).productSample.update({
+        where: { id },
+        data: {
+          materialReceiptStatus: 'ENVIADO_A_UDP',
+          logisticsMaterialDate: new Date(),
+          udpRequirements: {
+            ...existingRequirements,
+            opDispatches: [newDispatch, ...existingDispatches]
+          }
+        }
+      });
+
+      await tx.notification.create({
+        data: {
+          title: `Materiales enviados para OP ${op}`,
+          message: `Logística te envió los materiales para la Orden de Producción ${op} (${sample.name}). Por favor verifica la entrega física para iniciar la auditoría.`,
+          type: 'OP_MATERIALS_SENT_TO_UDP',
+          referenceId: id,
+          targetRole: 'UDP',
+          userId: sample.udpId || undefined,
+        }
+      });
+
+      return {
+        success: true,
+        dispatch: newDispatch,
+        sample: updatedSample
+      };
+    });
+  }
+
+  async confirmOpMaterialsReceipt(id: string, dispatchId?: string, user?: any) {
+    const sample = await this.findOne(id);
+    const existingRequirements = (sample.udpRequirements as any) || {};
+    const existingDispatches = Array.isArray(existingRequirements.opDispatches) ? [...existingRequirements.opDispatches] : [];
+
+    let targetDispatch = existingDispatches.length > 0 ? existingDispatches[0] : null;
+    if (dispatchId) {
+      const found = existingDispatches.find((d: any) => d.id === dispatchId);
+      if (found) targetDispatch = found;
+    }
+
+    if (targetDispatch) {
+      targetDispatch.status = 'CONFORME';
+      targetDispatch.receivedAt = new Date().toISOString();
+      targetDispatch.receivedByName = user?.name || 'UDP';
+    }
+
+    const updatedSample = await (this.prisma as any).productSample.update({
+      where: { id },
+      data: {
+        materialReceiptStatus: 'RECIBIDO_CONFORME',
+        udpMaterialReceivedAt: new Date(),
+        udpRequirements: {
+          ...existingRequirements,
+          opDispatches: existingDispatches
+        }
       }
     });
 
     await this.notifications.create({
-      title: 'OP Aprobada por Administrador',
-      message: `El administrador ha aprobado la muestra ${sample.name} y su OP ${sample.op}. Ya está disponible para Auditoría de Procesos.`,
-      type: 'OP_APPROVED',
+      title: `Materiales Recibidos Conforme - OP ${sample.op}`,
+      message: `UDP confirmó la recepción física conforme de los materiales para la OP ${sample.op} (${sample.name}). La producción está lista para auditoría.`,
+      type: 'OP_MATERIALS_CONFIRMED',
       referenceId: id,
-      targetRole: 'UDP', // or whatever role audits
+      targetRole: 'LOGISTICA',
     });
 
-    return updated;
+    return {
+      success: true,
+      sample: updatedSample,
+      dispatch: targetDispatch
+    };
+  }
+
+  async rejectOpMaterialsReceipt(id: string, payload: { rejectionReason: string; dispatchId?: string }, user?: any) {
+    const sample = await this.findOne(id);
+    const existingRequirements = (sample.udpRequirements as any) || {};
+    const existingDispatches = Array.isArray(existingRequirements.opDispatches) ? [...existingRequirements.opDispatches] : [];
+
+    let targetDispatch = existingDispatches.length > 0 ? existingDispatches[0] : null;
+    if (payload.dispatchId) {
+      const found = existingDispatches.find((d: any) => d.id === payload.dispatchId);
+      if (found) targetDispatch = found;
+    }
+
+    if (targetDispatch) {
+      targetDispatch.status = 'RECHAZADO';
+      targetDispatch.rejectionReason = payload.rejectionReason;
+      targetDispatch.rejectedAt = new Date().toISOString();
+      targetDispatch.rejectedByName = user?.name || 'UDP';
+    }
+
+    const updatedSample = await (this.prisma as any).productSample.update({
+      where: { id },
+      data: {
+        materialReceiptStatus: 'RECHAZADO_POR_UDP',
+        udpRequirements: {
+          ...existingRequirements,
+          opDispatches: existingDispatches
+        }
+      }
+    });
+
+    await this.notifications.create({
+      title: `Materiales Observados/Rechazados - OP ${sample.op}`,
+      message: `UDP observó o rechazó los materiales de la OP ${sample.op} (${sample.name}): "${payload.rejectionReason}". Por favor revisa y reenvía.`,
+      type: 'OP_MATERIALS_REJECTED',
+      referenceId: id,
+      targetRole: 'LOGISTICA',
+    });
+
+    return {
+      success: true,
+      sample: updatedSample,
+      dispatch: targetDispatch
+    };
   }
 
   async dischargeInventory(id: string, discharges: { materialId: string, variantId: string, quantity: number }[], userId: string) {

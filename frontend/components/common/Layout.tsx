@@ -36,7 +36,9 @@ import {
   FileSignature,
   Scale,
   Landmark,
-  Ruler
+  Ruler,
+  Boxes,
+  PackageCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -115,6 +117,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Productos', href: '/products', icon: Package },
       { name: 'Órdenes de Prod.', href: '/production-orders', icon: ClipboardCheck },
       { name: 'Inventario', href: '/inventory', icon: ShoppingCart },
+      { name: 'Despacho Mat. OP', href: '/inventory/op-materials', icon: Boxes },
       { name: 'Kardex', href: '/kardex', icon: BookOpen },
       { name: 'Banco de Costos', href: '/inventory/cost-bank', icon: DollarSign },
       { name: 'Reportes', href: '/reports', icon: BarChart3 },
@@ -127,6 +130,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Muestras', href: '/samples', icon: Beaker }
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'UDP' ? [
+      { name: 'Materiales OP', href: '/samples/op-materials', icon: PackageCheck },
       { name: 'Calidad', href: '/quality', icon: ShieldCheck },
       { name: 'Auditoría', href: '/audit', icon: FileSearch },
       { name: 'Medidas por OP', href: '/samples/measurements', icon: Ruler }
