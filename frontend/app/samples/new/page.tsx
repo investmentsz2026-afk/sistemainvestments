@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '../../../components/common/Layout';
 import { useAuth } from '../../../hooks/useAuth';
 import api from '../../../lib/axios';
@@ -21,7 +21,8 @@ import {
     Loader2,
     Check,
     RotateCcw,
-    Sparkles
+    Sparkles,
+    Ruler
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -60,6 +61,46 @@ export default function NewSamplePage() {
     const [customMatName, setCustomMatName] = useState('');
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [pendingVariantProduct, setPendingVariantProduct] = useState<any>(null);
+
+    // Official Entalles State
+    const [officialEntalles, setOfficialEntalles] = useState<any[]>([]);
+    const [selectedEntalleName, setSelectedEntalleName] = useState<string>('');
+
+    useEffect(() => {
+        const fetchOfficialEntalles = async () => {
+            try {
+                const resp = await api.get('/products-measurements/official-entalles');
+                setOfficialEntalles(resp.data || []);
+            } catch (err) {
+                console.warn('Error fetching official entalles in new sample:', err);
+            }
+        };
+        fetchOfficialEntalles();
+    }, []);
+
+    const selectedEntalleObj = useMemo(() => {
+        if (!selectedEntalleName) return null;
+        return officialEntalles.find(e => e.name.toUpperCase() === selectedEntalleName.toUpperCase()) || null;
+    }, [selectedEntalleName, officialEntalles]);
+
+    const handleSelectEntalle = (entalleName: string) => {
+        setSelectedEntalleName(entalleName);
+        const found = officialEntalles.find(e => e.name.toUpperCase() === entalleName.toUpperCase());
+        if (found) {
+            const entalleText = `Entalle Oficial: ${found.name} (${found.cinturaType}) • Base: Talla ${found.baseSize || '32'} • Cintura: ${found.cintura || '-'} • Cadera: ${found.cadera || '-'} • Muslo: ${found.muslo || '-'} • Rodilla: ${found.rodilla || '-'} • Botapie: ${found.botaPie || '-'} • Largo: ${found.largoTotal || '-'}`;
+            setFormData(prev => {
+                let currentChars = prev.characteristics || '';
+                if (currentChars.includes('Entalle Oficial:')) {
+                    currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
+                }
+                const updated = currentChars ? `${currentChars} • ${entalleText}` : entalleText;
+                return {
+                    ...prev,
+                    characteristics: updated
+                };
+            });
+        }
+    };
 
     useEffect(() => {
         if (isExisting) {
@@ -111,6 +152,10 @@ export default function NewSamplePage() {
             description: `Muestra basada en producto terminado de catálogo: ${prod.name} (SKU: ${prod.sku || 'S/N'})`,
             images: prod.imageUrl ? (prev.images.includes(prod.imageUrl) ? prev.images : [prod.imageUrl, ...prev.images]) : prev.images
         }));
+
+        if (prod.entalle) {
+            handleSelectEntalle(prod.entalle);
+        }
 
         // Buscar si este producto terminado tiene materiales previos registrados
         setIsLoadingPreviousMaterials(true);
@@ -283,6 +328,8 @@ export default function NewSamplePage() {
             await api.post('/samples', {
                 ...formData,
                 isExisting,
+                entalle: selectedEntalleName || undefined,
+                entalleMeasurements: selectedEntalleObj || undefined,
                 materials: materials.map(m => ({
                     productId: m.productId,
                     customMaterial: m.customMaterial,
@@ -494,6 +541,91 @@ export default function NewSamplePage() {
                                 )}
                             </div>
                         )}
+
+                        {/* ── SELECTOR DE ENTALLE OBJETIVO (OFICIAL) ── */}
+                        <div className="bg-amber-50/60 p-5 md:p-6 rounded-2xl border border-amber-200/90 space-y-3.5 shadow-sm">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <label className="flex items-center gap-2 text-xs font-black uppercase text-amber-900 tracking-wider">
+                                        <Ruler className="w-4 h-4 text-amber-600" />
+                                        Entalle al que se quiere llegar (Medidas Oficiales)
+                                    </label>
+                                    <p className="text-[11px] text-amber-800/80 font-medium mt-0.5">
+                                        Selecciona el entalle oficial para asociar sus medidas predeterminadas a esta muestra:
+                                    </p>
+                                </div>
+                                {selectedEntalleObj && (
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full uppercase self-start sm:self-auto">
+                                        <Check className="w-3.5 h-3.5 text-amber-700" />
+                                        {selectedEntalleObj.name} • {selectedEntalleObj.cinturaType}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="relative">
+                                <select
+                                    value={selectedEntalleName}
+                                    onChange={e => handleSelectEntalle(e.target.value)}
+                                    className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition text-xs shadow-sm cursor-pointer"
+                                >
+                                    <option value="">-- Seleccionar Entalle Oficial (Ej: PARKER, RELAX, SONNY...) --</option>
+                                    {officialEntalles.map(ent => (
+                                        <option key={ent.id || ent.name} value={ent.name}>
+                                            {ent.name} • {ent.cinturaType} (Tela: {ent.tela || 'DENIM'} - {ent.tipoTela || 'CONFORT'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Preview Card of Measurements */}
+                            {selectedEntalleObj && (
+                                <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm space-y-3">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                        <span className="text-xs font-black text-gray-800 uppercase flex items-center gap-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                            Medidas Base Talla {selectedEntalleObj.baseSize || '32'}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-gray-400 font-mono">
+                                            {selectedEntalleObj.tela} • {selectedEntalleObj.tipoTela}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center">
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Cintura</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.cintura || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Cadera</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.cadera || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Muslo</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.muslo || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Rodilla</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.rodilla || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Botapie</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.botaPie || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">T.Delt.</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.tiroDel || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">T.Espd.</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.tiroPos || '-'}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Largo</p>
+                                            <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.largoTotal || '-'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* NAME */}
                         <div className="space-y-1.5">

@@ -14,6 +14,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { OfficialEntallesModal } from '../../../components/samples/OfficialEntallesModal';
 
 interface ColumnType {
   id: string; // unique, e.g. "OP-02|Camello"
@@ -163,6 +164,7 @@ export default function MeasurementsPage() {
   // Matrix data structure: { [columnId]: { [measurementKey]: value } }
   const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showEntallesModal, setShowEntallesModal] = useState(false);
 
   // Load items
   useEffect(() => {
@@ -519,7 +521,18 @@ export default function MeasurementsPage() {
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
           {/* Inventory Type Select */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Inventario</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Inventario</label>
+              {inventoryType === 'TERMINADOS' && (
+                <button
+                  type="button"
+                  onClick={() => setShowEntallesModal(true)}
+                  className="px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-200 transition active:scale-95"
+                >
+                  <Ruler className="w-3.5 h-3.5" /> Entalles Oficiales
+                </button>
+              )}
+            </div>
             <select
               className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
               value={inventoryType}
@@ -858,6 +871,16 @@ export default function MeasurementsPage() {
           </div>
         )}
       </div>
+
+      {/* Official Entalles Modal */}
+      <OfficialEntallesModal
+        isOpen={showEntallesModal}
+        onClose={() => setShowEntallesModal(false)}
+        availableProducts={products}
+        onSaved={() => {
+          fetchItems();
+        }}
+      />
     </Layout>
   );
 }

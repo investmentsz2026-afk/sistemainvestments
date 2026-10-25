@@ -7,6 +7,22 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class MeasurementsController {
   constructor(private readonly measurementsService: MeasurementsService) {}
 
+  @Get('official-entalles')
+  async getOfficialEntalles() {
+    return this.measurementsService.getOfficialEntalles();
+  }
+
+  @Post('official-entalles')
+  async saveOfficialEntalles(@Body() body: any) {
+    const list = Array.isArray(body) ? body : (body.entalles || [body]);
+    return this.measurementsService.saveOfficialEntallesBulk(list);
+  }
+
+  @Delete('official-entalles/:name')
+  async deleteOfficialEntalle(@Param('name') name: string) {
+    return this.measurementsService.deleteOfficialEntalle(name);
+  }
+
   @Get()
   async getMeasurements(
     @Query('productId') productId?: string,

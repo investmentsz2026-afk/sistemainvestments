@@ -38,9 +38,13 @@ export class SamplesService {
   }
 
   async create(udpId: string, data: any) {
-    const { name, code, description, characteristics, images, materials, isExisting } = data;
+    const { name, code, description, characteristics, images, materials, isExisting, entalle, entalleMeasurements } = data;
     
     return await this.prisma.$transaction(async (tx) => {
+      const initialProductionSizeData = entalle
+        ? [{ entalle, size: entalleMeasurements?.baseSize || '32', quantity: 1 }]
+        : null;
+
       const sample = await (tx as any).productSample.create({
         data: {
           name,
@@ -52,8 +56,33 @@ export class SamplesService {
           isExisting: !!isExisting,
           materialReceiptStatus: isExisting ? 'DESARROLLO_COMPLETADO' : (materials && materials.length > 0 ? 'PENDIENTE_ADMIN' : null),
           adminOpApprovalStatus: 'SIN_OP',
+          productionSizeData: initialProductionSizeData,
         },
       });
+
+      if (entalleMeasurements) {
+        try {
+          await (tx as any).productMeasurement.create({
+            data: {
+              sampleId: sample.id,
+              stage: 'OFICIAL',
+              size: entalleMeasurements.baseSize || '32',
+              cintura: entalleMeasurements.cintura || null,
+              cadera: entalleMeasurements.cadera || null,
+              muslo: entalleMeasurements.muslo || null,
+              rodilla: entalleMeasurements.rodilla || null,
+              botaPie: entalleMeasurements.botaPie || null,
+              tiroDel: entalleMeasurements.tiroDel || null,
+              tiroPos: entalleMeasurements.tiroPos || null,
+              largoTotal: entalleMeasurements.largoTotal || null,
+              color: entalleMeasurements.cinturaType || null,
+              op: entalle || null,
+            },
+          });
+        } catch (mErr) {
+          console.warn('Could not register initial sample official measurement:', mErr);
+        }
+      }
 
       if (materials && materials.length > 0) {
         for (const mat of materials) {
