@@ -25,6 +25,8 @@ import autoTable from 'jspdf-autotable';
 export interface OfficialEntalle {
   id?: string;
   name: string;
+  code?: string;
+  isCustomCode?: boolean;
   cinturaType: string;
   cintura: string;
   cadera: string;
@@ -42,6 +44,8 @@ export interface OfficialEntalle {
 export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   {
     name: 'RELAX',
+    code: 'ENT-001',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '17 "',
     cadera: '20 3/4 "',
@@ -57,6 +61,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'BULL DENIM',
+    code: 'ENT-002',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '17 "',
     cadera: '20 3/4 "',
@@ -72,6 +78,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'CONFORT',
+    code: 'ENT-003',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '16 3/4 "',
     cadera: '20 1/2 "',
@@ -87,6 +95,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'PARKER',
+    code: 'ENT-004',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 1/4 "',
@@ -102,6 +112,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'SONNY',
+    code: 'ENT-005',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 1/4 "',
@@ -117,6 +129,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'SCOOTTER',
+    code: 'ENT-006',
+    isCustomCode: false,
     cinturaType: 'CINTURA SKINNY',
     cintura: '16 3/4',
     cadera: '20 1/4 "',
@@ -132,6 +146,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'ROLEX',
+    code: 'ENT-007',
+    isCustomCode: false,
     cinturaType: 'CINTURA RECTO',
     cintura: '16 3/4 "',
     cadera: '20 3/8 "',
@@ -147,6 +163,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'MORRISON',
+    code: 'ENT-008',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 3/8 "',
@@ -162,6 +180,8 @@ export const INITIAL_DEFAULT_ENTALLES: OfficialEntalle[] = [
   },
   {
     name: 'KING',
+    code: 'ENT-009',
+    isCustomCode: false,
     cinturaType: 'CINTURA SKINNY',
     cintura: '16 1/2 "',
     cadera: '20 "',
@@ -196,6 +216,7 @@ export function OfficialEntallesModal({
 
   // Search / add new model state
   const [searchModel, setSearchModel] = useState('');
+  const [newModelCode, setNewModelCode] = useState('');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   // Load official entalles from backend on open
@@ -210,7 +231,11 @@ export function OfficialEntallesModal({
     try {
       const resp = await api.get('/products-measurements/official-entalles');
       if (Array.isArray(resp.data) && resp.data.length > 0) {
-        setEntalles(resp.data);
+        setEntalles(resp.data.map((item: any, idx: number) => ({
+          ...item,
+          code: item.code || `ENT-${String(idx + 1).padStart(3, '0')}`,
+          isCustomCode: item.isCustomCode === true,
+        })));
       } else {
         setEntalles(INITIAL_DEFAULT_ENTALLES);
       }
@@ -233,6 +258,18 @@ export function OfficialEntallesModal({
     });
   };
 
+  const handleCodeChange = (index: number, newCode: string) => {
+    setEntalles(prev => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        code: newCode.toUpperCase(),
+        isCustomCode: true, // Marcado como puesto/editado por el área UDP
+      };
+      return copy;
+    });
+  };
+
   const handleAddNewEntalle = (nameToAdd?: string) => {
     const rawName = (nameToAdd || searchModel).trim().toUpperCase();
     if (!rawName) {
@@ -245,8 +282,15 @@ export function OfficialEntallesModal({
       return;
     }
 
+    const defaultCode = `ENT-${String(entalles.length + 1).padStart(3, '0')}`;
+    const customCodeProvided = newModelCode.trim().toUpperCase();
+    const finalCode = customCodeProvided || defaultCode;
+    const isCustom = !!customCodeProvided;
+
     const newEntalle: OfficialEntalle = {
       name: rawName,
+      code: finalCode,
+      isCustomCode: isCustom,
       cinturaType: 'CINTURA SLIM',
       cintura: '16 3/4 "',
       cadera: '20 1/4 "',
@@ -263,8 +307,9 @@ export function OfficialEntallesModal({
 
     setEntalles(prev => [...prev, newEntalle]);
     setSearchModel('');
+    setNewModelCode('');
     setShowModelDropdown(false);
-    toast.success(`Modelo "${rawName}" agregado al cuadro de entalles.`);
+    toast.success(`Modelo "${rawName}" (${finalCode}) agregado al cuadro de entalles.`);
   };
 
   const handleDeleteColumn = (index: number) => {
@@ -316,9 +361,15 @@ export function OfficialEntallesModal({
       aoa.push([]); // blank
 
       // Row 3: Model Names
-      aoa.push(['MEDIDA / ESPEC.', ...entalles.map(e => e.name)]);
+      aoa.push(['MODELO', ...entalles.map(e => e.name)]);
 
-      // Row 4: Cintura Type (Subheader)
+      // Row 4: Código de Entalle
+      aoa.push(['CÓDIGO ENTALLE', ...entalles.map((e, idx) => e.code || `ENT-${String(idx + 1).padStart(3, '0')}`)]);
+
+      // Row 5: Estado de Código
+      aoa.push(['ESTADO CÓDIGO', ...entalles.map(e => e.isCustomCode ? 'Código puesto por el área UDP' : 'Código puesto por defecto')]);
+
+      // Row 6: Cintura Type (Subheader)
       aoa.push(['CORTE / PRETINA', ...entalles.map(e => e.cinturaType)]);
 
       // Rows for measurements
@@ -375,6 +426,7 @@ export function OfficialEntallesModal({
       // Table columns & rows
       const head = [
         ['MEDIDA / ESPEC.', ...entalles.map(e => e.name)],
+        ['CÓDIGO ENTALLE', ...entalles.map((e, idx) => `${e.code || `ENT-${String(idx + 1).padStart(3, '0')}`}\n(${e.isCustomCode ? 'UDP' : 'Defecto'})`)],
         ['CORTE / PRETINA', ...entalles.map(e => e.cinturaType)]
       ];
 
@@ -587,6 +639,19 @@ export function OfficialEntallesModal({
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <input
+                type="text"
+                placeholder="Código de entalle (opcional)"
+                value={newModelCode}
+                onChange={e => setNewModelCode(e.target.value.toUpperCase())}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewEntalle();
+                  }
+                }}
+                className="w-48 bg-white border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-xs text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition shadow-sm uppercase placeholder:normal-case"
+              />
               <button
                 type="button"
                 onClick={() => handleAddNewEntalle()}
@@ -605,7 +670,7 @@ export function OfficialEntallesModal({
                   <thead>
                     {/* Header Row: Model Names */}
                     <tr className="border-b-2 border-gray-300">
-                      <th className="sticky left-0 z-20 bg-slate-100 px-4 py-3 text-left font-black text-xs uppercase tracking-wider text-slate-700 border-r-2 border-gray-300 min-w-[160px] shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+                      <th className="sticky left-0 z-20 bg-slate-100 px-4 py-3 text-left font-black text-xs uppercase tracking-wider text-slate-700 border-r-2 border-gray-300 min-w-[170px] shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                         MODELO
                       </th>
                       {entalles.map((ent, idx) => {
@@ -616,7 +681,7 @@ export function OfficialEntallesModal({
                         return (
                           <th
                             key={idx}
-                            className={`px-3 py-2.5 font-black text-xs uppercase border-r border-gray-300 min-w-[140px] relative group ${bgClass}`}
+                            className={`px-3 py-2.5 font-black text-xs uppercase border-r border-gray-300 min-w-[170px] relative group ${bgClass}`}
                           >
                             <div className="flex items-center justify-center gap-1">
                               <input
@@ -633,6 +698,54 @@ export function OfficialEntallesModal({
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Header Row: Código de Entalle */}
+                    <tr className="border-b-2 border-indigo-200 bg-indigo-50/30">
+                      <th className="sticky left-0 z-20 bg-slate-100 px-4 py-2.5 text-left font-black text-[11px] uppercase tracking-wider text-indigo-900 border-r-2 border-gray-300 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                          CÓDIGO DE ENTALLE
+                        </div>
+                      </th>
+                      {entalles.map((ent, idx) => {
+                        const currentCode = ent.code || `ENT-${String(idx + 1).padStart(3, '0')}`;
+                        const isCustom = ent.isCustomCode === true;
+
+                        return (
+                          <th key={idx} className="px-2.5 py-2.5 border-r border-gray-300 bg-white align-top">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <div className="relative w-full">
+                                <input
+                                  type="text"
+                                  value={currentCode}
+                                  onChange={e => handleCodeChange(idx, e.target.value)}
+                                  placeholder={`ENT-${String(idx + 1).padStart(3, '0')}`}
+                                  className="w-full text-center font-black text-xs text-indigo-950 bg-indigo-50/60 hover:bg-indigo-100/70 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-lg py-1.5 px-2 outline-none transition uppercase tracking-wider border border-indigo-200/80 shadow-xs"
+                                />
+                              </div>
+
+                              {isCustom ? (
+                                <div
+                                  title="Código de entalle puesto por el área UDP"
+                                  className="w-full py-1 px-1 rounded-md bg-emerald-50 border border-emerald-300 text-[9.5px] font-black text-emerald-800 flex items-center justify-center gap-1 shadow-2xs text-center"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span className="leading-tight">Código de entalle puesto x el área UDP</span>
+                                </div>
+                              ) : (
+                                <div
+                                  title="Código de entalle puesto por defecto. Puedes editarlo para personalizarlo."
+                                  className="w-full py-1 px-1 rounded-md bg-slate-100 border border-slate-300 text-[9.5px] font-bold text-slate-600 flex items-center justify-center gap-1 shadow-2xs text-center"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+                                  <span className="leading-tight">Código de entalle puesto x defecto</span>
+                                </div>
+                              )}
                             </div>
                           </th>
                         );

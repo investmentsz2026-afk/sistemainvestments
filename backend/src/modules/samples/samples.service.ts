@@ -38,11 +38,17 @@ export class SamplesService {
   }
 
   async create(udpId: string, data: any) {
-    const { name, code, description, characteristics, images, materials, isExisting, entalle, entalleMeasurements } = data;
+    const { name, code, description, characteristics, images, materials, isExisting, entalle, entalleCode, entalleMeasurements } = data;
     
     return await this.prisma.$transaction(async (tx) => {
+      const resolvedEntalleCode = entalleCode || entalleMeasurements?.code || null;
       const initialProductionSizeData = entalle
-        ? [{ entalle, size: entalleMeasurements?.baseSize || '32', quantity: 1 }]
+        ? [{
+            entalle,
+            entalleCode: resolvedEntalleCode,
+            size: entalleMeasurements?.baseSize || '32',
+            quantity: 1
+          }]
         : null;
 
       const sample = await (tx as any).productSample.create({

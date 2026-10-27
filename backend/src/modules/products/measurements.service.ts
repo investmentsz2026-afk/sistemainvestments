@@ -6,6 +6,8 @@ import * as path from 'path';
 export const DEFAULT_OFFICIAL_ENTALLES = [
   {
     name: 'RELAX',
+    code: 'ENT-001',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '17 "',
     cadera: '20 3/4 "',
@@ -21,6 +23,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'BULL DENIM',
+    code: 'ENT-002',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '17 "',
     cadera: '20 3/4 "',
@@ -36,6 +40,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'CONFORT',
+    code: 'ENT-003',
+    isCustomCode: false,
     cinturaType: 'CINTURA STRAIGHT',
     cintura: '16 3/4 "',
     cadera: '20 1/2 "',
@@ -51,6 +57,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'PARKER',
+    code: 'ENT-004',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 1/4 "',
@@ -66,6 +74,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'SONNY',
+    code: 'ENT-005',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 1/4 "',
@@ -81,6 +91,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'SCOOTTER',
+    code: 'ENT-006',
+    isCustomCode: false,
     cinturaType: 'CINTURA SKINNY',
     cintura: '16 3/4',
     cadera: '20 1/4 "',
@@ -96,6 +108,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'ROLEX',
+    code: 'ENT-007',
+    isCustomCode: false,
     cinturaType: 'CINTURA RECTO',
     cintura: '16 3/4 "',
     cadera: '20 3/8 "',
@@ -111,6 +125,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'MORRISON',
+    code: 'ENT-008',
+    isCustomCode: false,
     cinturaType: 'CINTURA SLIM',
     cintura: '16 3/4 "',
     cadera: '20 3/8 "',
@@ -126,6 +142,8 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
   {
     name: 'KING',
+    code: 'ENT-009',
+    isCustomCode: false,
     cinturaType: 'CINTURA SKINNY',
     cintura: '16 1/2 "',
     cadera: '20 "',
@@ -162,7 +180,7 @@ export class MeasurementsService {
       });
 
       if (records && records.length > 0) {
-        return records.map((r) => {
+        return records.map((r, idx) => {
           let extra: any = {};
           try {
             if (r.color && (r.color.startsWith('{') || r.color.startsWith('['))) {
@@ -170,10 +188,16 @@ export class MeasurementsService {
             }
           } catch (e) {}
 
+          const fallbackCode = `ENT-${String(idx + 1).padStart(3, '0')}`;
+          const code = extra.code || fallbackCode;
+          const isCustomCode = extra.isCustomCode === true;
+
           return {
             id: r.id,
             name: r.op || 'SIN_NOMBRE',
-            cinturaType: extra.cinturaType || r.color || 'CINTURA SLIM',
+            code,
+            isCustomCode,
+            cinturaType: extra.cinturaType || (typeof r.color === 'string' && !r.color.startsWith('{') ? r.color : 'CINTURA SLIM'),
             cintura: r.cintura || '',
             cadera: r.cadera || '',
             muslo: r.muslo || '',
@@ -200,7 +224,11 @@ export class MeasurementsService {
         const raw = fs.readFileSync(filePath, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((item: any, idx: number) => ({
+            ...item,
+            code: item.code || `ENT-${String(idx + 1).padStart(3, '0')}`,
+            isCustomCode: item.isCustomCode === true,
+          }));
         }
       }
     } catch (e) {
@@ -230,12 +258,18 @@ export class MeasurementsService {
 
     // 2. Persistir en ProductMeasurement
     try {
-      for (const ent of entalles) {
+      for (let i = 0; i < entalles.length; i++) {
+        const ent = entalles[i];
         if (!ent.name) continue;
+        const code = ent.code || `ENT-${String(i + 1).padStart(3, '0')}`;
+        const isCustomCode = ent.isCustomCode === true;
+
         const extraJson = JSON.stringify({
           cinturaType: ent.cinturaType || 'CINTURA SLIM',
           tela: ent.tela || 'DENIM',
           tipoTela: ent.tipoTela || 'CONFORT',
+          code,
+          isCustomCode,
         });
 
         const existing = await this.prisma.productMeasurement.findFirst({
