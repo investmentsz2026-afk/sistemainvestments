@@ -286,8 +286,161 @@ export class SalesService {
     return sale;
   }
 
+  async getPendingReturnsForSale(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: {
+              include: { product: true }
+            }
+          }
+        },
+        payments: true
+      }
+    });
+
+    if (!sale) throw new NotFoundException('Venta no encontrada');
+
+    const invoiceNumber = sale.invoiceNumber?.trim();
+    if (!invoiceNumber) {
+      return [];
+    }
+
+    // Find return requests for this client or that mention this invoiceNumber
+    const allReturns = await this.prisma.returnRequest.findMany({
+      where: {
+        OR: [
+          { clientId: sale.clientId || undefined },
+          { reason: { contains: invoiceNumber, mode: 'insensitive' } }
+        ]
+      },
+      include: {
+        client: true,
+        seller: { select: { name: true } },
+        items: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Filter to those matching this specific invoice AND not yet credited
+    const pendingReturns = allReturns.filter((req) => {
+      // 1. Must match this invoice
+      const invoiceMatch = req.reason && req.reason.match(/\[Comprobante:\s*([^\]]+)\]/i);
+      const matchedInvoice = invoiceMatch ? invoiceMatch[1].trim() : null;
+      const directMention = req.reason && req.reason.toUpperCase().includes(invoiceNumber.toUpperCase());
+      
+      if (!matchedInvoice && !directMention) {
+        return false;
+      }
+      if (matchedInvoice && matchedInvoice.toUpperCase() !== invoiceNumber.toUpperCase()) {
+        return false;
+      }
+
+      // 2. Must not be rejected
+      if (req.status.startsWith('RECHAZADO')) {
+        return false;
+      }
+
+      // 3. Must not have a Credit Note already assigned/created
+      const hasNCInReason = req.reason && req.reason.match(/\[NC:\s*([^\]]+)\]/i);
+      const hasNCInQuality = req.qualityObservations && req.qualityObservations.match(/\[NC:\s*([^\]]+)\]/i);
+      if (hasNCInReason || hasNCInQuality) {
+        return false;
+      }
+
+      // Also check if any approved/pending payment in this sale already references this returnNumber
+      const paymentRef = sale.payments.some(p => 
+        p.notes && p.notes.toUpperCase().includes(req.returnNumber.toUpperCase()) &&
+        (p.status === 'APROBADO' || p.status === 'CONCILIADO' || p.status === 'PENDIENTE')
+      );
+      if (paymentRef) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // Size label map
+    const sizeMap: Record<string, string> = {
+      s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
+      size38: '38', size40: '40', size42: '42', size44: '44', size46: '46', size48: '48', size50: '50', size52: '52',
+    };
+
+    // Calculate item pricing based on sale.items
+    return pendingReturns.map((ret) => {
+      let totalReturnAmount = 0;
+      let totalUnits = 0;
+
+      const detailedItems = ret.items.map((item) => {
+        // Find matching sale item to get unitPrice
+        const matchingSaleItem = sale.items.find((si) => {
+          const prodName = si.variant?.product?.name || '';
+          const sameModel = prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
+          const sameColor = (si.variant?.color || '').trim().toUpperCase() === item.color.trim().toUpperCase();
+          return sameModel && sameColor;
+        }) || sale.items.find((si) => {
+          const prodName = si.variant?.product?.name || '';
+          return prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
+        });
+
+        // Determine unit price from original sale
+        let unitPrice = matchingSaleItem ? matchingSaleItem.unitPrice : 0;
+        if (!unitPrice || unitPrice <= 0) {
+          const totalSaleQty = sale.items.reduce((s, it) => s + (it.quantity || 0), 0);
+          unitPrice = totalSaleQty > 0 ? (sale.totalAmount / totalSaleQty) : 0;
+        }
+        unitPrice = Math.round(unitPrice * 100) / 100;
+
+        // Breakdown of sizes
+        const sizesList: { size: string; quantity: number }[] = [];
+        for (const [field, sizeLabel] of Object.entries(sizeMap)) {
+          const q = (item as any)[field] || 0;
+          if (q > 0) {
+            sizesList.push({ size: sizeLabel, quantity: q });
+          }
+        }
+
+        const itemQty = item.quantity || sizesList.reduce((acc, s) => acc + s.quantity, 0);
+        const subtotal = Math.round(itemQty * unitPrice * 100) / 100;
+
+        totalUnits += itemQty;
+        totalReturnAmount += subtotal;
+
+        return {
+          id: item.id,
+          modelName: item.modelName,
+          color: item.color,
+          quantity: itemQty,
+          sizes: sizesList,
+          unitPrice,
+          subtotal
+        };
+      });
+
+      totalReturnAmount = Math.round(totalReturnAmount * 100) / 100;
+
+      return {
+        id: ret.id,
+        returnNumber: ret.returnNumber,
+        status: ret.status,
+        reason: ret.reason.replace(/\[Comprobante:\s*([^\]]+)\]\s*/i, '').trim(),
+        evidenceUrl: ret.evidenceUrl,
+        createdAt: ret.createdAt,
+        sellerName: ret.seller?.name || 'Vendedor',
+        clientName: ret.client?.name || sale.client?.name,
+        invoiceNumber,
+        totalUnits,
+        totalReturnAmount,
+        items: detailedItems
+      };
+    });
+  }
+
   async addPayment(saleId: string, data: any, currentUser?: any) {
-    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic, paymentDate } = data;
+    const { amount, method, notes, evidenceUrl, creditNoteMotive, creditNoteNumber, isElectronic, paymentDate, returnRequestId } = data;
 
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -395,6 +548,37 @@ export class SalesService {
         data: paymentData,
         include: { letraDetails: true }
       });
+
+      // If this credit note corresponds to a ReturnRequest, tag that returnRequest as credited
+      const targetReturnId = returnRequestId || data.returnRequestId;
+      if (method === 'NOTA_CREDITO' && targetReturnId) {
+        try {
+          const targetReturn = await tx.returnRequest.findUnique({
+            where: { id: targetReturnId }
+          });
+          if (targetReturn) {
+            const finalNCNum = payment.creditNoteNumber || creditNoteNumber || 'E001-NC';
+            const updatedReason = targetReturn.reason.includes('[NC:')
+              ? targetReturn.reason
+              : `${targetReturn.reason} [NC: ${finalNCNum}] [NC_PAYMENT_ID: ${payment.id}]`.trim();
+
+            const ncLog = `Nota de Crédito generada: ${finalNCNum} el ${new Date().toLocaleDateString('es-PE')}`;
+            const updatedQualityObs = targetReturn.qualityObservations
+              ? `${targetReturn.qualityObservations} • ${ncLog}`
+              : ncLog;
+
+            await tx.returnRequest.update({
+              where: { id: targetReturn.id },
+              data: {
+                reason: updatedReason,
+                qualityObservations: updatedQualityObs
+              }
+            });
+          }
+        } catch (rErr) {
+          console.warn('Could not tag returnRequest with credit note:', rErr);
+        }
+      }
 
       // If registered by a vendor, the payment remains pending and doesn't update sale status
       if (!isVendor) {
@@ -552,6 +736,28 @@ export class SalesService {
         await tx.letraDetail.deleteMany({
           where: { paymentId }
         });
+      }
+
+      if (payment.method === 'NOTA_CREDITO') {
+        try {
+          const returnsWithThisPayment = await tx.returnRequest.findMany({
+            where: {
+              reason: { contains: paymentId }
+            }
+          });
+          for (const ret of returnsWithThisPayment) {
+            const cleanedReason = ret.reason
+              .replace(new RegExp(`\\s*\\[NC:[^\\]]+\\]\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'g'), '')
+              .replace(new RegExp(`\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'g'), '')
+              .trim();
+            await tx.returnRequest.update({
+              where: { id: ret.id },
+              data: { reason: cleanedReason }
+            });
+          }
+        } catch (e) {
+          console.warn('Error clearing NC tag on deletePayment:', e);
+        }
       }
 
       await tx.salePayment.delete({

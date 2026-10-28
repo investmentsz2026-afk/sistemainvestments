@@ -115,6 +115,11 @@ export class SalesController {
     return this.salesService.completeLetraGroup(id, req.user);
   }
 
+  @Get(':id/pending-returns')
+  getPendingReturns(@Param('id') id: string) {
+    return this.salesService.getPendingReturnsForSale(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);

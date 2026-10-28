@@ -24,7 +24,8 @@ import {
     RotateCw,
     Printer,
     Edit2,
-    FileSignature
+    FileSignature,
+    Check
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../hooks/useAuth';
@@ -389,11 +390,60 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const [creditNoteMotive, setCreditNoteMotive] = useState('4');
     const [creditNoteNumber, setCreditNoteNumber] = useState('');
 
+    // Devolution linkage state
+    const [pendingReturns, setPendingReturns] = useState<any[]>([]);
+    const [isLoadingReturns, setIsLoadingReturns] = useState(false);
+    const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+
     // Letras specific form state
     const [cantidadLetras, setCantidadLetras] = useState(1);
     const [letrasList, setLetrasList] = useState<any[]>([
         { number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }
     ]);
+
+    useEffect(() => {
+        if (showAddForm && method === 'NOTA_CREDITO' && (creditNoteMotive === '6' || creditNoteMotive === '7')) {
+            loadPendingReturns();
+        } else {
+            setPendingReturns([]);
+            setSelectedReturnId(null);
+        }
+    }, [showAddForm, method, creditNoteMotive, saleId]);
+
+    const loadPendingReturns = async () => {
+        setIsLoadingReturns(true);
+        try {
+            const resp = await api.get(`/sales/${saleId}/pending-returns`);
+            const returnsData = resp.data || [];
+            setPendingReturns(returnsData);
+            if (returnsData.length > 0) {
+                const first = returnsData[0];
+                setSelectedReturnId(first.id);
+                applyReturnToForm(first);
+            } else {
+                setSelectedReturnId(null);
+            }
+        } catch (err) {
+            console.error('Error fetching pending returns:', err);
+        } finally {
+            setIsLoadingReturns(false);
+        }
+    };
+
+    const applyReturnToForm = (ret: any) => {
+        if (!ret) return;
+        const retAmount = ret.totalReturnAmount || 0;
+        setAmount(retAmount > 0 ? retAmount.toFixed(2) : '');
+        setNotes(`Devolución de mercadería según solicitud ${ret.returnNumber} (${ret.totalUnits} unds)`);
+    };
+
+    const handleSelectReturn = (retId: string) => {
+        setSelectedReturnId(retId);
+        const found = pendingReturns.find(r => r.id === retId);
+        if (found) {
+            applyReturnToForm(found);
+        }
+    };
 
     const handleCantidadLetrasChange = (val: number) => {
         if (val < 1) return;
@@ -572,7 +622,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                 creditNoteMotive: method === 'NOTA_CREDITO' ? creditNoteMotive : undefined,
                 creditNoteNumber: method === 'NOTA_CREDITO' && !isElectronic ? creditNoteNumber : undefined,
                 isElectronic: method === 'NOTA_CREDITO' ? isElectronic : undefined,
-                letras: method === 'LETRAS' ? letrasList : undefined
+                letras: method === 'LETRAS' ? letrasList : undefined,
+                returnRequestId: (method === 'NOTA_CREDITO' && (creditNoteMotive === '6' || creditNoteMotive === '7')) ? selectedReturnId : undefined
             };
 
             if (editingPaymentId) {
@@ -591,6 +642,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             setPaymentDate(new Date().toISOString().split('T')[0]);
             setCantidadLetras(1);
             setLetrasList([{ number: 1, dueDate: '', amount: '', uniqueNumber: '', observation: '' }]);
+            setSelectedReturnId(null);
+            setPendingReturns([]);
             setShowAddForm(false);
             setEditingPaymentId(null);
             
@@ -1250,11 +1303,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                         <select
                                                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none"
                                                             value={creditNoteMotive}
-                                                            onChange={(e) => setCreditNoteMotive(e.target.value)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setCreditNoteMotive(val);
+                                                                if (val === '4') setNotes('Descuento global al total de ventas');
+                                                                else if (val === '1') setNotes('Anulación de la operación');
+                                                            }}
                                                         >
                                                             <option value="1">Anulación de la operación (Anulación Total)</option>
                                                             <option value="4">Descuento global / Disminución del total</option>
                                                             <option value="6">Devolución total de productos</option>
+                                                            <option value="7">Devolución por ítem (Parcial)</option>
                                                             <option value="10">Otros conceptos</option>
                                                         </select>
                                                     </div>
@@ -1271,6 +1330,157 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                             onChange={(e) => setCreditNoteNumber(e.target.value)}
                                                         />
                                                     </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">Motivo</label>
+                                                        <select
+                                                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none"
+                                                            value={creditNoteMotive}
+                                                            onChange={(e) => setCreditNoteMotive(e.target.value)}
+                                                        >
+                                                            <option value="4">Descuento global / Disminución del total</option>
+                                                            <option value="6">Devolución total de productos</option>
+                                                            <option value="7">Devolución por ítem (Parcial)</option>
+                                                            <option value="1">Anulación de la operación</option>
+                                                            <option value="10">Otros conceptos</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* SECCIÓN DETALLE DEVOLUCIÓN AUTOMÁTICA */}
+                                            {(creditNoteMotive === '6' || creditNoteMotive === '7') && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 space-y-3">
+                                                    {isLoadingReturns ? (
+                                                        <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-center justify-center gap-2 text-indigo-700 text-xs font-bold">
+                                                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                                            Buscando devoluciones asociadas a {sale?.invoiceNumber || 'esta venta'}...
+                                                        </div>
+                                                    ) : pendingReturns.length === 0 ? (
+                                                        <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[10px] font-bold space-y-1">
+                                                            <div className="flex items-center gap-1.5 font-black uppercase text-amber-900">
+                                                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                                                Sin devoluciones pendientes para {sale?.invoiceNumber || 'esta factura'}
+                                                            </div>
+                                                            <p className="leading-snug">
+                                                                No se encontró ninguna devolución pendiente para esta venta o ya tienen Nota de Crédito generada. Puede ingresar el monto y sustento manualmente si corresponde.
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {/* Selector si hay más de 1 devolución pendiente para esta misma factura */}
+                                                            {pendingReturns.length > 1 && (
+                                                                <div className="space-y-1">
+                                                                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider block">
+                                                                        Seleccionar Solicitud de Devolución
+                                                                    </label>
+                                                                    <select
+                                                                        value={selectedReturnId || ''}
+                                                                        onChange={(e) => handleSelectReturn(e.target.value)}
+                                                                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-black text-indigo-900 outline-none"
+                                                                    >
+                                                                        {pendingReturns.map((ret) => (
+                                                                            <option key={ret.id} value={ret.id}>
+                                                                                {ret.returnNumber} — {ret.totalUnits} unds (S/ {ret.totalReturnAmount.toFixed(2)}) — {ret.status}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Card con el detalle de la devolución seleccionada */}
+                                                            {(() => {
+                                                                const activeRet = pendingReturns.find(r => r.id === selectedReturnId) || pendingReturns[0];
+                                                                if (!activeRet) return null;
+                                                                return (
+                                                                    <div className="bg-white border-2 border-indigo-500/30 rounded-2xl p-3.5 shadow-sm space-y-3">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase tracking-wider shadow-sm">
+                                                                                    {activeRet.returnNumber}
+                                                                                </span>
+                                                                                <div>
+                                                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">
+                                                                                        Devolución Asociada
+                                                                                    </span>
+                                                                                    <span className="text-[10px] font-bold text-slate-700">
+                                                                                        Vendedor: {activeRet.sellerName}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">
+                                                                                    Total a Descontar
+                                                                                </span>
+                                                                                <span className="text-sm font-black font-mono text-emerald-600">
+                                                                                    S/ {activeRet.totalReturnAmount.toFixed(2)}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Tabla de prendas devueltas */}
+                                                                        <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                                                                            <table className="w-full text-left text-[10px] border-collapse min-w-[340px]">
+                                                                                <thead>
+                                                                                    <tr className="bg-slate-50 text-slate-500 font-black uppercase text-[8px] border-b border-slate-200">
+                                                                                        <th className="px-3 py-2">Modelo / Prenda</th>
+                                                                                        <th className="px-2 py-2">Color</th>
+                                                                                        <th className="px-2 py-2 text-center">Tallas</th>
+                                                                                        <th className="px-2 py-2 text-center">Cant.</th>
+                                                                                        <th className="px-2 py-2 text-right">P. Unit</th>
+                                                                                        <th className="px-3 py-2 text-right">Subtotal</th>
+                                                                                    </tr>
+                                                                                </thead>
+                                                                                <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                                                                                    {activeRet.items.map((it: any) => (
+                                                                                        <tr key={it.id} className="hover:bg-slate-50/50">
+                                                                                            <td className="px-3 py-2 font-black text-slate-900 uppercase">
+                                                                                                {it.modelName}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-2 text-slate-600 uppercase">
+                                                                                                {it.color}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-2 text-center">
+                                                                                                {it.sizes && it.sizes.length > 0 ? (
+                                                                                                    <div className="flex flex-wrap justify-center gap-1">
+                                                                                                        {it.sizes.map((s: any, sIdx: number) => (
+                                                                                                            <span key={sIdx} className="px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-700">
+                                                                                                                T{s.size}: {s.quantity}
+                                                                                                            </span>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                ) : (
+                                                                                                    <span className="text-slate-400">—</span>
+                                                                                                )}
+                                                                                            </td>
+                                                                                            <td className="px-2 py-2 text-center font-black text-slate-900">
+                                                                                                {it.quantity} unds
+                                                                                            </td>
+                                                                                            <td className="px-2 py-2 text-right font-mono text-slate-600">
+                                                                                                S/ {it.unitPrice.toFixed(2)}
+                                                                                            </td>
+                                                                                            <td className="px-3 py-2 text-right font-black font-mono text-indigo-700">
+                                                                                                S/ {it.subtotal.toFixed(2)}
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    ))}
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </div>
+
+                                                                        <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-[9.5px] font-black text-emerald-800">
+                                                                            <span className="flex items-center gap-1.5">
+                                                                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                                                Monto autocalculado: {activeRet.totalUnits} unds devueltas
+                                                                            </span>
+                                                                            <span className="text-xs font-mono font-black text-emerald-700">
+                                                                                Total NC: S/ {activeRet.totalReturnAmount.toFixed(2)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

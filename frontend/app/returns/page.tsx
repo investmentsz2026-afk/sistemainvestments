@@ -531,16 +531,36 @@ export default function ReturnsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, req?: any) => {
+    const ncNum = req?.creditNoteNumber || (req?.reason?.match(/\[NC:\s*([^\]]+)\]/i)?.[1]) || (req?.qualityObservations?.match(/\[NC:\s*([^\]]+)\]/i)?.[1]);
+    
+    if (ncNum) {
+      return (
+        <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-sm">
+          <CheckCircle className="w-3 h-3 text-emerald-600" />
+          NC: {ncNum} (Finalizado)
+        </span>
+      );
+    }
+
+    if (status === 'COMPLETADO') {
+      return (
+        <span className="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1">
+          <Check className="w-3 h-3 text-teal-600" />
+          En Inventario • Pendiente NC
+        </span>
+      );
+    }
+
     const badges: Record<string, JSX.Element> = {
-      PENDIENTE_COMERCIAL: <span className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-[10px] font-black uppercase tracking-wider">Pendiente Comercial</span>,
+      PENDIENTE_COMERCIAL: <span className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-[10px] font-black uppercase tracking-wider">1. Pendiente Comercial</span>,
       RECHAZADO_COMERCIAL: <span className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-[10px] font-black uppercase tracking-wider">Rechazado Comercial</span>,
-      PENDIENTE_ADMIN: <span className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-full text-[10px] font-black uppercase tracking-wider">Pendiente Admin</span>,
+      PENDIENTE_ADMIN: <span className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-full text-[10px] font-black uppercase tracking-wider">2. Pendiente Admin</span>,
       RECHAZADO_ADMIN: <span className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-[10px] font-black uppercase tracking-wider">Rechazado por Admin</span>,
-      PENDIENTE_UDP: <span className="px-3 py-1 bg-purple-50 text-purple-600 border border-purple-100 rounded-full text-[10px] font-black uppercase tracking-wider">Calidad (UDP)</span>,
+      PENDIENTE_UDP: <span className="px-3 py-1 bg-purple-50 text-purple-600 border border-purple-100 rounded-full text-[10px] font-black uppercase tracking-wider">3. Calidad (UDP)</span>,
       RECHAZADO_UDP: <span className="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-[10px] font-black uppercase tracking-wider">Rechazado Calidad</span>,
-      PENDIENTE_LOGISTICA: <span className="px-3 py-1 bg-orange-50 text-orange-600 border border-orange-100 rounded-full text-[10px] font-black uppercase tracking-wider">Listo p/ Almacén</span>,
-      COMPLETADO: <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-wider">Ingresado Inventario</span>,
+      PENDIENTE_LOGISTICA: <span className="px-3 py-1 bg-orange-50 text-orange-600 border border-orange-100 rounded-full text-[10px] font-black uppercase tracking-wider">4. Listo p/ Inventario</span>,
+      COMPLETADO: <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-wider">5. En Inventario</span>,
     };
     return badges[status] || <span>{status}</span>;
   };
@@ -611,7 +631,7 @@ export default function ReturnsPage() {
                           <td className="px-6 py-4 text-slate-500 uppercase">{req.seller?.name}</td>
                           <td className="px-6 py-4 text-slate-500">{new Date(req.createdAt).toLocaleDateString()}</td>
                           <td className="px-6 py-4 text-right font-black text-slate-900">{totalQty} unds</td>
-                          <td className="px-6 py-4 text-center">{getStatusBadge(req.status)}</td>
+                          <td className="px-6 py-4 text-center">{getStatusBadge(req.status, req)}</td>
                           <td className="px-6 py-4 text-center space-x-2">
                             <button
                               onClick={() => handleViewDetails(req)}
@@ -1304,11 +1324,137 @@ export default function ReturnsPage() {
                     Registrado el {new Date(selectedRequest.createdAt).toLocaleString()}
                   </p>
                 </div>
-                {getStatusBadge(selectedRequest.status)}
+                {getStatusBadge(selectedRequest.status, selectedRequest)}
               </div>
 
               {/* Body */}
               <div className="space-y-6">
+                {/* PIPELINE DE ESTADOS DEL PROCEDIMIENTO */}
+                {(() => {
+                  const ncNum = selectedRequest.creditNoteNumber || (selectedRequest.reason?.match(/\[NC:\s*([^\]]+)\]/i)?.[1]) || (selectedRequest.qualityObservations?.match(/\[NC:\s*([^\]]+)\]/i)?.[1]);
+                  const st = selectedRequest.status;
+
+                  const steps = [
+                    {
+                      label: '1. Vendedor',
+                      desc: 'Registro Solicitud',
+                      done: true,
+                      current: false,
+                      failed: false,
+                    },
+                    {
+                      label: '2. Comercial',
+                      desc: st === 'PENDIENTE_COMERCIAL' ? 'Pendiente' : st === 'RECHAZADO_COMERCIAL' ? 'Rechazado' : 'Aprobado',
+                      done: st !== 'PENDIENTE_COMERCIAL' && st !== 'RECHAZADO_COMERCIAL',
+                      current: st === 'PENDIENTE_COMERCIAL',
+                      failed: st === 'RECHAZADO_COMERCIAL',
+                    },
+                    {
+                      label: '3. Admin',
+                      desc: st === 'PENDIENTE_ADMIN' ? 'Pendiente' : st === 'RECHAZADO_ADMIN' ? 'Rechazado' : (st === 'PENDIENTE_COMERCIAL' || st === 'RECHAZADO_COMERCIAL') ? 'En Espera' : 'Aprobado',
+                      done: ['PENDIENTE_UDP', 'RECHAZADO_UDP', 'PENDIENTE_LOGISTICA', 'COMPLETADO'].includes(st),
+                      current: st === 'PENDIENTE_ADMIN',
+                      failed: st === 'RECHAZADO_ADMIN',
+                    },
+                    {
+                      label: '4. Calidad UDP',
+                      desc: st === 'PENDIENTE_UDP' ? 'En Inspección' : st === 'RECHAZADO_UDP' ? 'Rechazado' : ['PENDIENTE_LOGISTICA', 'COMPLETADO'].includes(st) ? 'Aprobado' : 'En Espera',
+                      done: ['PENDIENTE_LOGISTICA', 'COMPLETADO'].includes(st),
+                      current: st === 'PENDIENTE_UDP',
+                      failed: st === 'RECHAZADO_UDP',
+                    },
+                    {
+                      label: '5. Logística',
+                      desc: st === 'COMPLETADO' ? 'En Inventario' : st === 'PENDIENTE_LOGISTICA' ? 'Pendiente Almacén' : 'En Espera',
+                      done: st === 'COMPLETADO',
+                      current: st === 'PENDIENTE_LOGISTICA',
+                      failed: false,
+                    },
+                    {
+                      label: '6. Nota de Crédito',
+                      desc: ncNum ? `Emitida (${ncNum})` : (st === 'COMPLETADO' ? 'Pendiente en Ventas' : 'En Espera'),
+                      done: !!ncNum,
+                      current: st === 'COMPLETADO' && !ncNum,
+                      failed: false,
+                    },
+                  ];
+
+                  return (
+                    <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                          Flujo del Procedimiento de Devolución
+                        </span>
+                        {ncNum ? (
+                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase">
+                            Procedimiento Finalizado
+                          </span>
+                        ) : st === 'COMPLETADO' ? (
+                          <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 rounded-full text-[10px] font-black uppercase">
+                            En Inventario • Pendiente NC en Pagos
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[10px] font-black uppercase">
+                            En Proceso de Aprobación
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Timeline steps */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        {steps.map((step, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-xl border text-center transition-all ${
+                              step.done
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                : step.current
+                                ? 'bg-indigo-50 border-indigo-300 text-indigo-900 shadow-sm ring-2 ring-indigo-200'
+                                : step.failed
+                                ? 'bg-rose-50 border-rose-200 text-rose-800'
+                                : 'bg-white border-slate-200 text-slate-400 opacity-70'
+                            }`}
+                          >
+                            <div className="flex items-center justify-center mb-1">
+                              {step.done ? (
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                              ) : step.failed ? (
+                                <XCircle className="w-4 h-4 text-rose-600" />
+                              ) : step.current ? (
+                                <Clock className="w-4 h-4 text-indigo-600 animate-pulse" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-slate-300" />
+                              )}
+                            </div>
+                            <p className="text-[9.5px] font-black uppercase leading-tight truncate">{step.label}</p>
+                            <p className="text-[8.5px] font-bold mt-0.5 truncate">{step.desc}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Banner si la Nota de Crédito ya fue generada */}
+                      {ncNum && (
+                        <div className="bg-emerald-100/70 border border-emerald-300 p-3 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-900">
+                          <span className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                            Nota de Crédito generada: <span className="font-mono font-black">{ncNum}</span>. La deuda de la factura fue reducida correctamente.
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Banner si ya está en inventario pero aún falta generar la NC en pagos */}
+                      {st === 'COMPLETADO' && !ncNum && (
+                        <div className="bg-teal-50 border border-teal-200 p-3 rounded-xl flex items-center justify-between text-xs font-bold text-teal-900">
+                          <span className="flex items-center gap-2">
+                            <Info className="w-4 h-4 text-teal-600 shrink-0" />
+                            Prendas ya reingresadas al inventario de almacén. Ahora Comercial puede ir a <strong>Ventas &gt; Pagos</strong> y registrar la <strong>Nota de Crédito</strong> para esta devolución.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Meta details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
                   <div className="flex items-start gap-3">
@@ -1341,7 +1487,7 @@ export default function ReturnsPage() {
                     )}
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border font-medium text-xs text-slate-700 italic break-all break-words whitespace-pre-wrap">
-                    "{selectedRequest.reason ? selectedRequest.reason.replace(/\[Comprobante:\s*([^\]]+)\]\s*/i, '') : ''}"
+                    "{selectedRequest.reason ? selectedRequest.reason.replace(/\[Comprobante:\s*([^\]]+)\]\s*/gi, '').replace(/\[NC:[^\]]+\]\s*/gi, '').replace(/\[NC_PAYMENT_ID:[^\]]+\]\s*/gi, '').trim() : ''}"
                   </div>
                 </div>
 

@@ -93,7 +93,7 @@ export class ReturnsService {
       };
     }
 
-    return this.prisma.returnRequest.findMany({
+    const list = await this.prisma.returnRequest.findMany({
       where,
       include: {
         client: true,
@@ -102,6 +102,33 @@ export class ReturnsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return list.map(item => this.formatReturnResponse(item));
+  }
+
+  private formatReturnResponse(ret: any) {
+    const invoiceMatch = ret.reason?.match(/\[Comprobante:\s*([^\]]+)\]/i);
+    const invoiceNumber = invoiceMatch ? invoiceMatch[1].trim() : null;
+
+    const ncMatch = ret.reason?.match(/\[NC:\s*([^\]]+)\]/i) || ret.qualityObservations?.match(/\[NC:\s*([^\]]+)\]/i);
+    const creditNoteNumber = ncMatch ? ncMatch[1].trim() : null;
+
+    const cleanReason = ret.reason
+      ? ret.reason
+          .replace(/\[Comprobante:\s*([^\]]+)\]/gi, '')
+          .replace(/\[NC:\s*([^\]]+)\]/gi, '')
+          .replace(/\[NC_PAYMENT_ID:\s*([^\]]+)\]/gi, '')
+          .trim()
+      : '';
+
+    return {
+      ...ret,
+      invoiceNumber,
+      creditNoteNumber,
+      hasCreditNote: !!creditNoteNumber,
+      inInventory: ret.status === 'COMPLETADO',
+      cleanReason: cleanReason || ret.reason
+    };
   }
 
   async findOne(id: string) {
@@ -118,7 +145,7 @@ export class ReturnsService {
       throw new NotFoundException('Devolución no encontrada');
     }
 
-    return returnRequest;
+    return this.formatReturnResponse(returnRequest);
   }
 
   async update(id: string, user: any, data: any) {
