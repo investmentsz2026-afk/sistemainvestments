@@ -801,6 +801,17 @@ export default function SampleDetailPage() {
                             <Ruler className="w-4 h-4 text-indigo-500" /> Ver Medidas
                         </button>
 
+                        {/* PRINT OP BARCODE BUTTON */}
+                        {sample.op && sample.barcode && (
+                            <button
+                                type="button"
+                                onClick={() => setShowOPPrintModal(true)}
+                                className="flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-black transition shadow-md shadow-indigo-100 active:scale-95"
+                            >
+                                <Printer className="w-4 h-4" /> Imprimir Stickers OP
+                            </button>
+                        )}
+
                         {/* UDP EDIT BUTTON */}
                         {(user?.role === 'UDP' || user?.role === 'ADMIN') && sample.status !== 'COMPLETADO_INVENTARIO' && (
                             <button
@@ -1192,10 +1203,24 @@ export default function SampleDetailPage() {
                         {sample.status !== 'PENDIENTE' && (
                             <div className="space-y-8">
                                 {/* PROTOTYPE SUMMARY & STICKER CARD */}
-                                <div className={`${cardClass} border-emerald-100 shadow-emerald-100/20`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                                            {sample.status === 'APROBADO' ? '✅ Prototipo Aprobado' : '❌ Muestra Observada'}
+                                <div className={`${cardClass} ${
+                                    sample.status === 'COMPLETADO_INVENTARIO'
+                                    ? 'border-blue-100 shadow-blue-100/20'
+                                    : 'border-emerald-100 shadow-emerald-100/20'
+                                }`}>
+                                    <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                                            sample.status === 'COMPLETADO_INVENTARIO'
+                                            ? 'text-blue-700 bg-blue-50 border-blue-200'
+                                            : sample.status === 'APROBADO'
+                                            ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                                            : 'text-rose-600 bg-rose-50 border-rose-200'
+                                        }`}>
+                                            {sample.status === 'COMPLETADO_INVENTARIO' 
+                                                ? '🎉 Lote Finalizado e Inventariado' 
+                                                : sample.status === 'APROBADO' 
+                                                ? '✅ Prototipo Aprobado' 
+                                                : '❌ Muestra Observada'}
                                         </span>
                                         {sample.approvedAt && (
                                             <span className="text-[10px] font-bold text-gray-400">
@@ -1217,7 +1242,7 @@ export default function SampleDetailPage() {
                                         </div>
                                     )}
 
-                                    {sample.status === 'APROBADO' && sample.op && sample.barcode && (
+                                    {(sample.status === 'APROBADO' || sample.status === 'COMPLETADO_INVENTARIO') && sample.op && sample.barcode && (
                                         <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                                             <div className="flex flex-col items-center sm:items-start">
                                                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SKU Numérico de OP ({sample.op})</span>
@@ -1238,29 +1263,37 @@ export default function SampleDetailPage() {
                                 </div>
 
                                 {/* PRODUCTION ORDER (OP) SECTION */}
-                                {sample.status === 'APROBADO' && (
+                                {(sample.status === 'APROBADO' || sample.status === 'COMPLETADO_INVENTARIO') && (
                                     <div className={`${cardClass} border-indigo-100`}>
                                         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
                                             <div className="flex items-center gap-3">
                                                 <Package className="w-6 h-6 text-indigo-600" />
                                                 <div>
                                                     <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Orden de Producción (OP)</h3>
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confección masiva</p>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                        {sample.status === 'COMPLETADO_INVENTARIO' ? 'Lote Completado e Inventariado' : 'Confección masiva'}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            {sample.op && !isCreatingOP && canCommercialEdit && sample.adminOpApprovalStatus !== 'APROBADO' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setIsCreatingOP(true);
-                                                        setOpName(sample.op || '');
-                                                        const currentEntalle = sample.entalle || (Array.isArray(sample.productionSizeData) ? sample.productionSizeData[0]?.entalle : '') || '';
-                                                        setEntalle(currentEntalle);
-                                                    }}
-                                                    className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
-                                                >
-                                                    <Edit className="w-3.5 h-3.5" /> Modificar OP
-                                                </button>
+                                            {sample.status === 'COMPLETADO_INVENTARIO' ? (
+                                                <span className="px-3.5 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border border-blue-200">
+                                                    <CheckCircle2 className="w-4 h-4 text-blue-600" /> Inventariado en Almacén
+                                                </span>
+                                            ) : (
+                                                sample.op && !isCreatingOP && canCommercialEdit && sample.adminOpApprovalStatus !== 'APROBADO' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsCreatingOP(true);
+                                                            setOpName(sample.op || '');
+                                                            const currentEntalle = sample.entalle || (Array.isArray(sample.productionSizeData) ? sample.productionSizeData[0]?.entalle : '') || '';
+                                                            setEntalle(currentEntalle);
+                                                        }}
+                                                        className="px-4 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-black uppercase transition flex items-center gap-2 shadow-sm"
+                                                    >
+                                                        <Edit className="w-3.5 h-3.5" /> Modificar OP
+                                                    </button>
+                                                )
                                             )}
                                         </div>
 
