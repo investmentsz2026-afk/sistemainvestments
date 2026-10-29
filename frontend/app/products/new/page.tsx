@@ -404,9 +404,13 @@ export default function NewProductPage() {
       setShowAuditDetailModal(false);
       setSelectedAudit(null);
       fetchFinalizedAudits();
-    } catch (error) {
+      queryClient.invalidateQueries('process-audits');
+      queryClient.invalidateQueries('samples');
+      queryClient.invalidateQueries('products');
+    } catch (error: any) {
       console.error('Error finalizing audit:', error);
-      toast.error('Error al finalizar la auditoría');
+      const msg = error.response?.data?.message || 'Error al finalizar la auditoría';
+      toast.error(msg);
     }
   };
 

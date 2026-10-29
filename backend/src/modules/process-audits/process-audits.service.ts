@@ -418,32 +418,74 @@ export class ProcessAuditsService {
         });
     }
 
-    // Logística confirma recibido
+    // Logística confirma recibido e inventariado completo
     async logisticsConfirm(id: string) {
         const audit = await this.findOne(id);
-        if (audit.adminStatus !== 'APROBADO') {
-            throw new BadRequestException('Solo se pueden recibir auditorías aprobadas por el administrador.');
+        if (audit.adminStatus === 'RECHAZADO') {
+            throw new BadRequestException('No se puede recibir una auditoría rechazada por el administrador.');
         }
 
         const updatedAudit = await (this.prisma as any).processAudit.update({
             where: { id },
             data: {
                 status: 'FINALIZADO',
+                adminStatus: 'APROBADO',
                 logisticsStatus: 'RECIBIDO',
                 receivedAt: new Date(),
                 processHistory: [
                     ...(Array.isArray(audit.processHistory) ? audit.processHistory : []),
-                    { action: 'RECIBIDO_EN_LOGISTICA', date: new Date(), notes: 'Cargado al inventario' }
+                    { 
+                        action: 'RECIBIDO_EN_LOGISTICA', 
+                        date: new Date(), 
+                        notes: 'Lote completado e inventariado en almacén' 
+                    }
                 ]
             },
+            include: { sample: true },
         });
 
-        // Si viene de una muestra, marcar la muestra como completada en inventario
+        // Marcar la muestra correspondiente como COMPLETADO_INVENTARIO
         if (audit.sampleId) {
-            await (this.prisma as any).productSample.update({
-                where: { id: audit.sampleId },
-                data: { status: 'COMPLETADO_INVENTARIO' }
-            });
+            try {
+                await (this.prisma as any).productSample.update({
+                    where: { id: audit.sampleId },
+                    data: { status: 'COMPLETADO_INVENTARIO' }
+                });
+            } catch (err) {
+                console.error('Error updating sample status by sampleId:', err);
+            }
+        }
+
+        if (audit.op) {
+            try {
+                const cleanOp = audit.op.replace(/\D/g, '');
+                await (this.prisma as any).productSample.updateMany({
+                    where: {
+                        OR: [
+                            { op: audit.op },
+                            { op: audit.op.trim() },
+                            ...(cleanOp ? [{ op: cleanOp }] : [])
+                        ]
+                    },
+                    data: { status: 'COMPLETADO_INVENTARIO' }
+                });
+            } catch (err) {
+                console.error('Error updating sample status by OP:', err);
+            }
+        }
+
+        if (audit.inspectorId) {
+            try {
+                await this.notifications.create({
+                    title: 'Lote e Inventariado Completado',
+                    message: `La OP ${audit.op} ha sido recibida e inventariada completamente en Logística/Almacén.`,
+                    type: 'INVENTORY_RECEIVED',
+                    referenceId: audit.id,
+                    userId: audit.inspectorId,
+                });
+            } catch (err) {
+                console.error('Error sending inventory notification to inspector:', err);
+            }
         }
 
         return updatedAudit;
