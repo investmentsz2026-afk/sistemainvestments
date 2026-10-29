@@ -288,7 +288,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             opVariants[v.size].push(v.color);
           }
         });
-        dataToReset.opVariants = opVariants;
+        dataToReset.opVariants = initialData.opVariants || opVariants;
+      }
+      if (initialData.importedStockQuantities) {
+        dataToReset.importedStockQuantities = initialData.importedStockQuantities;
       }
       if (['MATERIALES', 'MAQUINARIA', 'AVIOS', 'MERCHAN_DESIGN', 'OTROS'].includes(dataToReset.inventoryType)) {
         if (!dataToReset.sizes || dataToReset.sizes.length === 0) {
@@ -415,13 +418,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       const importedSizes = initialData.importedItems.map((item: any) => item.size);
       setValue('sizes', importedSizes);
 
-      // Set default quantities if colors are available
-      if (initialData.colors && initialData.colors.length > 0 && !watch('importedStockQuantities')) {
+      // Set quantities and opVariants
+      if (initialData.importedStockQuantities && Object.keys(initialData.importedStockQuantities).length > 0) {
+        setValue('importedStockQuantities', initialData.importedStockQuantities);
+      } else if (initialData.colors && initialData.colors.length > 0 && !watch('importedStockQuantities')) {
         const defaultQuantities: Record<string, Record<string, number>> = {};
         initialData.importedItems.forEach((item: any) => {
           defaultQuantities[item.size] = { [initialData.colors[0]]: item.quantity };
         });
         setValue('importedStockQuantities', defaultQuantities);
+      }
+
+      if (initialData.opVariants && Object.keys(initialData.opVariants).length > 0) {
+        setValue('opVariants', initialData.opVariants);
+      }
+      if (initialData.colors && initialData.colors.length > 0) {
+        setValue('colors', initialData.colors);
+      }
+      if (initialData.purchasePrice !== undefined) {
+        setValue('purchasePrice', initialData.purchasePrice);
+      }
+      if (initialData.sellingPrice !== undefined) {
+        setValue('sellingPrice', initialData.sellingPrice);
+      }
+      if (initialData.realPrice !== undefined) {
+        setValue('realPrice', initialData.realPrice);
       }
     } else {
       setImportedMetadata(null);
@@ -816,7 +837,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               id: existing.id,
               size,
               color,
-              stock: existing.stock !== undefined ? existing.stock : existing.initialStock,
+              stock: existing.stock !== undefined ? existing.stock : (existing.initialStock !== undefined ? existing.initialStock : importedQty),
+              initialStock: existing.initialStock !== undefined ? existing.initialStock : importedQty,
               variantSku: existing.variantSku,
             });
           } else {

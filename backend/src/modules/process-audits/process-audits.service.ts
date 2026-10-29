@@ -531,13 +531,22 @@ export class ProcessAuditsService {
             let totalUnitCost = Number(a.servicePrice) || 0;
             const history = Array.isArray(a.processHistory) ? a.processHistory : [];
             const finalStep = history.find((h: any) => h.action === 'FINALIZADO_POR_UDP' && h.totalUnitCost !== undefined);
-            if (finalStep) {
-                totalUnitCost = Number(finalStep.totalUnitCost) || totalUnitCost;
+            if (finalStep && Number(finalStep.totalUnitCost) > 0) {
+                totalUnitCost = Number(finalStep.totalUnitCost);
             } else {
-                // Sumar de los procesos en el historial si no hay paso final
+                // Sumar de los procesos en el historial si no hay paso final o está incompleto
                 const pMap: Record<string, number> = {};
                 history.forEach((h: any) => {
-                    if (h.process && h.servicePrice) pMap[h.process] = Number(h.servicePrice) || 0;
+                    if (h.manufacturingCosts && Array.isArray(h.manufacturingCosts)) {
+                        h.manufacturingCosts.forEach((mc: any) => {
+                            if (mc.process && (mc.price !== undefined || mc.servicePrice !== undefined)) {
+                                pMap[mc.process] = Number(mc.price || mc.servicePrice) || 0;
+                            }
+                        });
+                    }
+                    if (h.process && (h.servicePrice !== undefined || h.price !== undefined)) {
+                        pMap[h.process] = Number(h.servicePrice || h.price) || 0;
+                    }
                 });
                 if (a.process && a.servicePrice) pMap[a.process] = Number(a.servicePrice) || 0;
                 const sum = Object.values(pMap).reduce((acc, v) => acc + v, 0);

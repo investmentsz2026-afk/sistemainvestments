@@ -164,26 +164,90 @@ export default function NewProductPage() {
       invType = 'PROCESO';
     }
 
+    const auditSizes = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
+
+    const cleanColorName = (col: string | undefined | null) => {
+      if (!col) return '';
+      const c = col.trim();
+      const up = c.toUpperCase();
+      if (
+        up === '1RA CALIDAD' ||
+        up === '2DA CALIDAD' ||
+        up === 'EN PROCESO' ||
+        up === 'SEGUNDA' ||
+        up === '1RA' ||
+        up === '2DA' ||
+        up === 'CALIDAD'
+      ) {
+        return '';
+      }
+      return c;
+    };
+
+    const getGarmentColorForSize = (size: string) => {
+      // 1. Check productionSizeData for this specific size
+      const matchedProd = auditSizes.find((s: any) => String(s.size).trim().toUpperCase() === String(size).trim().toUpperCase());
+      const cProd = cleanColorName(matchedProd?.color);
+      if (cProd) return cProd;
+
+      // 2. Check qualitySizeData for this specific size
+      if (Array.isArray(audit.qualitySizeData)) {
+        const matchedQ = audit.qualitySizeData.find((s: any) => String(s.size).trim().toUpperCase() === String(size).trim().toUpperCase());
+        const cQ = cleanColorName(matchedQ?.color);
+        if (cQ) return cQ;
+      }
+
+      // 3. Check audit.productionColor
+      const cAud = cleanColorName(audit.productionColor);
+      if (cAud) return cAud;
+
+      // 4. Check audit.sample?.productionColor
+      const cSample = cleanColorName(audit.sample?.productionColor);
+      if (cSample) return cSample;
+
+      // 5. Check audit.sample?.color
+      const cSampleCol = cleanColorName(audit.sample?.color);
+      if (cSampleCol) return cSampleCol;
+
+      // 6. Check masterProduct colors
+      if (Array.isArray(audit.masterProduct?.colors) && audit.masterProduct.colors.length > 0) {
+        const cMaster = audit.masterProduct.colors.map(cleanColorName).find(Boolean);
+        if (cMaster) return cMaster;
+      }
+
+      // 7. Check registeredOpProduct variants
+      if (Array.isArray(audit.registeredOpProduct?.variants) && audit.registeredOpProduct.variants.length > 0) {
+        const cVar = audit.registeredOpProduct.variants.map((v: any) => cleanColorName(v.color)).find(Boolean);
+        if (cVar) return cVar;
+      }
+
+      // 8. Check any item in productionSizeData that has a color
+      const cAny = auditSizes.map((s: any) => cleanColorName(s.color)).find(Boolean);
+      if (cAny) return cAny;
+
+      return 'ÚNICO';
+    };
+
     selectedSizes.forEach(size => {
       let qty = 0;
       if (Array.isArray(audit.qualitySizeData)) {
-        const sz = audit.qualitySizeData.find((s: any) => s.size === size);
+        const sz = audit.qualitySizeData.find((s: any) => String(s.size).trim().toUpperCase() === String(size).trim().toUpperCase());
         if (sz) {
           if (type === '1RA') qty = sz.qGood || 0;
           else if (type === '2DA') qty = sz.qSecond || 0;
           else if (type === 'PROCESO') qty = sz.qProcess || 0;
         }
       } else {
-        const sz = (audit.productionSizeData || []).find((s: any) => s.size === size);
+        const sz = auditSizes.find((s: any) => String(s.size).trim().toUpperCase() === String(size).trim().toUpperCase());
         if (sz) qty = sz.quantity || 0;
       }
       
       importedItems.push({ size, quantity: qty });
       
-      const defaultColor = type === '1RA' ? (audit.productionColor || '1RA CALIDAD') : type === '2DA' ? '2DA CALIDAD' : 'EN PROCESO';
+      const garmentColor = getGarmentColorForSize(size);
       variants.push({
         size,
-        color: defaultColor,
+        color: garmentColor,
         initialStock: qty
       });
     });
@@ -193,23 +257,89 @@ export default function NewProductPage() {
       return;
     }
 
-    // Set prices based on first selected size
-    const firstSize = selectedSizes[0];
-    let pPrice = 0.1;
-    let sPrice = 0.1;
+    // Pre-configurar opVariants, importedStockQuantities y lista de colores reales
+    const opVariants: Record<string, string[]> = {};
+    const importedStockQuantities: Record<string, Record<string, number>> = {};
+    const allColorsSet = new Set<string>();
 
-    if (firstSize) {
-      const auditSizes = Array.isArray(audit.productionSizeData) ? audit.productionSizeData : [];
-      if (audit.udpRequirements?.sizes) {
-        const sizeReq = audit.udpRequirements.sizes.find((s: any) => s.size === firstSize);
+    variants.forEach(v => {
+      allColorsSet.add(v.color);
+      if (!opVariants[v.size]) {
+        opVariants[v.size] = [];
+      }
+      if (!opVariants[v.size].includes(v.color)) {
+        opVariants[v.size].push(v.color);
+      }
+      if (!importedStockQuantities[v.size]) {
+        importedStockQuantities[v.size] = {};
+      }
+      importedStockQuantities[v.size][v.color] = v.initialStock;
+    });
+
+    const colorsList = Array.from(allColorsSet);
+
+    // Costo de Producción: extraer de auditoría UDP (Costo por Prenda del Lote)
+    let pPrice = Number(audit.totalUnitCost) || 0;
+
+    // Fallback: verificar el paso final o el historial de procesos de la auditoría
+    if (!pPrice || pPrice <= 0) {
+      const history = Array.isArray(audit.processHistory) ? audit.processHistory : [];
+      const finalStep = history.find((h: any) => h.action === 'FINALIZADO_POR_UDP' && h.totalUnitCost !== undefined);
+      if (finalStep && Number(finalStep.totalUnitCost) > 0) {
+        pPrice = Number(finalStep.totalUnitCost);
+      } else {
+        const pMap: Record<string, number> = {};
+        history.forEach((h: any) => {
+          if (h.manufacturingCosts && Array.isArray(h.manufacturingCosts)) {
+            h.manufacturingCosts.forEach((mc: any) => {
+              if (mc.process && (mc.price !== undefined || mc.servicePrice !== undefined)) {
+                pMap[mc.process] = Number(mc.price || mc.servicePrice) || 0;
+              }
+            });
+          }
+          if (h.process && (h.servicePrice !== undefined || h.price !== undefined)) {
+            pMap[h.process] = Number(h.servicePrice || h.price) || 0;
+          }
+        });
+        if (audit.process && (audit.servicePrice !== undefined || audit.externalCompany)) {
+          pMap[audit.process] = Number(audit.servicePrice) || 0;
+        }
+        const sum = Object.values(pMap).reduce((acc, v) => acc + v, 0);
+        if (sum > 0) pPrice = sum;
+      }
+    }
+
+    if (!pPrice || pPrice <= 0) {
+      const firstSize = selectedSizes[0];
+      if (firstSize && audit.udpRequirements?.sizes) {
+        const sizeReq = audit.udpRequirements.sizes.find((s: any) => String(s.size).trim().toUpperCase() === String(firstSize).trim().toUpperCase());
         if (sizeReq) {
           pPrice = sizeReq.items.reduce((acc: number, item: any) => acc + ((item.price || 0) * (item.consumption || 0)), 0);
         }
       }
+    }
 
-      const sizeSaleData = auditSizes.find((s: any) => s.size === firstSize);
+    if (!pPrice || pPrice <= 0) {
+      if (audit.masterProduct?.purchasePrice && Number(audit.masterProduct.purchasePrice) > 0) {
+        pPrice = Number(audit.masterProduct.purchasePrice);
+      }
+    }
+
+    const firstSize = selectedSizes[0];
+    let sPrice = 0;
+
+    if (firstSize) {
+      const sizeSaleData = auditSizes.find((s: any) => String(s.size).trim().toUpperCase() === String(firstSize).trim().toUpperCase());
       if (sizeSaleData) {
         sPrice = type === '1RA' ? (sizeSaleData.salePrice || 0) : (sizeSaleData.secondSalePrice || 0);
+      }
+    }
+
+    if (!sPrice || sPrice <= 0) {
+      if (type === '1RA') {
+        sPrice = audit.masterProduct?.sellingPrice || (pPrice > 0 ? pPrice * 1.5 : 0);
+      } else if (type === '2DA') {
+        sPrice = pPrice > 0 ? Math.round(pPrice * 0.7 * 100) / 100 : 0;
       }
     }
 
@@ -230,11 +360,14 @@ export default function NewProductPage() {
       op: audit.op,
       description: `Importado de OP: ${audit.op}. Calidad: ${type}. Tallas: ${selectedSizes.join(', ')}.`,
       purchasePrice: pPrice || 0.1,
-      sellingPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
-      realPrice: sPrice || (type === '1RA' ? pPrice * 1.5 : 0),
+      sellingPrice: sPrice || pPrice || 0.1,
+      realPrice: sPrice || pPrice || 0.1,
       minStock: 5,
       sizes: selectedSizes,
-      colors: [type === '1RA' ? (audit.productionColor || 'Negro') : type === '2DA' ? '2da Calidad' : 'En Proceso'],
+      colors: colorsList.length > 0 ? colorsList : ['ÚNICO'],
+      variants,
+      opVariants,
+      importedStockQuantities,
       importedItems,
       importedQuality: type
     };
@@ -462,6 +595,7 @@ export default function NewProductPage() {
         transition={{ delay: 0.1 }}
       >
         <ProductForm
+          key={formKey}
           onSubmit={handleSubmit}
           initialData={initialData}
           isLoading={isCreating}
