@@ -788,9 +788,37 @@ export class SamplesService {
       throw new BadRequestException('No se puede editar una muestra que ya ha sido completada en inventario');
     }
 
-    const { name, code, description, characteristics, images, materials } = data;
+    const { name, code, description, characteristics, images, materials, entalle, entalleCode, entalleMeasurements } = data;
 
     return await this.prisma.$transaction(async (tx) => {
+      let nextProductionSizeData = sample.productionSizeData;
+      if (entalle !== undefined) {
+        const resolvedEntalleCode = entalleCode || entalleMeasurements?.code || null;
+        if (entalle) {
+          if (Array.isArray(sample.productionSizeData) && sample.productionSizeData.length > 0) {
+            nextProductionSizeData = sample.productionSizeData.map((item: any) => ({
+              ...item,
+              entalle: entalle,
+              entalleCode: resolvedEntalleCode || item.entalleCode || null,
+            }));
+          } else {
+            nextProductionSizeData = [{
+              entalle,
+              entalleCode: resolvedEntalleCode,
+              size: entalleMeasurements?.baseSize || '32',
+              quantity: 1
+            }];
+          }
+        } else {
+          if (Array.isArray(sample.productionSizeData) && sample.productionSizeData.length > 0) {
+            nextProductionSizeData = sample.productionSizeData.map((item: any) => {
+              const { entalle: _, entalleCode: __, ...rest } = item;
+              return rest;
+            });
+          }
+        }
+      }
+
       const updated = await (tx as any).productSample.update({
         where: { id },
         data: {
@@ -799,6 +827,7 @@ export class SamplesService {
           description: description !== undefined ? description : sample.description,
           characteristics: characteristics !== undefined ? characteristics : sample.characteristics,
           images: images !== undefined ? images : sample.images,
+          ...(nextProductionSizeData !== undefined ? { productionSizeData: nextProductionSizeData } : {}),
           status: sample.status === 'OBSERVADO' ? 'PENDIENTE' : sample.status,
         },
       });
@@ -815,6 +844,52 @@ export class SamplesService {
               unitPriceAtTime: mat.unitPriceAtTime || 0,
             },
           });
+        }
+      }
+
+      if (entalleMeasurements) {
+        try {
+          const existingOfficial = await (tx as any).productMeasurement.findFirst({
+            where: { sampleId: id, stage: 'OFICIAL' }
+          });
+          if (existingOfficial) {
+            await (tx as any).productMeasurement.update({
+              where: { id: existingOfficial.id },
+              data: {
+                size: entalleMeasurements.baseSize || '32',
+                cintura: entalleMeasurements.cintura || null,
+                cadera: entalleMeasurements.cadera || null,
+                muslo: entalleMeasurements.muslo || null,
+                rodilla: entalleMeasurements.rodilla || null,
+                botaPie: entalleMeasurements.botaPie || null,
+                tiroDel: entalleMeasurements.tiroDel || null,
+                tiroPos: entalleMeasurements.tiroPos || null,
+                largoTotal: entalleMeasurements.largoTotal || null,
+                color: entalleMeasurements.cinturaType || null,
+                op: entalle || null,
+              }
+            });
+          } else {
+            await (tx as any).productMeasurement.create({
+              data: {
+                sampleId: id,
+                stage: 'OFICIAL',
+                size: entalleMeasurements.baseSize || '32',
+                cintura: entalleMeasurements.cintura || null,
+                cadera: entalleMeasurements.cadera || null,
+                muslo: entalleMeasurements.muslo || null,
+                rodilla: entalleMeasurements.rodilla || null,
+                botaPie: entalleMeasurements.botaPie || null,
+                tiroDel: entalleMeasurements.tiroDel || null,
+                tiroPos: entalleMeasurements.tiroPos || null,
+                largoTotal: entalleMeasurements.largoTotal || null,
+                color: entalleMeasurements.cinturaType || null,
+                op: entalle || null,
+              }
+            });
+          }
+        } catch (mErr) {
+          console.warn('Could not update sample official measurement in update:', mErr);
         }
       }
 

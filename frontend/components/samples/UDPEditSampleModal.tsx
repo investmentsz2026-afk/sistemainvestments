@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Save,
@@ -14,7 +14,10 @@ import {
   FileText,
   Settings,
   Beaker,
-  Upload
+  Upload,
+  Ruler,
+  Sparkles,
+  Check
 } from 'lucide-react';
 import api from '../../lib/axios';
 import { getImageUrl } from '../../lib/imageUrl';
@@ -52,6 +55,104 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Official Entalles State
+  const [officialEntalles, setOfficialEntalles] = useState<any[]>([]);
+  const [selectedEntalleName, setSelectedEntalleName] = useState<string>(() => {
+    if (sample.entalle) return sample.entalle;
+    if (Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.entalle) {
+      return sample.productionSizeData[0].entalle;
+    }
+    const match = (sample.characteristics || '').match(/Entalle Oficial:\s*(?:\[[^\]]*\]\s*)?([^\(•\n]+)/i);
+    if (match) return match[1].trim();
+    return '';
+  });
+  const [entalleSearch, setEntalleSearch] = useState<string>('');
+  const [isEntalleDropdownOpen, setIsEntalleDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchOfficialEntalles = async () => {
+      try {
+        const resp = await api.get('/products-measurements/official-entalles');
+        const list = resp.data || [];
+        setOfficialEntalles(list);
+
+        const currentName = selectedEntalleName || 
+          sample.entalle || 
+          (Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.entalle);
+
+        if (currentName) {
+          const found = list.find((e: any) => 
+            e.name.toUpperCase() === currentName.toUpperCase() ||
+            (e.code && e.code.toUpperCase() === currentName.toUpperCase())
+          );
+          if (found) {
+            setSelectedEntalleName(found.name);
+          }
+        } else if (Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.entalleCode) {
+          const code = sample.productionSizeData[0].entalleCode;
+          const found = list.find((e: any) => e.code && e.code.toUpperCase() === code.toUpperCase());
+          if (found) {
+            setSelectedEntalleName(found.name);
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching official entalles in edit modal:', err);
+      }
+    };
+    fetchOfficialEntalles();
+  }, []);
+
+  const selectedEntalleObj = useMemo(() => {
+    if (!selectedEntalleName) return null;
+    return officialEntalles.find(e => 
+      e.name.toUpperCase() === selectedEntalleName.toUpperCase() ||
+      (e.code && e.code.toUpperCase() === selectedEntalleName.toUpperCase())
+    ) || null;
+  }, [selectedEntalleName, officialEntalles]);
+
+  const filteredEntalles = useMemo(() => {
+    const q = entalleSearch.trim().toLowerCase();
+    if (!q) return officialEntalles;
+    return officialEntalles.filter(ent => {
+      const nameMatch = (ent.name || '').toLowerCase().includes(q);
+      const codeMatch = (ent.code || '').toLowerCase().includes(q);
+      const cinturaMatch = (ent.cinturaType || '').toLowerCase().includes(q);
+      return nameMatch || codeMatch || cinturaMatch;
+    });
+  }, [officialEntalles, entalleSearch]);
+
+  const handleSelectEntalle = (entalleName: string) => {
+    setSelectedEntalleName(entalleName);
+    setIsEntalleDropdownOpen(false);
+    setEntalleSearch('');
+    const found = officialEntalles.find(e => e.name.toUpperCase() === entalleName.toUpperCase());
+    if (found) {
+      const codeText = found.code ? `[${found.code}] ` : '';
+      const entalleText = `Entalle Oficial: ${codeText}${found.name} (${found.cinturaType}) • Base: Talla ${found.baseSize || '32'} • Cintura: ${found.cintura || '-'} • Cadera: ${found.cadera || '-'} • Muslo: ${found.muslo || '-'} • Rodilla: ${found.rodilla || '-'} • Botapie: ${found.botaPie || '-'} • Largo: ${found.largoTotal || '-'}`;
+      setCharacteristics(prev => {
+        let currentChars = prev || '';
+        if (currentChars.includes('Entalle Oficial:')) {
+          currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
+        }
+        const updated = currentChars ? `${currentChars} • ${entalleText}` : entalleText;
+        return updated;
+      });
+    }
+  };
+
+  const handleClearEntalle = () => {
+    setSelectedEntalleName('');
+    setEntalleSearch('');
+    setIsEntalleDropdownOpen(false);
+    setCharacteristics(prev => {
+      let currentChars = prev || '';
+      if (currentChars.includes('Entalle Oficial:')) {
+        currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
+      }
+      return currentChars;
+    });
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -199,6 +300,9 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
         description,
         characteristics,
         images,
+        entalle: selectedEntalleName || undefined,
+        entalleCode: selectedEntalleObj?.code || undefined,
+        entalleMeasurements: selectedEntalleObj || undefined,
         materials: materials.map(m => ({
           productId: m.productId,
           customMaterial: m.customMaterial,
@@ -274,6 +378,217 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 font-black text-gray-900 uppercase outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+          </div>
+
+          {/* ── SELECTOR DE ENTALLE OBJETIVO (OFICIAL) ── */}
+          <div className="bg-amber-50/60 p-5 md:p-6 rounded-2xl border border-amber-200/90 space-y-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="flex items-center gap-2 text-xs font-black uppercase text-amber-900 tracking-wider">
+                  <Ruler className="w-4 h-4 text-amber-600" />
+                  Entalle al que se quiere llegar (Medidas Oficiales)
+                </label>
+                <p className="text-[11px] text-amber-800/80 font-medium mt-0.5">
+                  Busca y selecciona por <b>Código de Entalle</b> (ej: ENT-001) o <b>Nombre de Modelo</b> (ej: PARKER):
+                </p>
+              </div>
+              {selectedEntalleObj && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-indigo-900 bg-indigo-100 border border-indigo-300 px-3 py-1 rounded-full uppercase">
+                    {selectedEntalleObj.code || 'ENT-000'}
+                  </span>
+                  {selectedEntalleObj.isCustomCode ? (
+                    <span className="inline-flex items-center gap-1 text-[9.5px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full uppercase">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      Código puesto x área UDP
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-slate-700 bg-slate-200 border border-slate-300 px-2.5 py-1 rounded-full uppercase">
+                      Código puesto x defecto
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleClearEntalle}
+                    className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline px-1 py-0.5"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Buscador Rápido por Código o Nombre */}
+            <div className="relative">
+              <div className="relative">
+                <Search className="w-4 h-4 text-amber-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar entalle por Código (ej: ENT-004) o Modelo (ej: PARKER, RELAX)..."
+                  value={entalleSearch}
+                  onChange={e => {
+                    setEntalleSearch(e.target.value);
+                    setIsEntalleDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsEntalleDropdownOpen(true)}
+                  className="w-full bg-white border border-amber-300 rounded-xl pl-10 pr-10 py-3 font-bold text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition text-xs shadow-sm placeholder:text-amber-800/40"
+                />
+                {entalleSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setEntalleSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown con resultados de búsqueda de entalles */}
+              {isEntalleDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsEntalleDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 mt-1.5 bg-white border border-amber-200 rounded-2xl shadow-2xl z-40 max-h-72 overflow-y-auto divide-y divide-gray-100">
+                    {filteredEntalles.length > 0 ? (
+                      filteredEntalles.map(ent => (
+                        <button
+                          key={ent.id || ent.name}
+                          type="button"
+                          onClick={() => handleSelectEntalle(ent.name)}
+                          className={`w-full text-left px-4 py-3 hover:bg-amber-50/80 transition flex items-center justify-between gap-3 group ${
+                            selectedEntalleName.toUpperCase() === ent.name.toUpperCase() ? 'bg-amber-100/50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-200 shrink-0">
+                              {ent.code || 'ENT-000'}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-slate-900 uppercase group-hover:text-amber-900">
+                                  {ent.name}
+                                </span>
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  {ent.cinturaType}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                Tela: {ent.tela || 'DENIM'} • Tipo: {ent.tipoTela || 'CONFORT'} • Cintura: {ent.cintura || '-'} • Cadera: {ent.cadera || '-'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            {ent.isCustomCode ? (
+                              <span className="text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                UDP
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
+                                Defecto
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-slate-500 font-medium">
+                        No se encontró ningún entalle oficial con el código o nombre "{entalleSearch}".
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Selector Directo desplegable alternativo */}
+            <div className="relative">
+              <select
+                value={selectedEntalleName}
+                onChange={e => handleSelectEntalle(e.target.value)}
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition text-xs shadow-sm cursor-pointer"
+              >
+                <option value="">-- O selecciona directamente de la lista de entalles oficiales --</option>
+                {officialEntalles.map(ent => (
+                  <option key={ent.id || ent.name} value={ent.name}>
+                    [{ent.code || 'ENT-000'}] {ent.name} • {ent.cinturaType} ({ent.isCustomCode ? 'Puesto x área UDP' : 'Puesto x defecto'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Preview Card of Measurements */}
+            {selectedEntalleObj && (
+              <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-xs font-black text-gray-900 uppercase">
+                      {selectedEntalleObj.name}
+                    </span>
+                    <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      {selectedEntalleObj.code || 'ENT-000'}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700">
+                      ({selectedEntalleObj.cinturaType})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedEntalleObj.isCustomCode ? (
+                      <span className="text-[9.5px] font-black text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5 text-emerald-600" />
+                        Código de entalle puesto x el área UDP
+                      </span>
+                    ) : (
+                      <span className="text-[9.5px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        Código de entalle puesto x defecto
+                      </span>
+                    )}
+                    <span className="text-[10px] font-bold text-gray-400 font-mono">
+                      Base: Talla {selectedEntalleObj.baseSize || '32'} • {selectedEntalleObj.tela} ({selectedEntalleObj.tipoTela})
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Cintura</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.cintura || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Cadera</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.cadera || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Muslo</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.muslo || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Rodilla</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.rodilla || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Botapie</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.botaPie || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">T.Delt.</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.tiroDel || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">T.Espd.</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.tiroPos || '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">Largo</p>
+                    <p className="text-xs font-black text-slate-900 mt-0.5">{selectedEntalleObj.largoTotal || '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* FICHA TÉCNICA */}
