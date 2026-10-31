@@ -165,7 +165,15 @@ export class SalesService {
     return sale;
   }
 
-  private calculatePaymentStatus(totalAmount: number, payments: any[]): 'CANCELADO' | 'PARCIAL' | 'PENDIENTE' {
+  private calculatePaymentStatus(totalAmount: number, payments: any[], sale?: any): 'CANCELADO' | 'PARCIAL' | 'PENDIENTE' {
+    // Si la venta está asociada a un grupo de letras (canje de letras) y no está rechazado:
+    if (sale?.letraGroupId || sale?.letraGroup) {
+      const groupStatus = sale.letraGroup?.status;
+      if (groupStatus !== 'RECHAZADO') {
+        return 'CANCELADO';
+      }
+    }
+
     const totalPaid = (payments || [])
       .filter(p => p.status === 'APROBADO' || p.status === 'CONCILIADO')
       .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
@@ -211,6 +219,15 @@ export class SalesService {
       include: {
         client: true,
         seller: { select: { name: true, zone: true } },
+        letraGroup: {
+          select: {
+            id: true,
+            status: true,
+            totalSalesAmount: true,
+            totalLetrasAmount: true,
+            pendingBalance: true
+          }
+        },
         payments: {
           include: {
             letraDetails: true
@@ -229,7 +246,7 @@ export class SalesService {
 
     const outOfSyncItems: { id: string; status: string }[] = [];
     const reconciledSales = sales.map(sale => {
-      const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments);
+      const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments, sale);
       if (correctStatus !== sale.paymentStatus) {
         outOfSyncItems.push({ id: sale.id, status: correctStatus });
         return { ...sale, paymentStatus: correctStatus };
@@ -257,6 +274,15 @@ export class SalesService {
       include: {
         client: true,
         seller: { select: { name: true, zone: true } },
+        letraGroup: {
+          select: {
+            id: true,
+            status: true,
+            totalSalesAmount: true,
+            totalLetrasAmount: true,
+            pendingBalance: true
+          }
+        },
         payments: {
           include: {
             letraDetails: true
@@ -274,7 +300,7 @@ export class SalesService {
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
 
-    const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments);
+    const correctStatus = this.calculatePaymentStatus(sale.totalAmount, sale.payments, sale);
     if (correctStatus !== sale.paymentStatus) {
       sale.paymentStatus = correctStatus;
       this.prisma.sale.update({
@@ -586,7 +612,7 @@ export class SalesService {
           where: { saleId }
         });
 
-        const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
+        const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments, sale);
 
         await tx.sale.update({
           where: { id: saleId },
@@ -768,7 +794,7 @@ export class SalesService {
         where: { saleId: sale.id }
       });
 
-      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, remainingPayments);
+      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, remainingPayments, sale);
 
       await tx.sale.update({
         where: { id: sale.id },
@@ -918,7 +944,7 @@ export class SalesService {
         where: { saleId: payment.saleId }
       });
 
-      const paymentStatus = this.calculatePaymentStatus(payment.sale.totalAmount, allPayments);
+      const paymentStatus = this.calculatePaymentStatus(payment.sale.totalAmount, allPayments, payment.sale);
 
       await tx.sale.update({
         where: { id: payment.saleId },
@@ -2588,13 +2614,13 @@ export class SalesService {
         }
       });
 
-      // Link sales and if approved, mark them as CANCELADO
+      // Link sales and mark them as CANCELADO
       for (const saleId of saleIds) {
         await tx.sale.update({
           where: { id: saleId },
           data: {
             letraGroupId: group.id,
-            paymentStatus: status === 'APROBADO' ? 'CANCELADO' : undefined
+            paymentStatus: 'CANCELADO'
           }
         });
       }
@@ -2650,7 +2676,8 @@ export class SalesService {
 
   async rejectLetraGroup(groupId: string) {
     const group = await this.prisma.letraGroup.findUnique({
-      where: { id: groupId }
+      where: { id: groupId },
+      include: { sales: true }
     });
 
     if (!group) throw new NotFoundException('Lote de letras no encontrado');
@@ -2658,9 +2685,22 @@ export class SalesService {
       throw new BadRequestException('El lote ya ha sido procesado');
     }
 
-    return this.prisma.letraGroup.update({
-      where: { id: groupId },
-      data: { status: 'RECHAZADO' }
+    return await this.prisma.$transaction(async (tx) => {
+      // Unlink sales and restore paymentStatus if rejected
+      for (const sale of (group.sales || [])) {
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: {
+            letraGroupId: null,
+            paymentStatus: 'PENDIENTE'
+          }
+        });
+      }
+
+      return tx.letraGroup.update({
+        where: { id: groupId },
+        data: { status: 'RECHAZADO' }
+      });
     });
   }
 

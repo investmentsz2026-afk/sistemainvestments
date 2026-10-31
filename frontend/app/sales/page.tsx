@@ -100,6 +100,12 @@ export default function SalesPage() {
     };
 
     const getSalePaymentStatus = (sale: any) => {
+        if (sale.letraGroupId || sale.letraGroup) {
+            const groupStatus = sale.letraGroup?.status;
+            if (groupStatus !== 'RECHAZADO') {
+                return 'CANCELADO';
+            }
+        }
         const approvedPayments = (sale.payments || []).filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO');
         const totalPaid = approvedPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
         const isPaidFull = sale.paymentStatus === 'CANCELADO' || (sale.totalAmount > 0 && (sale.totalAmount - totalPaid) <= 0.01 && totalPaid > 0);
@@ -165,6 +171,12 @@ export default function SalesPage() {
     const totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
 
     const calcPendingToCollect = (sale: any) => {
+        if (sale.letraGroupId || sale.letraGroup) {
+            const groupStatus = sale.letraGroup?.status;
+            if (groupStatus !== 'RECHAZADO') {
+                return 0;
+            }
+        }
         const totalPaid = (sale.payments || [])
             .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
             .reduce((acc: number, p: any) => acc + p.amount, 0);
@@ -653,13 +665,21 @@ export default function SalesPage() {
                                             <td className="px-4 py-4">
                                                 {(() => {
                                                     const status = getSalePaymentStatus(sale);
+                                                    const isLetra = Boolean(sale.letraGroupId || sale.letraGroup);
                                                     return (
-                                                        <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
-                                                            status === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                            status === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'
-                                                        }`}>
-                                                            {status}
-                                                        </span>
+                                                        <div className="flex flex-col gap-0.5 items-start">
+                                                            <span className={`px-2 py-1 rounded border text-[9px] font-black uppercase tracking-widest ${
+                                                                status === 'CANCELADO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                                status === 'PARCIAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                            }`}>
+                                                                {status}
+                                                            </span>
+                                                            {isLetra && (
+                                                                <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 tracking-wider">
+                                                                    EN LETRAS
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     );
                                                 })()}
                                             </td>

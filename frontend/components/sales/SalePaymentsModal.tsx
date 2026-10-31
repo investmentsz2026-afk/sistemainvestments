@@ -744,7 +744,8 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const totalPending = sale?.payments?.filter((p: any) => p.status === 'PENDIENTE').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
     const pendingAmount = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
     const pendingAmountWithPending = Math.round((pendingAmount - totalPending) * 100) / 100;
-    const isCompleted = sale?.paymentStatus === 'CANCELADO' || (sale && pendingAmount <= 0.01 && totalPaid > 0);
+    const isLetraRefinanced = Boolean(sale?.letraGroupId || sale?.letraGroup);
+    const isCompleted = sale?.paymentStatus === 'CANCELADO' || isLetraRefinanced || (sale && pendingAmount <= 0.01 && totalPaid > 0);
 
     const currentFormOtherPayments = (sale?.payments || []).filter((p: any) => 
         (!editingPaymentId || p.id !== editingPaymentId) && 
@@ -847,6 +848,21 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                             </div>
                         ) : (
                             <div className="max-w-xl mx-auto space-y-6">
+                                {isLetraRefinanced && (
+                                    <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200/60 flex items-start gap-3 shadow-sm">
+                                        <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-200 flex-shrink-0">
+                                            <Wallet className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider">
+                                                Venta Liquidada mediante Canje de Letras
+                                            </h4>
+                                            <p className="text-[11px] font-bold text-indigo-700 mt-0.5 leading-relaxed">
+                                                Esta factura está asociada a un canje de letras en el módulo <span className="underline font-black">Letras</span>. Por ello, figura como <b className="text-emerald-700 uppercase">CANCELADA</b> en Ventas y su cobranza se gestiona en dicho módulo.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                                 {/* SECTION TITLE */}
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 border-l-2 border-indigo-500 pl-3">Abonos Realizados</h3>
