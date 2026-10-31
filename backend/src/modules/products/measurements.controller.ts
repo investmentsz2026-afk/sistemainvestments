@@ -23,6 +23,23 @@ export class MeasurementsController {
     return this.measurementsService.deleteOfficialEntalle(name);
   }
 
+
+  @Get('competition-measurements')
+  async getCompetitionMeasurements() {
+    return this.measurementsService.getCompetitionMeasurements();
+  }
+
+  @Post('competition-measurements')
+  async saveCompetitionMeasurements(@Body() body: any) {
+    const list = Array.isArray(body) ? body : (body.measurements || [body]);
+    return this.measurementsService.saveCompetitionMeasurementsBulk(list);
+  }
+
+  @Delete('competition-measurements/:id')
+  async deleteCompetitionMeasurement(@Param('id') id: string) {
+    return this.measurementsService.deleteCompetitionMeasurement(id);
+  }
+
   @Get()
   async getMeasurements(
     @Query('productId') productId?: string,

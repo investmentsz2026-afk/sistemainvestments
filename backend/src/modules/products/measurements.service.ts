@@ -159,6 +159,90 @@ export const DEFAULT_OFFICIAL_ENTALLES = [
   },
 ];
 
+
+export const DEFAULT_COMPETITION_MEASUREMENTS = [
+  {
+    competitor: 'ZARA',
+    name: 'SLIM FIT DENIM',
+    code: 'CMP-001',
+    isCustomCode: false,
+    cinturaType: 'CINTURA SLIM',
+    cintura: '16 3/4 "',
+    cadera: '20 1/4 "',
+    muslo: '12 1/4 "',
+    rodilla: '8 1/2 "',
+    botaPie: '7 1/4" (18.5 Cm)',
+    tiroDel: '11 "',
+    tiroPos: '15 "',
+    largoTotal: '31 "',
+    tela: 'DENIM',
+    tipoTela: 'CONFORT',
+    baseSize: '32',
+    notes: 'Prenda referencial Zara Mall del Sur, 98% algodón 2% elastano',
+    priceRef: '149.00',
+  },
+  {
+    competitor: 'H&M',
+    name: 'REGULAR JEANS',
+    code: 'CMP-002',
+    isCustomCode: false,
+    cinturaType: 'CINTURA STRAIGHT',
+    cintura: '17 "',
+    cadera: '20 3/4 "',
+    muslo: '12 3/4 "',
+    rodilla: '9 1/2 "',
+    botaPie: '7 5/8" (19,5 Cm)',
+    tiroDel: '12 "',
+    tiroPos: '15 1/2 "',
+    largoTotal: '31 1/2 "',
+    tela: 'DENIM',
+    tipoTela: 'RIGIDO',
+    baseSize: '32',
+    notes: 'Denim rígido 100% algodón',
+    priceRef: '119.00',
+  },
+  {
+    competitor: 'PIONIER',
+    name: 'ROLEX CONFORT',
+    code: 'CMP-003',
+    isCustomCode: false,
+    cinturaType: 'CINTURA RECTO',
+    cintura: '16 3/4 "',
+    cadera: '20 3/8 "',
+    muslo: '12 1/4 "',
+    rodilla: '9 "',
+    botaPie: '7 5/8" (19,5 Cm)',
+    tiroDel: '11 "',
+    tiroPos: '15 "',
+    largoTotal: '31 1/2 "',
+    tela: 'DRILL',
+    tipoTela: 'CONFORT',
+    baseSize: '32',
+    notes: 'Tiro medio clásico, pretina anatómica',
+    priceRef: '139.00',
+  },
+  {
+    competitor: 'TOPITOP',
+    name: 'BASIC STRAIGHT',
+    code: 'CMP-004',
+    isCustomCode: false,
+    cinturaType: 'CINTURA STRAIGHT',
+    cintura: '16 3/4 "',
+    cadera: '20 1/2 "',
+    muslo: '12 3/8 "',
+    rodilla: '9 1/4 "',
+    botaPie: '7 1/2 "',
+    tiroDel: '11 1/2"',
+    tiroPos: '15 1/4 "',
+    largoTotal: '31 "',
+    tela: 'DENIM',
+    tipoTela: 'CONFORT',
+    baseSize: '32',
+    notes: 'Prenda clásica comercial',
+    priceRef: '99.00',
+  },
+];
+
 @Injectable()
 export class MeasurementsService {
   constructor(private prisma: PrismaService) {}
@@ -337,6 +421,187 @@ export class MeasurementsService {
       }
     } catch (e) {
       console.error('Error updating official-entalles.json after delete:', e);
+    }
+
+    return { success: true };
+  }
+
+
+  private getCompetitionStorageFilePath() {
+    const dir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return path.join(dir, 'competition-measurements.json');
+  }
+
+  async getCompetitionMeasurements() {
+    // 1. DB
+    try {
+      const records = await this.prisma.productMeasurement.findMany({
+        where: { stage: 'SPEC_COMPETENCIA' },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (records && records.length > 0) {
+        return records.map((r, idx) => {
+          let extra: any = {};
+          try {
+            if (r.color && (r.color.startsWith('{') || r.color.startsWith('['))) {
+              extra = JSON.parse(r.color);
+            }
+          } catch (e) {}
+
+          const fallbackCode = `CMP-${String(idx + 1).padStart(3, '0')}`;
+          const code = extra.code || fallbackCode;
+          const isCustomCode = extra.isCustomCode === true;
+
+          return {
+            id: r.id,
+            competitor: extra.competitor || 'COMPETENCIA',
+            name: r.op || 'SIN_NOMBRE',
+            code,
+            isCustomCode,
+            cinturaType: extra.cinturaType || 'CINTURA SLIM',
+            cintura: r.cintura || '',
+            cadera: r.cadera || '',
+            muslo: r.muslo || '',
+            rodilla: r.rodilla || '',
+            botaPie: r.botaPie || '',
+            tiroDel: r.tiroDel || '',
+            tiroPos: r.tiroPos || '',
+            largoTotal: r.largoTotal || '',
+            tela: extra.tela || 'DENIM',
+            tipoTela: extra.tipoTela || 'CONFORT',
+            baseSize: r.size || '32',
+            notes: extra.notes || '',
+            priceRef: extra.priceRef || '',
+            updatedAt: r.updatedAt,
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Could not query ProductMeasurement for SPEC_COMPETENCIA, checking file:', e);
+    }
+
+    // 2. File fallback
+    try {
+      const filePath = this.getCompetitionStorageFilePath();
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item, idx) => ({
+            ...item,
+            code: item.code || `CMP-${String(idx + 1).padStart(3, '0')}`,
+            isCustomCode: item.isCustomCode === true,
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading competition-measurements.json:', e);
+    }
+
+    // 3. Default Seed
+    const defaultList = DEFAULT_COMPETITION_MEASUREMENTS.map((d, idx) => ({
+      id: `seed-cmp-${idx + 1}`,
+      ...d,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    this.saveCompetitionMeasurementsBulk(defaultList).catch(() => {});
+    return defaultList;
+  }
+
+  async saveCompetitionMeasurementsBulk(measurements) {
+    // 1. Save to JSON backup file
+    try {
+      const filePath = this.getCompetitionStorageFilePath();
+      fs.writeFileSync(filePath, JSON.stringify(measurements, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('Error saving to competition-measurements.json:', e);
+    }
+
+    // 2. Persist in ProductMeasurement
+    try {
+      await this.prisma.productMeasurement.deleteMany({
+        where: { stage: 'SPEC_COMPETENCIA' },
+      });
+
+      for (let i = 0; i < measurements.length; i++) {
+        const item = measurements[i];
+        if (!item.name && !item.competitor) continue;
+        const code = item.code || `CMP-${String(i + 1).padStart(3, '0')}`;
+        const isCustomCode = item.isCustomCode === true;
+
+        const extraJson = JSON.stringify({
+          competitor: (item.competitor || 'COMPETENCIA').trim().toUpperCase(),
+          cinturaType: item.cinturaType || 'CINTURA SLIM',
+          tela: item.tela || 'DENIM',
+          tipoTela: item.tipoTela || 'CONFORT',
+          code,
+          isCustomCode,
+          notes: item.notes || '',
+          priceRef: item.priceRef || '',
+        });
+
+        await this.prisma.productMeasurement.create({
+          data: {
+            op: item.name || `MOD-${i + 1}`,
+            stage: 'SPEC_COMPETENCIA',
+            size: item.baseSize || '32',
+            color: extraJson,
+            cintura: item.cintura || null,
+            cadera: item.cadera || null,
+            muslo: item.muslo || null,
+            rodilla: item.rodilla || null,
+            botaPie: item.botaPie || null,
+            tiroDel: item.tiroDel || null,
+            tiroPos: item.tiroPos || null,
+            largoTotal: item.largoTotal || null,
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('Could not persist competition measurements to ProductMeasurement table:', e);
+    }
+
+    return measurements;
+  }
+
+  async deleteCompetitionMeasurement(idOrName) {
+    try {
+      await this.prisma.productMeasurement.deleteMany({
+        where: {
+          stage: 'SPEC_COMPETENCIA',
+          OR: [
+            { id: idOrName },
+            { op: idOrName },
+          ],
+        },
+      });
+    } catch (e) {
+      console.warn('Could not delete competition measurement from ProductMeasurement table:', e);
+    }
+
+    try {
+      const filePath = this.getCompetitionStorageFilePath();
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const updated = parsed.filter(
+            (item) =>
+              item.id !== idOrName &&
+              item.name !== idOrName &&
+              item.code !== idOrName
+          );
+          fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8');
+          return updated;
+        }
+      }
+    } catch (e) {
+      console.error('Error updating competition-measurements.json after delete:', e);
     }
 
     return { success: true };

@@ -11,10 +11,12 @@ import {
   Trash2, 
   Tag, 
   Info,
-  ChevronDown
+  ChevronDown,
+  Building2
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { OfficialEntallesModal } from '../../../components/samples/OfficialEntallesModal';
+import { CompetitionMeasurementsModal } from '../../../components/samples/CompetitionMeasurementsModal';
 
 interface ColumnType {
   id: string; // unique, e.g. "OP-02|Camello"
@@ -165,6 +167,7 @@ export default function MeasurementsPage() {
   const [matrix, setMatrix] = useState<Record<string, Record<string, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showEntallesModal, setShowEntallesModal] = useState(false);
+  const [showCompetitionModal, setShowCompetitionModal] = useState(false);
 
   // Load items
   useEffect(() => {
@@ -521,17 +524,26 @@ export default function MeasurementsPage() {
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/20 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
           {/* Inventory Type Select */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Tipo de Inventario</label>
-              {inventoryType === 'TERMINADOS' && (
+              <div className="flex items-center gap-2">
+                {inventoryType === 'TERMINADOS' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEntallesModal(true)}
+                    className="px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-200 transition active:scale-95"
+                  >
+                    <Ruler className="w-3.5 h-3.5" /> Entalles Oficiales
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setShowEntallesModal(true)}
-                  className="px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-200 transition active:scale-95"
+                  onClick={() => setShowCompetitionModal(true)}
+                  className="px-3 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-indigo-200 transition active:scale-95"
                 >
-                  <Ruler className="w-3.5 h-3.5" /> Entalles Oficiales
+                  <Building2 className="w-3.5 h-3.5" /> Medidas de la Competencia
                 </button>
-              )}
+              </div>
             </div>
             <select
               className="w-full p-4 bg-gray-50 border-none rounded-2xl font-bold outline-none ring-2 ring-transparent focus:ring-indigo-500 transition shadow-sm"
@@ -880,6 +892,12 @@ export default function MeasurementsPage() {
         onSaved={() => {
           fetchItems();
         }}
+      />
+
+      {/* Competition Measurements Modal */}
+      <CompetitionMeasurementsModal
+        isOpen={showCompetitionModal}
+        onClose={() => setShowCompetitionModal(false)}
       />
     </Layout>
   );
