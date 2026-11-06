@@ -186,7 +186,7 @@ const getProductSchema = (isEditing: boolean) => z.object({
   }
 
   // Validar precio de compra solo si es material/maquinaria o tiene OP/compra
-  if (showPrices && (!data.purchasePrice || data.purchasePrice < 0.01)) {
+  if (showPrices && (!data.purchasePrice || data.purchasePrice <= 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: isMaterialOrMachinery ? 'El precio de compra debe ser mayor a 0' : 'El costo de producción debe ser mayor a 0',
@@ -1262,7 +1262,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     {...register('purchasePrice', { valueAsNumber: true })}
                     className={`${inputBase} pl-10 ${errors.purchasePrice ? inputError : inputNormal}`}
                     placeholder="0.00"
@@ -1287,7 +1287,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="any"
                       {...register('sellingPrice', { valueAsNumber: true })}
                       className={`${inputBase} pl-10 ${errors.sellingPrice ? inputError : inputNormal}`}
                       placeholder="0.00"
@@ -1313,7 +1313,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">S/</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="any"
                       {...register('realPrice', { valueAsNumber: true })}
                       className={`${inputBase} pl-10 ${errors.realPrice ? inputError : inputNormal}`}
                       placeholder="0.00"

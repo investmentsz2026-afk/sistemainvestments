@@ -168,7 +168,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="bg-gray-50 rounded-lg p-2">
             <p className="text-xs text-gray-500">{isMaterialOrMachinery ? 'Costo Unit.' : 'Precio Venta'}</p>
             <p className="text-lg font-bold text-gray-900">
-              S/ {(isMaterialOrMachinery ? product.purchasePrice : (product.sellingPrice || product.purchasePrice || 0)).toFixed(2)}
+              S/ {(() => {
+                const val = Number(isMaterialOrMachinery ? product.purchasePrice : (product.sellingPrice || product.purchasePrice || 0));
+                return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+              })()}
             </p>
           </div>
         </div>
