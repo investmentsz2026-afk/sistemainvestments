@@ -16,11 +16,13 @@ import {
     Camera,
     ClipboardList,
     Beaker,
-    Trash2
+    Trash2,
+    Printer
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { SampleBarcodeModal } from '../../components/samples/SampleBarcodeModal';
 
 export default function SamplesPage() {
     const { user } = useAuth();
@@ -29,6 +31,7 @@ export default function SamplesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [selectedStickerSample, setSelectedStickerSample] = useState<any>(null);
 
     useEffect(() => {
         fetchSamples();
@@ -251,6 +254,18 @@ export default function SamplesPage() {
                                             <>Ver Detalles <Eye className="w-4 h-4" /></>
                                         )}
                                     </Link>
+                                    <button
+                                        type="button"
+                                        title="Imprimir Sticker de Muestra"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setSelectedStickerSample(sample);
+                                        }}
+                                        className="p-4 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-2xl transition shadow-sm active:scale-90"
+                                    >
+                                        <Printer className="w-4 h-4" />
+                                    </button>
                                     {(user?.role === 'COMERCIAL' || user?.role === 'UDP' || user?.role === 'ADMIN') && (
                                         <button
                                             type="button"
@@ -268,6 +283,14 @@ export default function SamplesPage() {
                     )}
                 </div>
             </div>
+
+            {/* MODAL IMPRIMIR STICKER DE MUESTRA */}
+            {selectedStickerSample && (
+                <SampleBarcodeModal
+                    sample={selectedStickerSample}
+                    onClose={() => setSelectedStickerSample(null)}
+                />
+            )}
         </Layout>
     );
 }

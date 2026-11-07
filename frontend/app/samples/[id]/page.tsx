@@ -801,6 +801,16 @@ export default function SampleDetailPage() {
                             <Ruler className="w-4 h-4 text-indigo-500" /> Ver Medidas
                         </button>
 
+                        {/* PRINT SAMPLE STICKER BUTTON */}
+                        <button
+                            type="button"
+                            onClick={() => setShowSampleStickerModal(true)}
+                            className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-wider text-gray-700 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition active:scale-95"
+                            title="Imprimir Sticker oficial de la muestra con su Código de Muestra"
+                        >
+                            <Printer className="w-4 h-4 text-indigo-500" /> Sticker de Muestra
+                        </button>
+
                         {/* PRINT OP BARCODE BUTTON */}
                         {sample.op && sample.barcode && (
                             <button
