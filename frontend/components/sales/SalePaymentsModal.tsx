@@ -205,11 +205,22 @@ const getCreditNoteVoucherHTML = (payment: any, sale: any) => {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td style="text-align: center; font-weight: 700;">1</td>
-                        <td style="font-weight: 500;">${motiveDesc.toUpperCase()}</td>
-                        <td style="text-align: right; font-weight: 700;">S/ ${subtotal.toFixed(2)}</td>
-                    </tr>
+                    ${Array.isArray(sale.items) && sale.items.length > 0 && (payment.creditNoteMotive === '6' || payment.creditNoteMotive === '7')
+                        ? sale.items.map((it: any) => `
+                            <tr>
+                                <td style="text-align: center; font-weight: 700;">${it.quantity}</td>
+                                <td style="font-weight: 500;">${(it.variant?.product?.name || 'PRENDA').toUpperCase()} (${(it.variant?.size || 'ST').toUpperCase()}/${(it.variant?.color || 'UNICO').toUpperCase()})</td>
+                                <td style="text-align: right; font-weight: 700;">S/ ${(it.unitPrice / 1.18).toFixed(2)}</td>
+                            </tr>
+                        `).join('')
+                        : `
+                            <tr>
+                                <td style="text-align: center; font-weight: 700;">1</td>
+                                <td style="font-weight: 500;">${motiveDesc.toUpperCase()}</td>
+                                <td style="text-align: right; font-weight: 700;">S/ ${subtotal.toFixed(2)}</td>
+                            </tr>
+                        `
+                    }
                 </tbody>
             </table>
 
@@ -996,9 +1007,9 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 target="_blank" 
                                                                 rel="noopener noreferrer"
                                                                 className="w-10 h-10 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-100 rounded-xl transition-all flex items-center justify-center shadow-sm"
-                                                                title="Ver Nota de Crédito SUNAT"
+                                                                title="Ver Nota de Crédito Oficial SUNAT (PDF)"
                                                             >
-                                                                <HelpCircle className="w-4 h-4" />
+                                                                <FileText className="w-4 h-4" />
                                                             </a>
                                                         )}
                                                         {payment.method !== 'LIQUIDACION' && (

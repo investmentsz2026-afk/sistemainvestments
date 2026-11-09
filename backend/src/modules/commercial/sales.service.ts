@@ -554,7 +554,8 @@ export class SalesService {
           paymentData.status = 'APROBADO';
           if (isElecCN) {
             // Generate in Nubefact immediately
-            const sunatResult = await this.sendCreditNoteToSunat(tx, saleId, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito');
+            const targetReturnId = returnRequestId || data.returnRequestId;
+            const sunatResult = await this.sendCreditNoteToSunat(tx, saleId, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito', targetReturnId);
             paymentData.creditNoteNumber = sunatResult.creditNoteNumber;
             paymentData.sunatStatus = sunatResult.sunatStatus;
             paymentData.sunatResponse = sunatResult.sunatResponse;
@@ -712,7 +713,15 @@ export class SalesService {
         } else {
           paymentData.status = 'APROBADO';
           if (isElecCN) {
-            const sunatResult = await this.sendCreditNoteToSunat(tx, sale.id, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito');
+            const devMatch = (notes || payment.notes || '')?.match(/DEV-\d+/i);
+            let targetReturnId: string | undefined = undefined;
+            if (devMatch) {
+              const foundRet = await tx.returnRequest.findFirst({
+                where: { returnNumber: devMatch[0].toUpperCase() }
+              });
+              if (foundRet) targetReturnId = foundRet.id;
+            }
+            const sunatResult = await this.sendCreditNoteToSunat(tx, sale.id, parseFloat(amount), creditNoteMotive, notes || 'Nota de crédito', targetReturnId);
             paymentData.creditNoteNumber = sunatResult.creditNoteNumber;
             paymentData.sunatStatus = sunatResult.sunatStatus;
             paymentData.sunatResponse = sunatResult.sunatResponse;
@@ -766,19 +775,39 @@ export class SalesService {
 
       if (payment.method === 'NOTA_CREDITO') {
         try {
+          const devMatch = (payment.notes || '').match(/DEV-\d+/i);
+          const devNumber = devMatch ? devMatch[0].toUpperCase() : null;
+
           const returnsWithThisPayment = await tx.returnRequest.findMany({
             where: {
-              reason: { contains: paymentId }
+              OR: [
+                { reason: { contains: paymentId } },
+                ...(payment.creditNoteNumber ? [{ reason: { contains: payment.creditNoteNumber } }] : []),
+                ...(devNumber ? [{ returnNumber: devNumber }] : [])
+              ]
             }
           });
           for (const ret of returnsWithThisPayment) {
-            const cleanedReason = ret.reason
-              .replace(new RegExp(`\\s*\\[NC:[^\\]]+\\]\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'g'), '')
-              .replace(new RegExp(`\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'g'), '')
+            let cleanedReason = ret.reason
+              .replace(new RegExp(`\\s*\\[NC:[^\\]]+\\]\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'gi'), '')
+              .replace(new RegExp(`\\s*\\[NC_PAYMENT_ID:\\s*${paymentId}\\]`, 'gi'), '')
+              .replace(new RegExp(`\\s*\\[NC:[^\\]]+\\]`, 'gi'), '')
               .trim();
+
+            let cleanedQualityObs = ret.qualityObservations || '';
+            if (payment.creditNoteNumber) {
+              cleanedQualityObs = cleanedQualityObs
+                .replace(new RegExp(`\\s*•?\\s*Nota de Crédito generada:\\s*${payment.creditNoteNumber}[^•]*`, 'gi'), '')
+                .replace(new RegExp(`\\s*\\[NC:[^\\]]+\\]`, 'gi'), '')
+                .trim();
+            }
+
             await tx.returnRequest.update({
               where: { id: ret.id },
-              data: { reason: cleanedReason }
+              data: {
+                reason: cleanedReason,
+                qualityObservations: cleanedQualityObs || null
+              }
             });
           }
         } catch (e) {
@@ -1048,10 +1077,19 @@ export class SalesService {
     });
   }
 
-  async sendCreditNoteToSunat(tx: any, saleId: string, amount: number, motiveCode: string, sustentoText: string) {
+  async sendCreditNoteToSunat(tx: any, saleId: string, amount: number, motiveCode: string, sustentoText: string, returnRequestId?: string) {
     const sale = await tx.sale.findUnique({
       where: { id: saleId },
-      include: { client: true }
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: {
+              include: { product: true }
+            }
+          }
+        }
+      }
     });
 
     if (!sale) throw new NotFoundException('Venta no encontrada');
@@ -1089,11 +1127,6 @@ export class SalesService {
       data: { nextNumber: number + 1 }
     });
 
-    // Calculate subtotal and IGV for the credit note amount
-    const total = parseFloat(amount.toFixed(2));
-    const subtotal = parseFloat((total / 1.18).toFixed(2));
-    const igv = parseFloat((total - subtotal).toFixed(2));
-
     const getFormattedDate = (d: Date) => {
       const formatter = new Intl.DateTimeFormat('es-PE', {
         timeZone: 'America/Lima',
@@ -1109,6 +1142,161 @@ export class SalesService {
     };
 
     const fechaEmision = getFormattedDate(new Date());
+
+    // Size map for return request item breakdown
+    const sizeMap: Record<string, string> = {
+      s28: '28', m30: '30', l32: '32', xl34: '34', xxl36: '36',
+      size38: '38', size40: '40', size42: '42', size44: '44', size46: '46', size48: '48', size50: '50', size52: '52',
+    };
+
+    let targetReturn: any = null;
+    if (returnRequestId) {
+      targetReturn = await tx.returnRequest.findUnique({
+        where: { id: returnRequestId },
+        include: { items: true }
+      });
+    } else {
+      const devMatch = (sustentoText || '').match(/DEV-\d+/i);
+      if (devMatch) {
+        targetReturn = await tx.returnRequest.findFirst({
+          where: { returnNumber: devMatch[0].toUpperCase() },
+          include: { items: true }
+        });
+      }
+    }
+
+    let cnItems: any[] = [];
+
+    if (targetReturn && Array.isArray(targetReturn.items) && targetReturn.items.length > 0) {
+      for (const item of targetReturn.items) {
+        // Find matching item in sale to get unitPrice
+        const matchingSaleItem = (sale.items || []).find((si: any) => {
+          const prodName = si.variant?.product?.name || '';
+          const sameModel = prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
+          const sameColor = (si.variant?.color || '').trim().toUpperCase() === item.color.trim().toUpperCase();
+          return sameModel && sameColor;
+        }) || (sale.items || []).find((si: any) => {
+          const prodName = si.variant?.product?.name || '';
+          return prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
+        });
+
+        let unitPrice = matchingSaleItem ? Number(matchingSaleItem.unitPrice) : 0;
+        if (!unitPrice || unitPrice <= 0) {
+          const totalSaleQty = (sale.items || []).reduce((s: number, it: any) => s + (it.quantity || 0), 0);
+          unitPrice = totalSaleQty > 0 ? (sale.totalAmount / totalSaleQty) : 0;
+        }
+        unitPrice = Math.round(unitPrice * 100) / 100;
+
+        const sizesList: { size: string; quantity: number }[] = [];
+        for (const [field, sizeLabel] of Object.entries(sizeMap)) {
+          const q = (item as any)[field] || 0;
+          if (q > 0) {
+            sizesList.push({ size: sizeLabel, quantity: q });
+          }
+        }
+
+        if (sizesList.length > 0) {
+          for (const s of sizesList) {
+            const lineQty = s.quantity;
+            const lineTotal = parseFloat((lineQty * unitPrice).toFixed(2));
+            const lineSubtotal = parseFloat((lineTotal / 1.18).toFixed(2));
+            const lineIgv = parseFloat((lineTotal - lineSubtotal).toFixed(2));
+            const lineValorUnit = parseFloat((unitPrice / 1.18).toFixed(2));
+
+            cnItems.push({
+              unidad_de_medida: "NIU",
+              codigo: "",
+              descripcion: `${item.modelName} (${s.size}/${item.color})`.toUpperCase(),
+              cantidad: lineQty,
+              valor_unitario: lineValorUnit,
+              precio_unitario: parseFloat(unitPrice.toFixed(2)),
+              subtotal: lineSubtotal,
+              tipo_de_igv: 1,
+              igv: lineIgv,
+              total: lineTotal,
+              anticipo_regularizacion: false,
+              anticipo_documento_serie: null,
+              anticipo_documento_numero: null
+            });
+          }
+        } else {
+          const lineQty = item.quantity || 1;
+          const lineTotal = parseFloat((lineQty * unitPrice).toFixed(2));
+          const lineSubtotal = parseFloat((lineTotal / 1.18).toFixed(2));
+          const lineIgv = parseFloat((lineTotal - lineSubtotal).toFixed(2));
+          const lineValorUnit = parseFloat((unitPrice / 1.18).toFixed(2));
+
+          cnItems.push({
+            unidad_de_medida: "NIU",
+            codigo: "",
+            descripcion: `${item.modelName} (${item.color})`.toUpperCase(),
+            cantidad: lineQty,
+            valor_unitario: lineValorUnit,
+            precio_unitario: parseFloat(unitPrice.toFixed(2)),
+            subtotal: lineSubtotal,
+            tipo_de_igv: 1,
+            igv: lineIgv,
+            total: lineTotal,
+            anticipo_regularizacion: false,
+            anticipo_documento_serie: null,
+            anticipo_documento_numero: null
+          });
+        }
+      }
+    } else if (motiveCode === '6' && Array.isArray(sale.items) && sale.items.length > 0) {
+      // Devolución total without specific return request: return all items from sale
+      for (const item of sale.items) {
+        const itemTotal = parseFloat((item.totalPrice).toFixed(2));
+        const itemSubtotal = parseFloat((itemTotal / 1.18).toFixed(2));
+        const itemIgv = parseFloat((itemTotal - itemSubtotal).toFixed(2));
+        const itemValorUnit = parseFloat((item.unitPrice / 1.18).toFixed(2));
+
+        cnItems.push({
+          unidad_de_medida: "NIU",
+          codigo: "",
+          descripcion: `${item.variant?.product?.name || 'PRENDA'} (${item.variant?.size || 'ST'}/${item.variant?.color || 'UNICO'})`.toUpperCase(),
+          cantidad: item.quantity,
+          valor_unitario: itemValorUnit,
+          precio_unitario: parseFloat(item.unitPrice.toFixed(2)),
+          subtotal: itemSubtotal,
+          tipo_de_igv: 1,
+          igv: itemIgv,
+          total: itemTotal,
+          anticipo_regularizacion: false,
+          anticipo_documento_serie: null,
+          anticipo_documento_numero: null
+        });
+      }
+    } else {
+      // Financial discount / others
+      const itemTotal = parseFloat(amount.toFixed(2));
+      const itemSubtotal = parseFloat((itemTotal / 1.18).toFixed(2));
+      const itemIgv = parseFloat((itemTotal - itemSubtotal).toFixed(2));
+
+      cnItems.push({
+        unidad_de_medida: "ZZ",
+        codigo: "",
+        descripcion: sustentoText || `NOTA DE CRÉDITO POR MODIFICACIÓN DE COMPROBANTE ${sale.invoiceNumber}`,
+        cantidad: 1,
+        valor_unitario: itemSubtotal,
+        precio_unitario: itemTotal,
+        subtotal: itemSubtotal,
+        tipo_de_igv: 1,
+        igv: itemIgv,
+        total: itemTotal,
+        anticipo_regularizacion: false,
+        anticipo_documento_serie: null,
+        anticipo_documento_numero: null
+      });
+    }
+
+    const totalCalculated = parseFloat(cnItems.reduce((acc, it) => acc + it.total, 0).toFixed(2));
+    const totalGravada = parseFloat(cnItems.reduce((acc, it) => acc + it.subtotal, 0).toFixed(2));
+    const totalIgv = parseFloat((totalCalculated - totalGravada).toFixed(2));
+
+    const total = totalCalculated > 0 ? totalCalculated : parseFloat(amount.toFixed(2));
+    const subtotal = totalGravada > 0 ? totalGravada : parseFloat((total / 1.18).toFixed(2));
+    const igv = totalCalculated > 0 ? totalIgv : parseFloat((total - subtotal).toFixed(2));
 
     const payload = {
       operacion: "generar_comprobante",
@@ -1142,23 +1330,7 @@ export class SalesService {
       documento_que_se_modifica_numero: refNumero,
       tipo_de_nota_de_credito: parseInt(motiveCode) || 4, // Descuento global por defecto
       motivo_o_sustento: sustentoText,
-      items: [
-        {
-          unidad_de_medida: "ZZ",
-          codigo: "",
-          descripcion: sustentoText || `NOTA DE CRÉDITO POR MODIFICACIÓN DE COMPROBANTE ${sale.invoiceNumber}`,
-          cantidad: 1,
-          valor_unitario: parseFloat(subtotal.toFixed(2)),
-          precio_unitario: parseFloat(total.toFixed(2)),
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          tipo_de_igv: 1,
-          igv: parseFloat(igv.toFixed(2)),
-          total: parseFloat(total.toFixed(2)),
-          anticipo_regularizacion: false,
-          anticipo_documento_serie: null,
-          anticipo_documento_numero: null
-        }
-      ]
+      items: cnItems
     };
 
     try {
