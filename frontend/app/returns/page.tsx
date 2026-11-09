@@ -26,7 +26,8 @@ import {
   RotateCcw,
   Receipt,
   X,
-  ChevronDown
+  ChevronDown,
+  Edit
 } from 'lucide-react';
 
 export default function ReturnsPage() {
@@ -77,7 +78,7 @@ export default function ReturnsPage() {
 
   useEffect(() => {
     fetchData();
-    if (user?.role.startsWith('VENDEDOR') || user?.role === 'ADMIN') {
+    if (user?.role.startsWith('VENDEDOR') || user?.role === 'ADMIN' || user?.role === 'COMERCIAL') {
       fetchClientsAndProducts();
     }
   }, [user]);
@@ -422,10 +423,13 @@ export default function ReturnsPage() {
     setIsEditing(true);
     setEditId(req.id);
     setFormClientId(req.clientId);
-    const client = clients.find(c => c.id === req.clientId);
+    if (clients.length === 0) {
+      fetchClientsAndProducts();
+    }
+    const client = clients.find(c => c.id === req.clientId) || req.client;
     setSelectedClient(client || null);
-    if (client) {
-      fetchSalesForClient(client.id);
+    if (req.clientId) {
+      fetchSalesForClient(req.clientId);
     }
     setCreationMode('MANUAL');
     setFormReason(req.reason);
@@ -521,6 +525,7 @@ export default function ReturnsPage() {
   };
 
   const handleLogisticsReceive = async () => {
+    setIsSubmitting(true);
     try {
       await api.post(`/returns/${selectedRequest.id}/logistics-receive`);
       toast.success('Mercadería ingresada al inventario del almacén correctamente');
@@ -528,6 +533,8 @@ export default function ReturnsPage() {
       fetchData();
     } catch (e: any) {
       toast.error(e.response?.data?.message || 'Error al procesar ingreso');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -580,7 +587,7 @@ export default function ReturnsPage() {
             </p>
           </div>
 
-          {(user?.role.startsWith('VENDEDOR') || user?.role === 'ADMIN') && (
+          {(user?.role.startsWith('VENDEDOR') || user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
             <button
               onClick={() => { resetForm(); setShowCreateModal(true); }}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-4 py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95 self-start sm:self-center"
@@ -640,12 +647,18 @@ export default function ReturnsPage() {
                               <Eye className="w-3.5 h-3.5" />
                               Ver Detalle
                             </button>
-                            {req.status === 'RECHAZADO_COMERCIAL' && (user?.role.startsWith('VENDEDOR') || user?.role === 'ADMIN') && (
+                            {req.status !== 'COMPLETADO' && (
+                              user?.role === 'ADMIN' ||
+                              user?.role === 'COMERCIAL' ||
+                              (req.status === 'RECHAZADO_COMERCIAL' && user?.role.startsWith('VENDEDOR'))
+                            ) && (
                               <button
                                 onClick={() => handleEditClick(req)}
                                 className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg transition-all"
+                                title="Editar prendas o información"
                               >
-                                Editar y Corregir
+                                <Edit className="w-3.5 h-3.5" />
+                                Editar
                               </button>
                             )}
                           </td>
@@ -1602,6 +1615,21 @@ export default function ReturnsPage() {
                     Cerrar
                   </button>
 
+                  {/* Edit Option for privileged roles or owner if rejected */}
+                  {selectedRequest.status !== 'COMPLETADO' && (user?.role === 'ADMIN' || user?.role === 'COMERCIAL' || (user?.id === selectedRequest.sellerId && selectedRequest.status === 'RECHAZADO_COMERCIAL')) && (
+                    <button
+                      onClick={() => {
+                        const target = selectedRequest;
+                        setShowDetailModal(false);
+                        handleEditClick(target);
+                      }}
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-black px-4 py-2.5 rounded-xl text-xs transition-all flex items-center gap-1.5"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Editar Información
+                    </button>
+                  )}
+
                   {/* 1. COMERCIAL review option */}
                   {(selectedRequest.status === 'PENDIENTE_COMERCIAL' || selectedRequest.status === 'RECHAZADO_ADMIN') && (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') && (
                     <div className="flex gap-2">
@@ -1657,12 +1685,13 @@ export default function ReturnsPage() {
                   )}
 
                   {/* 4. LOGISTICA final receive option */}
-                  {selectedRequest.status === 'PENDIENTE_LOGISTICA' && (user?.role === 'LOGISTICA' || user?.role === 'ADMIN') && (
+                  {selectedRequest.status === 'PENDIENTE_LOGISTICA' && (user?.role === 'LOGISTICA' || user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
                     <button
                       onClick={handleLogisticsReceive}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-6 py-2.5 rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
+                      disabled={isSubmitting}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black px-6 py-2.5 rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                       Confirmar Reingreso al Inventario
                     </button>
                   )}

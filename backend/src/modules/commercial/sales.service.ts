@@ -1168,17 +1168,23 @@ export class SalesService {
     let cnItems: any[] = [];
 
     if (targetReturn && Array.isArray(targetReturn.items) && targetReturn.items.length > 0) {
+      const normFuzzy = (str: string) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').replace(/Y/g, 'I').trim();
+
       for (const item of targetReturn.items) {
         // Find matching item in sale to get unitPrice
         const matchingSaleItem = (sale.items || []).find((si: any) => {
           const prodName = si.variant?.product?.name || '';
-          const sameModel = prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
+          const sameModel = normFuzzy(prodName) === normFuzzy(item.modelName) ||
+            normFuzzy(prodName).includes(normFuzzy(item.modelName)) ||
+            normFuzzy(item.modelName).includes(normFuzzy(prodName));
           const sameColor = (si.variant?.color || '').trim().toUpperCase() === item.color.trim().toUpperCase();
           return sameModel && sameColor;
         }) || (sale.items || []).find((si: any) => {
           const prodName = si.variant?.product?.name || '';
-          return prodName.trim().toUpperCase() === item.modelName.trim().toUpperCase();
-        });
+          return normFuzzy(prodName) === normFuzzy(item.modelName) ||
+            normFuzzy(prodName).includes(normFuzzy(item.modelName)) ||
+            normFuzzy(item.modelName).includes(normFuzzy(prodName));
+        }) || (sale.items || [])[0];
 
         let unitPrice = matchingSaleItem ? Number(matchingSaleItem.unitPrice) : 0;
         if (!unitPrice || unitPrice <= 0) {

@@ -151,12 +151,15 @@ export class ReturnsService {
   async update(id: string, user: any, data: any) {
     const returnRequest = await this.findOne(id);
 
-    // Can only edit if status is RECHAZADO_COMERCIAL and user is owner
-    if (returnRequest.status !== 'RECHAZADO_COMERCIAL') {
-      throw new BadRequestException('Solo se pueden editar devoluciones que estén rechazadas por comercial');
+    // Can not edit once fully completed into inventory
+    if (returnRequest.status === 'COMPLETADO') {
+      throw new BadRequestException('No se puede editar una devolución que ya completó su reingreso al inventario');
     }
 
-    if (returnRequest.sellerId !== user.id && user.role !== 'ADMIN') {
+    const isPrivileged = user.role === 'ADMIN' || user.role === 'COMERCIAL';
+    const isOwnerRejected = returnRequest.sellerId === user.id && returnRequest.status === 'RECHAZADO_COMERCIAL';
+
+    if (!isPrivileged && !isOwnerRejected) {
       throw new ForbiddenException('No tienes permisos para editar esta devolución');
     }
 
@@ -197,14 +200,17 @@ export class ReturnsService {
       where: { returnRequestId: id }
     });
 
+    // Maintain current status (e.g. PENDIENTE_LOGISTICA) if privileged user edits, or reset if rejected
+    const newStatus = returnRequest.status === 'RECHAZADO_COMERCIAL' ? 'PENDIENTE_COMERCIAL' : returnRequest.status;
+
     const updated = await this.prisma.returnRequest.update({
       where: { id },
       data: {
-        clientId,
-        reason,
-        evidenceUrl: evidenceUrl || null,
-        status: 'PENDIENTE_COMERCIAL', // Reset back to pending
-        rejectionReason: null, // Clear rejection text
+        clientId: clientId || returnRequest.clientId,
+        reason: reason || returnRequest.reason,
+        evidenceUrl: evidenceUrl !== undefined ? (evidenceUrl || null) : returnRequest.evidenceUrl,
+        status: newStatus,
+        rejectionReason: returnRequest.status === 'RECHAZADO_COMERCIAL' ? null : returnRequest.rejectionReason,
         items: {
           create: sanitizedItems
         }
@@ -216,7 +222,7 @@ export class ReturnsService {
       }
     });
 
-    return updated;
+    return this.formatReturnResponse(updated);
   }
 
   async comercialReview(id: string, user: any, body: { action: 'APPROVE' | 'REJECT'; rejectionReason?: string }) {
@@ -302,8 +308,8 @@ export class ReturnsService {
   }
 
   async logisticsReceive(id: string, user: any) {
-    if (user.role !== 'LOGISTICA' && user.role !== 'ADMIN') {
-      throw new ForbiddenException('Solo el personal de Logística o Admin puede ingresar las devoluciones al inventario');
+    if (user.role !== 'LOGISTICA' && user.role !== 'ADMIN' && user.role !== 'COMERCIAL') {
+      throw new ForbiddenException('Solo el personal de Logística, Comercial o Admin puede ingresar las devoluciones al inventario');
     }
 
     const returnRequest = await this.findOne(id) as any;
@@ -317,17 +323,153 @@ export class ReturnsService {
       size38: '38', size40: '40', size42: '42', size44: '44', size46: '46', size48: '48', size50: '50', size52: '52',
     };
 
+    const normalize = (str: string) =>
+      (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const normalizeFuzzy = (str: string) =>
+      normalize(str).replace(/Y/g, 'I');
+
     // Process inventory ingress inside a Prisma transaction to ensure consistency
     await this.prisma.$transaction(async (tx) => {
-      for (const item of returnRequest.items) {
-        // Find matching product
-        const product = await tx.product.findFirst({
-          where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
-          include: { variants: true },
+      // Check if return is linked to an invoice (e.g. [Comprobante: F001-000082])
+      let linkedSale: any = null;
+      const invoiceMatch = returnRequest.reason?.match(/\[Comprobante:\s*([^\]]+)\]/i);
+      const invoiceNum = invoiceMatch ? invoiceMatch[1].trim() : null;
+      if (invoiceNum) {
+        linkedSale = await tx.sale.findFirst({
+          where: {
+            OR: [
+              { invoiceNumber: { equals: invoiceNum, mode: 'insensitive' } },
+              { id: invoiceNum },
+            ],
+          },
+          include: {
+            items: {
+              include: {
+                variant: {
+                  include: {
+                    product: {
+                      include: { variants: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
         });
+      }
 
+      for (const item of returnRequest.items) {
+        let product: any = null;
+        const mNorm = normalize(item.modelName);
+        const mFuzzy = normalizeFuzzy(item.modelName);
+
+        // 1. Try finding matching product in linked sale items (the exact items sold)
+        if (linkedSale && Array.isArray(linkedSale.items)) {
+          const byExact = linkedSale.items.find((si: any) =>
+            normalize(si.variant?.product?.name) === mNorm
+          );
+          if (byExact?.variant?.product) {
+            product = byExact.variant.product;
+          }
+
+          if (!product) {
+            const byFuzzy = linkedSale.items.find((si: any) =>
+              normalizeFuzzy(si.variant?.product?.name) === mFuzzy
+            );
+            if (byFuzzy?.variant?.product) {
+              product = byFuzzy.variant.product;
+            }
+          }
+
+          if (!product) {
+            const bySub = linkedSale.items.find((si: any) => {
+              const pNorm = normalize(si.variant?.product?.name);
+              return pNorm.includes(mNorm) || mNorm.includes(pNorm);
+            });
+            if (bySub?.variant?.product) {
+              product = bySub.variant.product;
+            }
+          }
+
+          if (!product && linkedSale.items.length === 1 && linkedSale.items[0]?.variant?.product) {
+            product = linkedSale.items[0].variant.product;
+          }
+        }
+
+        // 2. Direct exact catalog match
         if (!product) {
-          throw new BadRequestException(`El modelo "${item.modelName}" no existe en el catálogo de productos`);
+          product = await tx.product.findFirst({
+            where: { name: { equals: item.modelName.trim(), mode: 'insensitive' } },
+            include: { variants: true },
+          });
+        }
+
+        // 3. Normalized / Interchangeable Y and I (e.g. FENDY <-> FENDI)
+        if (!product) {
+          const alt1 = item.modelName.replace(/y/gi, 'i');
+          const alt2 = item.modelName.replace(/i/gi, 'y');
+          product = await tx.product.findFirst({
+            where: {
+              OR: [
+                { name: { equals: alt1.trim(), mode: 'insensitive' } },
+                { name: { equals: alt2.trim(), mode: 'insensitive' } },
+              ],
+            },
+            include: { variants: true },
+          });
+        }
+
+        // 4. Contains match in catalog
+        if (!product) {
+          product = await tx.product.findFirst({
+            where: { name: { contains: item.modelName.trim(), mode: 'insensitive' } },
+            include: { variants: true },
+          });
+        }
+
+        // 5. SKU match in catalog
+        if (!product) {
+          product = await tx.product.findFirst({
+            where: { sku: { equals: item.modelName.trim(), mode: 'insensitive' } },
+            include: { variants: true },
+          });
+        }
+
+        // 6. Memory search across all products (fuzzy / substring)
+        if (!product) {
+          const allProducts = await tx.product.findMany({
+            include: { variants: true },
+          });
+          const found = allProducts.find((p) => {
+            const pFuzzy = normalizeFuzzy(p.name);
+            return pFuzzy === mFuzzy || pFuzzy.includes(mFuzzy) || mFuzzy.includes(pFuzzy);
+          });
+          if (found) {
+            product = found;
+          }
+        }
+
+        // 7. Auto-create product if absent in catalog so return re-entry NEVER gets blocked
+        if (!product) {
+          const autoSku = `PROD-${item.modelName.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'RET'}-${Date.now().toString().slice(-4)}`;
+          product = await tx.product.create({
+            data: {
+              sku: autoSku,
+              name: item.modelName.trim().toUpperCase(),
+              category: 'TERMINADOS',
+              purchasePrice: 0,
+              sellingPrice: 0,
+              minStock: 5,
+              inventoryType: 'TERMINADOS',
+            },
+            include: { variants: true },
+          });
         }
 
         // Check active size fields
@@ -335,22 +477,39 @@ export class ReturnsService {
           const qty = (item as any)[field] || 0;
           if (qty <= 0) continue;
 
-          // Find or create variant
-          let variant = product.variants.find((v) => 
+          // Find variant
+          let variant = (product.variants || []).find((v: any) => 
             v.size.trim().toUpperCase() === sizeValue.trim().toUpperCase() &&
             v.color.trim().toUpperCase() === item.color.trim().toUpperCase()
           );
 
           if (!variant) {
-            // Auto-create variant if it does not exist (robustness)
-            const variantSku = `${product.sku}-${item.color.slice(0, 3)}-${sizeValue}`;
+            // Check if variant already exists in DB for this product with size & color
+            variant = await tx.productVariant.findFirst({
+              where: {
+                productId: product.id,
+                size: { equals: sizeValue, mode: 'insensitive' },
+                color: { equals: item.color.trim(), mode: 'insensitive' },
+              },
+            });
+          }
+
+          if (!variant) {
+            // Auto-create variant if it does not exist
+            const baseSku = `${product.sku}-${item.color.slice(0, 3)}-${sizeValue}`.toUpperCase();
+            let variantSku = baseSku;
+            const existingSku = await tx.productVariant.findUnique({ where: { variantSku } });
+            if (existingSku) {
+              variantSku = `${baseSku}-${Date.now().toString().slice(-4)}`;
+            }
+
             variant = await tx.productVariant.create({
               data: {
                 productId: product.id,
                 size: sizeValue,
                 color: item.color.toUpperCase(),
                 stock: 0,
-                variantSku: variantSku.toUpperCase(),
+                variantSku,
               },
             });
           }
