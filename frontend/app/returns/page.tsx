@@ -1684,7 +1684,7 @@ export default function ReturnsPage() {
                   )}
 
                   {/* 4. LOGISTICA final receive option */}
-                  {selectedRequest.status === 'PENDIENTE_LOGISTICA' && (user?.role === 'LOGISTICA' || user?.role === 'ADMIN' || user?.role === 'COMERCIAL') && (
+                  {selectedRequest.status === 'PENDIENTE_LOGISTICA' && (user?.role === 'LOGISTICA' || user?.role === 'ADMIN') && (
                     <button
                       onClick={handleLogisticsReceive}
                       disabled={isSubmitting}

@@ -308,8 +308,8 @@ export class ReturnsService {
   }
 
   async logisticsReceive(id: string, user: any) {
-    if (user.role !== 'LOGISTICA' && user.role !== 'ADMIN' && user.role !== 'COMERCIAL') {
-      throw new ForbiddenException('Solo el personal de Logística, Comercial o Admin puede ingresar las devoluciones al inventario');
+    if (user.role !== 'LOGISTICA' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('Solo el personal de Logística o Admin puede ingresar las devoluciones al inventario');
     }
 
     const returnRequest = await this.findOne(id) as any;
