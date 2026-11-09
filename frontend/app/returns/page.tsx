@@ -693,7 +693,6 @@ export default function ReturnsPage() {
                     Selecciona el cliente y la factura de venta para cargar las prendas vendidas automáticamente.
                   </p>
                 </div>
-
                 {!isEditing && (
                   <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl self-start sm:self-center">
                     <button
