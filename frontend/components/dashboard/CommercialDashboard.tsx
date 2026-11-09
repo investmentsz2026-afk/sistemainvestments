@@ -41,6 +41,10 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE');
 };
 
+const formatMoney = (amount: number) => {
+    return (Number(amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export function CommercialDashboard({ user }: CommercialDashboardProps) {
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -92,22 +96,38 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
 
       const total = sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       
-      const limaSales = sales.filter((s: any) => s.client?.zone === 'LIMA');
-      const orienteSales = sales.filter((s: any) => s.client?.zone === 'ORIENTE');
-      const oficinaSales = sales.filter((s: any) => s.client?.zone === 'OFICINA' || !s.client?.zone || s.client?.zone === '');
+      const isLima = (s: any) => (s.client?.zone || s.seller?.zone || '').trim().toUpperCase() === 'LIMA';
+      const isOriente = (s: any) => (s.client?.zone || s.seller?.zone || '').trim().toUpperCase() === 'ORIENTE';
+      const isOficina = (s: any) => !isLima(s) && !isOriente(s);
+
+      const limaSales = sales.filter(isLima);
+      const orienteSales = sales.filter(isOriente);
+      const oficinaSales = sales.filter(isOficina);
       
       const limaTotal = limaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const orienteTotal = orienteSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
       const oficinaTotal = oficinaSales.reduce((acc: number, s: any) => acc + s.totalAmount, 0);
 
-      // Calculate Accounts Receivable (Cuentas por Cobrar)
+      // Calculate Accounts Receivable (Cuentas por Cobrar) identically to Sales module (/sales)
+      const calcPendingToCollect = (sale: any) => {
+        // If sale is associated with a Letra group that is not rejected, debt is handled in Letras module
+        if (sale.letraGroupId || sale.letraGroup) {
+          const groupStatus = sale.letraGroup?.status;
+          if (groupStatus !== 'RECHAZADO') {
+            return 0;
+          }
+        }
+        if (sale.paymentStatus === 'CANCELADO') {
+          return 0;
+        }
+        const totalPaid = (sale.payments || [])
+          .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+          .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+        return Math.max(0, (Number(sale.totalAmount) || 0) - totalPaid);
+      };
+
       const calculateAR = (salesList: any[]) => {
-        return salesList.reduce((acc: number, s: any) => {
-          const paid = (s.payments || [])
-            .filter((p: any) => p.status === 'APROBADO')
-            .reduce((sum: number, p: any) => sum + p.amount, 0);
-          return acc + Math.max(0, s.totalAmount - paid);
-        }, 0);
+        return salesList.reduce((acc: number, s: any) => acc + calcPendingToCollect(s), 0);
       };
 
       const totalAR = calculateAR(sales);
@@ -235,9 +255,9 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
         {[
           { 
             label: 'Ventas Totales', 
-            value: `S/ ${stats.totalSales.toLocaleString()}`, 
+            value: `S/ ${formatMoney(stats.totalSales)}`, 
             subValue: (user?.role === 'COMERCIAL' || user?.role === 'ADMIN')
-              ? `Por Cobrar: S/ ${stats.accountsReceivable.toLocaleString()}`
+              ? `Por Cobrar: S/ ${formatMoney(stats.accountsReceivable)}`
               : undefined,
             subValueColor: 'text-rose-600',
             garmentsValue: `Prendas Vendidas: ${stats.totalGarments.toLocaleString()} uds.`,
@@ -246,28 +266,28 @@ export function CommercialDashboard({ user }: CommercialDashboardProps) {
             bg: 'bg-emerald-50', 
             trend: '+15.4%',
             extraInfo: [
-              { label: 'Lima', value: `S/ ${stats.limaSalesTotal.toLocaleString()} (${stats.limaGarments.toLocaleString()} uds.)` },
-              { label: 'Oriente', value: `S/ ${stats.orienteSalesTotal.toLocaleString()} (${stats.orienteGarments.toLocaleString()} uds.)` },
-              { label: 'Oficina', value: `S/ ${stats.oficinaSalesTotal.toLocaleString()} (${stats.oficinaGarments.toLocaleString()} uds.)` }
+              { label: 'Lima', value: `S/ ${formatMoney(stats.limaSalesTotal)} (${stats.limaGarments.toLocaleString()} uds.)` },
+              { label: 'Oriente', value: `S/ ${formatMoney(stats.orienteSalesTotal)} (${stats.orienteGarments.toLocaleString()} uds.)` },
+              { label: 'Oficina', value: `S/ ${formatMoney(stats.oficinaSalesTotal)} (${stats.oficinaGarments.toLocaleString()} uds.)` }
             ],
             arExtraInfo: (user?.role === 'COMERCIAL' || user?.role === 'ADMIN') ? [
-              { label: 'Cobrar Lima', value: `S/ ${stats.limaAR.toLocaleString()}` },
-              { label: 'Cobrar Oriente', value: `S/ ${stats.orienteAR.toLocaleString()}` },
-              { label: 'Cobrar Oficina', value: `S/ ${stats.oficinaAR.toLocaleString()}` }
+              { label: 'Cobrar Lima', value: `S/ ${formatMoney(stats.limaAR)}` },
+              { label: 'Cobrar Oriente', value: `S/ ${formatMoney(stats.orienteAR)}` },
+              { label: 'Cobrar Oficina', value: `S/ ${formatMoney(stats.oficinaAR)}` }
             ] : undefined
           },
           { 
             label: 'Pedidos Pendientes', 
             value: `${stats.salesCount} ${stats.salesCount === 1 ? 'Pedido' : 'Pedidos'}`, 
-            subValue: `S/ ${stats.pendingOrdersAmount.toLocaleString()}`,
+            subValue: `S/ ${formatMoney(stats.pendingOrdersAmount)}`,
             icon: ShoppingBag, 
             color: 'text-indigo-600', 
             bg: 'bg-indigo-50', 
             trend: 'Pendientes',
             extraInfo: [
-              { label: 'Lima', value: `${stats.limaOrdersCount} ped. • S/ ${stats.limaOrdersAmount.toLocaleString()}` },
-              { label: 'Oriente', value: `${stats.orienteOrdersCount} ped. • S/ ${stats.orienteOrdersAmount.toLocaleString()}` },
-              { label: 'Oficina', value: `${stats.oficinaOrdersCount} ped. • S/ ${stats.oficinaOrdersAmount.toLocaleString()}` }
+              { label: 'Lima', value: `${stats.limaOrdersCount} ped. • S/ ${formatMoney(stats.limaOrdersAmount)}` },
+              { label: 'Oriente', value: `${stats.orienteOrdersCount} ped. • S/ ${formatMoney(stats.orienteOrdersAmount)}` },
+              { label: 'Oficina', value: `${stats.oficinaOrdersCount} ped. • S/ ${formatMoney(stats.oficinaOrdersAmount)}` }
             ]
           },
           { label: 'Auditorías Pendientes', value: stats.pendingApprovals.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Prioridad Alta' },
