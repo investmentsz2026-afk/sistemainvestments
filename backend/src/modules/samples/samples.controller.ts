@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Patch, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Patch, Delete, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { SamplesService } from './samples.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -34,6 +34,9 @@ export class SamplesController {
 
   @Put(':id/review')
   updateReview(@Req() req: any, @Param('id') id: string, @Body() data: any) {
+    if (req.user?.role === 'UDP') {
+      throw new ForbiddenException('El rol UDP no tiene permisos para emitir veredicto o aprobar muestras. Solo Comercial o Administrador.');
+    }
     return this.samplesService.updateReview(id, req.user.id, data);
   }
 

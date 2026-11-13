@@ -34,6 +34,7 @@ import { OPBarcodeModal } from '../../../components/samples/OPBarcodeModal';
 import { SampleBarcodeModal } from '../../../components/samples/SampleBarcodeModal';
 import { SampleMeasurementsModal } from '../../../components/samples/SampleMeasurementsModal';
 import { UDPEditSampleModal } from '../../../components/samples/UDPEditSampleModal';
+import { DeleteSampleModal } from '../../../components/samples/DeleteSampleModal';
 import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 import { getImageUrl } from '../../../lib/imageUrl';
 import { generateOpGarmentSku } from '../../../lib/sku-generator';
@@ -66,20 +67,19 @@ export default function SampleDetailPage() {
     const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
     const [showUDPEditModal, setShowUDPEditModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // Permission helpers for Commercial editing
     const userRole = (user?.role || '').toString().trim().toUpperCase();
-    const canCommercialEdit = (userRole === 'COMERCIAL' || userRole === 'ADMIN' || !userRole) && sample?.adminOpApprovalStatus !== 'APROBADO';
+    const canCommercialEdit = (userRole === 'COMERCIAL' || userRole === 'ADMIN') && sample?.adminOpApprovalStatus !== 'APROBADO';
     const isCommercialMode = sample?.status === 'PENDIENTE' || isCommercialEditing;
 
-    const handleDeleteSample = async () => {
-        if (!window.confirm(`¿Estás seguro de eliminar la muestra "${sample?.name}"?\n\nEsta acción eliminará definitivamente la muestra, sus medidas, materiales y OP asociada para poder registrarla nuevamente.`)) {
-            return;
-        }
+    const handleConfirmDeleteSample = async () => {
         setIsDeleting(true);
         try {
             await api.delete(`/samples/${sample.id}`);
             toast.success('Muestra eliminada correctamente');
+            setShowDeleteModal(false);
             router.push('/samples');
         } catch (err: any) {
             console.error('Error deleting sample:', err);
@@ -866,11 +866,11 @@ export default function SampleDetailPage() {
                         {(userRole === 'COMERCIAL' || userRole === 'UDP' || userRole === 'ADMIN') && (
                             <button
                                 type="button"
-                                onClick={handleDeleteSample}
+                                onClick={() => setShowDeleteModal(true)}
                                 disabled={isDeleting}
                                 className="flex items-center gap-2 px-5 py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-rose-600 hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
                             >
-                                <Trash2 className="w-4 h-4" /> {isDeleting ? 'Eliminando...' : 'Eliminar Muestra'}
+                                <Trash2 className="w-4 h-4" /> Eliminar Muestra
                             </button>
                         )}
                     </div>
@@ -1111,7 +1111,7 @@ export default function SampleDetailPage() {
                     {/* RIGHT COLUMN: COMMERCIAL REVIEW & OP */}
                     <div className="lg:col-span-5 space-y-8">
                         {/* CASE 1: SAMPLE IS PENDING REVIEW (COMERCIAL REVIEW STEP) */}
-                        {sample.status === 'PENDIENTE' && (
+                        {sample.status === 'PENDIENTE' && (userRole === 'COMERCIAL' || userRole === 'ADMIN') && (
                             <div className={`${cardClass} border-indigo-100 shadow-indigo-100/30`}>
                                 <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center justify-between">
                                     <span>Evaluación de Prototipo</span>
@@ -1205,6 +1205,40 @@ export default function SampleDetailPage() {
                                             )}
                                         </button>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* CASE 1B: SAMPLE IS PENDING REVIEW (UDP VIEW - NO APPROVAL BUTTONS) */}
+                        {sample.status === 'PENDIENTE' && userRole === 'UDP' && (
+                            <div className={`${cardClass} border-indigo-100 shadow-indigo-100/30`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border text-amber-700 bg-amber-50 border-amber-200 flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" /> En Revisión Comercial
+                                    </span>
+                                </div>
+                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-3 flex items-center justify-between">
+                                    <span>Evaluación Comercial</span>
+                                    <ClipboardList className="w-6 h-6 text-indigo-600" />
+                                </h2>
+                                <p className="text-xs font-bold text-gray-500 mb-6 leading-relaxed">
+                                    Esta muestra se encuentra enviada al área <strong className="text-indigo-600">Comercial</strong> para su revisión. Comercial es el área encargada de evaluar y emitir el veredicto (Aprobar u Observar).
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowMeasurementsModal(true)}
+                                        className="w-full py-3.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition shadow-sm flex items-center justify-center gap-2"
+                                    >
+                                        <Ruler className="w-4 h-4" /> Ver Tabla de Medidas
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowUDPEditModal(true)}
+                                        className="w-full py-3.5 bg-white text-gray-800 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition shadow-sm flex items-center justify-center gap-2"
+                                    >
+                                        <Edit className="w-4 h-4 text-indigo-500" /> Editar Muestra (UDP)
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -2342,6 +2376,16 @@ export default function SampleDetailPage() {
                     product={pendingPoolProduct}
                     onSelectVariant={(variant) => applyAddToPool(pendingPoolProduct, variant)}
                     onClose={() => setPendingPoolProduct(null)}
+                />
+            )}
+            {/* DELETE SAMPLE CONFIRMATION MODAL */}
+            {showDeleteModal && (
+                <DeleteSampleModal
+                    sampleName={sample?.name || 'Muestra'}
+                    sampleCode={sample?.code}
+                    isDeleting={isDeleting}
+                    onConfirm={handleConfirmDeleteSample}
+                    onClose={() => !isDeleting && setShowDeleteModal(false)}
                 />
             )}
         </Layout>

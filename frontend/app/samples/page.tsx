@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { SampleBarcodeModal } from '../../components/samples/SampleBarcodeModal';
+import { DeleteSampleModal } from '../../components/samples/DeleteSampleModal';
 
 export default function SamplesPage() {
     const { user } = useAuth();
@@ -30,7 +31,8 @@ export default function SamplesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [sampleToDelete, setSampleToDelete] = useState<any | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [selectedStickerSample, setSelectedStickerSample] = useState<any>(null);
 
     useEffect(() => {
@@ -48,22 +50,25 @@ export default function SamplesPage() {
         }
     };
 
-    const handleDeleteSample = async (id: string, name: string, e: React.MouseEvent) => {
+    const promptDeleteSample = (sample: any, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!window.confirm(`¿Estás seguro de eliminar la muestra "${name}"?\n\nEsta acción borrará definitivamente la muestra, sus medidas y OP asociada para poder registrarla nuevamente.`)) {
-            return;
-        }
-        setDeletingId(id);
+        setSampleToDelete(sample);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!sampleToDelete) return;
+        setIsDeleting(true);
         try {
-            await api.delete(`/samples/${id}`);
+            await api.delete(`/samples/${sampleToDelete.id}`);
             toast.success('Muestra eliminada correctamente');
-            setSamples((prev: any) => prev.filter((s: any) => s.id !== id));
+            setSamples((prev: any) => prev.filter((s: any) => s.id !== sampleToDelete.id));
+            setSampleToDelete(null);
         } catch (err: any) {
             console.error('Error deleting sample:', err);
             toast.error(err.response?.data?.message || 'Error al eliminar la muestra');
         } finally {
-            setDeletingId(null);
+            setIsDeleting(false);
         }
     };
 
@@ -189,8 +194,8 @@ export default function SamplesPage() {
                                         <button
                                             type="button"
                                             title="Eliminar Muestra"
-                                            onClick={(e) => handleDeleteSample(sample.id, sample.name, e)}
-                                            disabled={deletingId === sample.id}
+                                            onClick={(e) => promptDeleteSample(sample, e)}
+                                            disabled={isDeleting && sampleToDelete?.id === sample.id}
                                             className="absolute top-4 left-4 p-2.5 bg-white/90 hover:bg-rose-600 text-rose-500 hover:text-white rounded-xl shadow-lg backdrop-blur-sm transition active:scale-90 z-10 disabled:opacity-50"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -270,8 +275,8 @@ export default function SamplesPage() {
                                         <button
                                             type="button"
                                             title="Eliminar Muestra"
-                                            onClick={(e) => handleDeleteSample(sample.id, sample.name, e)}
-                                            disabled={deletingId === sample.id}
+                                            onClick={(e) => promptDeleteSample(sample, e)}
+                                            disabled={isDeleting && sampleToDelete?.id === sample.id}
                                             className="p-4 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-2xl transition shadow-sm active:scale-90 disabled:opacity-50"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -289,6 +294,17 @@ export default function SamplesPage() {
                 <SampleBarcodeModal
                     sample={selectedStickerSample}
                     onClose={() => setSelectedStickerSample(null)}
+                />
+            )}
+
+            {/* MODAL DE CONFIRMACIÓN MODERNO PARA ELIMINAR MUESTRA */}
+            {sampleToDelete && (
+                <DeleteSampleModal
+                    sampleName={sampleToDelete.name}
+                    sampleCode={sampleToDelete.code}
+                    isDeleting={isDeleting}
+                    onConfirm={handleConfirmDelete}
+                    onClose={() => !isDeleting && setSampleToDelete(null)}
                 />
             )}
         </Layout>
