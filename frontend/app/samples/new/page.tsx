@@ -370,7 +370,7 @@ export default function NewSamplePage() {
                     unitPriceAtTime: m.unitPriceAtTime
                 }))
             });
-            toast.success(isExisting ? 'Muestra existente registrada con éxito' : (materials.length > 0 ? 'Solicitud enviada a Administrador' : 'Muestra creada con éxito'));
+            toast.success(isExisting ? 'Muestra existente registrada con éxito' : 'Muestra enviada a Comercial con éxito');
             router.push('/samples');
         } catch (error) {
             console.error('Error creating sample:', error);
@@ -1164,7 +1164,7 @@ export default function NewSamplePage() {
                                     <>Enviando...</>
                                 ) : (
                                     <>
-                                        <Send className={isExisting ? 'w-5 h-5' : 'w-8 h-8'} /> {isExisting ? 'Enviar a Comercial' : (materials.length > 0 ? 'Enviar a Administrador' : 'Enviar a Comercial')}
+                                        <Send className={isExisting ? 'w-5 h-5' : 'w-8 h-8'} /> Enviar a Comercial
                                     </>
                                 )}
                             </button>

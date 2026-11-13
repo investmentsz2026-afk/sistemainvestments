@@ -60,7 +60,7 @@ export class SamplesService {
           images: images || [],
           udpId,
           isExisting: !!isExisting,
-          materialReceiptStatus: isExisting ? 'DESARROLLO_COMPLETADO' : (materials && materials.length > 0 ? 'PENDIENTE_ADMIN' : null),
+          materialReceiptStatus: 'DESARROLLO_COMPLETADO',
           adminOpApprovalStatus: 'SIN_OP',
           productionSizeData: initialProductionSizeData,
         },
@@ -102,17 +102,19 @@ export class SamplesService {
             },
           });
         }
+      }
 
-        // Notify Admin
-        if (!isExisting) {
-          await this.notifications.create({
-            title: 'Nueva Solicitud de Materiales para Muestra',
-            message: `UDP ha solicitado materiales para la muestra: ${name} ${code ? `(Código: ${code})` : ''}`,
-            type: 'SAMPLE_MATERIAL_REQUEST',
-            referenceId: sample.id,
-            targetRole: 'ADMIN',
-          });
-        }
+      // Notify Comercial for review
+      try {
+        await this.notifications.create({
+          title: 'Nueva Muestra para Revisión Comercial',
+          message: `UDP ha registrado la muestra: ${name} ${code ? `(Código: ${code})` : ''}. Lista para evaluación comercial.`,
+          type: 'SAMPLE_DEVELOPMENT_COMPLETED',
+          referenceId: sample.id,
+          targetRole: 'COMERCIAL',
+        });
+      } catch (nErr) {
+        console.warn('Could not create notification for comercial:', nErr);
       }
 
       return sample;
