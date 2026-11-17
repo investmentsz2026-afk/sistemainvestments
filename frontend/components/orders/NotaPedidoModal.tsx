@@ -636,20 +636,31 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
 
         const order = initialOrder;
         
-        // Helper to format date timezone-safely to DD-MM-YY
+        // Helper to format date timezone-safely to DD-MM-YY without day-shifting
         const formatDateForPrint = (dateString: string) => {
             if (!dateString) return '';
-            let date: Date;
-            if (dateString.includes('T')) {
-                date = new Date(dateString);
-            } else {
-                const [year, month, day] = dateString.split('-').map(Number);
-                date = new Date(year, month - 1, day);
+            
+            // Si la fecha viene como fecha pura YYYY-MM-DD o formato ISO (ej: "2026-11-14", "2026-11-14T00:00:00.000Z")
+            const isDateOnly = !dateString.includes('T') || dateString.endsWith('T00:00:00.000Z') || dateString.includes('T00:00:00');
+            if (isDateOnly) {
+                const cleanStr = dateString.includes('T') ? dateString.split('T')[0] : dateString;
+                const parts = cleanStr.split('-');
+                if (parts.length === 3) {
+                    const [year, month, day] = parts;
+                    return `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year.slice(-2)}`;
+                }
             }
-            const dayVal = String(date.getDate()).padStart(2, '0');
-            const monthVal = String(date.getMonth() + 1).padStart(2, '0');
-            const yearVal = String(date.getFullYear()).slice(-2);
-            return `${dayVal}-${monthVal}-${yearVal}`;
+
+            // Para timestamps con hora específica guardada, convertimos considerando zona local
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                const dayVal = String(date.getDate()).padStart(2, '0');
+                const monthVal = String(date.getMonth() + 1).padStart(2, '0');
+                const yearVal = String(date.getFullYear()).slice(-2);
+                return `${dayVal}-${monthVal}-${yearVal}`;
+            }
+
+            return dateString;
         };
 
         const displayQty = (qty: number | string) => {
@@ -874,7 +885,7 @@ export function NotaPedidoModal({ isOpen, onClose, onSuccess, user, initialOrder
             <td class="meta-label">ZONA:</td>
             <td class="meta-value bg-yellow font-bold">${order.zone || order.client?.zone || ''}</td>
             <td class="meta-label">FECHA:</td>
-            <td class="meta-value font-bold">${formatDateForPrint(order.createdAt)}</td>
+            <td class="meta-value font-bold">${formatDateForPrint(formData.createdAt || order.createdAt)}</td>
         </tr>
         <tr>
             <td class="meta-label">CONDICION:</td>

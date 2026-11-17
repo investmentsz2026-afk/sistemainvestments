@@ -38,7 +38,7 @@ import { FileSpreadsheet, FileText } from 'lucide-react';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    if (dateString.endsWith('T00:00:00.000Z')) {
+    if (dateString.endsWith('T00:00:00.000Z') || dateString.includes('T00:00:00') || !dateString.includes('T')) {
         return new Date(dateString).toLocaleDateString('es-PE', { timeZone: 'UTC' });
     }
     return new Date(dateString).toLocaleDateString('es-PE');
