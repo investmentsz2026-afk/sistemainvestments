@@ -570,11 +570,77 @@ export class SalesService {
         }
       }
 
+      let advance: any = null;
+      if (method === 'ADELANTO') {
+        const targetAdvanceId = data.advanceId || data.advance_id;
+        if (!targetAdvanceId) {
+          throw new BadRequestException('Debe seleccionar el adelanto a utilizar.');
+        }
+
+        advance = await (tx as any).clientAdvance.findUnique({
+          where: { id: targetAdvanceId },
+        });
+
+        if (!advance) {
+          throw new NotFoundException('Adelanto no encontrado.');
+        }
+
+        if (advance.status === 'AGOTADO' || advance.status === 'ANULADO') {
+          throw new BadRequestException('El adelanto seleccionado ya se encuentra agotado o anulado.');
+        }
+
+        if (sale.clientId && advance.clientId !== sale.clientId) {
+          throw new BadRequestException('El adelanto seleccionado no pertenece al cliente de esta venta.');
+        }
+
+        if (advance.remainingAmount < inputAmount - 0.01) {
+          throw new BadRequestException(
+            `El saldo disponible del adelanto (S/ ${advance.remainingAmount.toFixed(2)}) es menor al monto a abonar (S/ ${inputAmount.toFixed(2)}).`
+          );
+        }
+
+        paymentData.advanceId = advance.id;
+        if (!paymentData.notes) {
+          paymentData.notes = `Adelanto ${advance.code} aplicado a la venta`;
+        }
+
+        // Descontar saldo del adelanto inmediatamente
+        const newUsed = advance.usedAmount + inputAmount;
+        const newRemaining = Math.max(0, advance.remainingAmount - inputAmount);
+        const newStatus = newRemaining <= 0.01 ? 'AGOTADO' : 'PARCIAL';
+
+        await (tx as any).clientAdvance.update({
+          where: { id: advance.id },
+          data: {
+            usedAmount: newUsed,
+            remainingAmount: newRemaining,
+            status: newStatus,
+          }
+        });
+      }
+
       // Create payment
       const payment = await tx.salePayment.create({
         data: paymentData,
         include: { letraDetails: true }
       });
+
+      // Registrar historial de uso del adelanto
+      if (method === 'ADELANTO' && advance) {
+        try {
+          await (tx as any).clientAdvanceUsage.create({
+            data: {
+              advanceId: advance.id,
+              saleId: sale.id,
+              paymentId: payment.id,
+              amount: inputAmount,
+              notes: notes || `Abono a venta ${sale.invoiceNumber || sale.id.slice(-6).toUpperCase()}`,
+            }
+          });
+        } catch (uErr) {
+          console.warn('Error recording advance usage log:', uErr);
+        }
+      }
 
       // If this credit note corresponds to a ReturnRequest, tag that returnRequest as credited
       const targetReturnId = returnRequestId || data.returnRequestId;
@@ -812,6 +878,33 @@ export class SalesService {
           }
         } catch (e) {
           console.warn('Error clearing NC tag on deletePayment:', e);
+        }
+      }
+
+      if (payment.method === 'ADELANTO' || (payment as any).advanceId) {
+        const advId = (payment as any).advanceId;
+        if (advId) {
+          try {
+            const advance = await (tx as any).clientAdvance.findUnique({ where: { id: advId } });
+            if (advance) {
+              const restoredUsed = Math.max(0, advance.usedAmount - payment.amount);
+              const restoredRemaining = advance.remainingAmount + payment.amount;
+              const restoredStatus = restoredUsed <= 0.01 ? 'DISPONIBLE' : 'PARCIAL';
+              await (tx as any).clientAdvance.update({
+                where: { id: advId },
+                data: {
+                  usedAmount: restoredUsed,
+                  remainingAmount: restoredRemaining,
+                  status: restoredStatus,
+                }
+              });
+            }
+            await (tx as any).clientAdvanceUsage.deleteMany({
+              where: { paymentId: payment.id }
+            });
+          } catch (advErr) {
+            console.warn('Error restoring advance on deletePayment:', advErr);
+          }
         }
       }
 
@@ -1071,9 +1164,38 @@ export class SalesService {
       throw new BadRequestException('El pago ya ha sido procesado');
     }
 
-    return this.prisma.salePayment.update({
-      where: { id: paymentId },
-      data: { status: 'RECHAZADO' },
+    return this.prisma.$transaction(async (tx) => {
+      if (payment.method === 'ADELANTO' || (payment as any).advanceId) {
+        const advId = (payment as any).advanceId;
+        if (advId) {
+          try {
+            const advance = await (tx as any).clientAdvance.findUnique({ where: { id: advId } });
+            if (advance) {
+              const restoredUsed = Math.max(0, advance.usedAmount - payment.amount);
+              const restoredRemaining = advance.remainingAmount + payment.amount;
+              const restoredStatus = restoredUsed <= 0.01 ? 'DISPONIBLE' : 'PARCIAL';
+              await (tx as any).clientAdvance.update({
+                where: { id: advId },
+                data: {
+                  usedAmount: restoredUsed,
+                  remainingAmount: restoredRemaining,
+                  status: restoredStatus,
+                }
+              });
+            }
+            await (tx as any).clientAdvanceUsage.deleteMany({
+              where: { paymentId: payment.id }
+            });
+          } catch (advErr) {
+            console.warn('Error restoring advance on rejectPayment:', advErr);
+          }
+        }
+      }
+
+      return tx.salePayment.update({
+        where: { id: paymentId },
+        data: { status: 'RECHAZADO' },
+      });
     });
   }
 

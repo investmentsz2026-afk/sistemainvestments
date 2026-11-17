@@ -38,6 +38,7 @@ import {
   Landmark,
   Ruler,
   Boxes,
+  Wallet,
   PackageCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -147,6 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       { name: 'Ventas', href: '/sales', icon: ShoppingCart },
       { name: 'Cobranza', href: '/sales/collections', icon: CreditCard },
       { name: 'Letras', href: '/sales/letra-groups', icon: FileSignature },
+      { name: 'Adelantos', href: '/commercial/advances', icon: Wallet },
       { name: 'Clientes', href: '/sales/clients', icon: Users },
       { name: 'Agencias', href: '/commercial/agencies', icon: Building2 }
     ] : []),

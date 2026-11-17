@@ -28,6 +28,7 @@ model User {
   returnRequests  ReturnRequest[]  @relation("UserReturnRequests")
   sales           Sale[]           @relation("UserSales")
   roles           Role[]           @relation("UserRoles")
+  advancesCreated ClientAdvance[]  @relation("AdvanceCreator")
 
   @@map("users")
 }
@@ -299,6 +300,7 @@ model Client {
   orders         Order[]
   returnRequests ReturnRequest[]
   sales          Sale[]
+  advances       ClientAdvance[]
 
   @@map("clients")
 }
@@ -397,6 +399,7 @@ model Sale {
   letraGroupId     String?       @map("letra_group_id")
   items            SaleItem[]
   payments         SalePayment[]
+  advanceUsages    ClientAdvanceUsage[]
   client           Client?       @relation(fields: [clientId], references: [id])
   letraGroup       LetraGroup?   @relation("LetraGroupSales", fields: [letraGroupId], references: [id])
   seller           User          @relation("UserSales", fields: [sellerId], references: [id])
@@ -424,6 +427,7 @@ model SalePayment {
   sunatResponse    String?       @map("sunat_response")
   sunatStatus      String?       @map("sunat_status")
   sunatXmlUrl      String?       @map("sunat_xml_url")
+  advanceId        String?       @map("advance_id")
   letraDetails     LetraDetail[]
   sale             Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
@@ -676,4 +680,42 @@ model ProductMeasurement {
 
   @@unique([productId, sampleId, op, size, color, stage])
   @@map("product_measurements")
+}
+
+model ClientAdvance {
+  id              String               @id @default(cuid())
+  code            String               @unique
+  clientId        String               @map("client_id")
+  amount          Float
+  usedAmount      Float                @default(0) @map("used_amount")
+  remainingAmount Float                @map("remaining_amount")
+  paymentMethod   String               @default("EFECTIVO") @map("payment_method")
+  reference       String?
+  description     String?
+  evidenceUrl     String?              @map("evidence_url")
+  status          String               @default("DISPONIBLE")
+  createdById     String?              @map("created_by_id")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  client          Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy       User?                @relation("AdvanceCreator", fields: [createdById], references: [id])
+  usages          ClientAdvanceUsage[]
+
+  @@map("client_advances")
+}
+
+model ClientAdvanceUsage {
+  id          String        @id @default(cuid())
+  advanceId   String        @map("advance_id")
+  saleId      String        @map("sale_id")
+  paymentId   String?       @map("payment_id")
+  amount      Float
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  advance     ClientAdvance @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+  sale        Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("client_advance_usages")
 }
