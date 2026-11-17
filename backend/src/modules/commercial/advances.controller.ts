@@ -27,6 +27,16 @@ export class AdvancesController {
     return this.advancesService.getAvailableForClient(clientId);
   }
 
+  @Get('sale-credit-info/:saleId')
+  getSaleCreditInfo(@Param('saleId') saleId: string) {
+    return this.advancesService.getSaleCreditInfo(saleId);
+  }
+
+  @Post('convert-from-sale-credit')
+  convertFromSaleCredit(@Req() req: any, @Body() data: any) {
+    return this.advancesService.convertFromSaleCredit(req.user.id, data);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.advancesService.findOne(id);

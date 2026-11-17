@@ -546,6 +546,45 @@ export class ReturnsService {
           status: 'COMPLETADO',
         },
       });
+
+      // Si la devolución proviene de una venta, actualizar el totalAmount de la venta con las prendas que quedan
+      if (linkedSale && Array.isArray(linkedSale.items)) {
+        let returnTotal = 0;
+        const sizeMapValues = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'];
+        for (const it of returnRequest.items) {
+          const mNorm = normalize(it.modelName);
+          const mFuzzy = normalizeFuzzy(it.modelName);
+          const matchingSaleItem = linkedSale.items.find((si: any) =>
+            normalize(si.variant?.product?.name) === mNorm
+          ) || linkedSale.items.find((si: any) =>
+            normalizeFuzzy(si.variant?.product?.name) === mFuzzy
+          ) || linkedSale.items.find((si: any) => {
+            const pNorm = normalize(si.variant?.product?.name || '');
+            return pNorm.includes(mNorm) || mNorm.includes(pNorm);
+          });
+
+          let unitPrice = matchingSaleItem ? matchingSaleItem.unitPrice : 0;
+          if (!unitPrice || unitPrice <= 0) {
+            const totalSaleQty = linkedSale.items.reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+            unitPrice = totalSaleQty > 0 ? (linkedSale.totalAmount / totalSaleQty) : 0;
+          }
+          unitPrice = Math.round(unitPrice * 100) / 100;
+
+          let itemQty = it.quantity || 0;
+          if (!itemQty || itemQty === 0) {
+            itemQty = sizeMapValues.reduce((acc, field) => acc + ((it as any)[field] || 0), 0);
+          }
+          returnTotal += Math.round(itemQty * unitPrice * 100) / 100;
+        }
+
+        if (returnTotal > 0) {
+          const newSaleTotal = Math.max(0, Math.round((linkedSale.totalAmount - returnTotal) * 100) / 100);
+          await tx.sale.update({
+            where: { id: linkedSale.id },
+            data: { totalAmount: newSaleTotal }
+          });
+        }
+      }
     });
 
     return this.findOne(id);

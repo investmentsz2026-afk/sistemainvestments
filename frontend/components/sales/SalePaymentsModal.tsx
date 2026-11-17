@@ -417,6 +417,45 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
     const [isLoadingAdvances, setIsLoadingAdvances] = useState(false);
     const [selectedAdvanceId, setSelectedAdvanceId] = useState<string | null>(null);
 
+    // Credit from return state
+    const [creditInfo, setCreditInfo] = useState<any>(null);
+    const [isLoadingCreditInfo, setIsLoadingCreditInfo] = useState(false);
+    const [isConvertingCredit, setIsConvertingCredit] = useState(false);
+
+    const fetchCreditInfo = async () => {
+        if (!saleId) return;
+        setIsLoadingCreditInfo(true);
+        try {
+            const resp = await api.get(`/commercial/advances/sale-credit-info/${saleId}`);
+            setCreditInfo(resp.data);
+        } catch (err) {
+            console.error('Error fetching sale credit info:', err);
+        } finally {
+            setIsLoadingCreditInfo(false);
+        }
+    };
+
+    const handleConvertCreditToAdvance = async () => {
+        if (!creditInfo || creditInfo.surplusAmount <= 0) return;
+        setIsConvertingCredit(true);
+        try {
+            const resp = await api.post('/commercial/advances/convert-from-sale-credit', {
+                saleId: sale?.id || saleId
+            });
+            const advCode = resp.data?.advance?.code || '';
+            const surplusVal = resp.data?.surplus || creditInfo.surplusAmount;
+            toast.success(`¡Saldo a favor de S/ ${surplusVal.toFixed(2)} registrado como Adelanto (${advCode}) exitosamente!`, { duration: 6000 });
+            await fetchSaleDetails();
+            if (onUpdate) onUpdate();
+        } catch (error: any) {
+            console.error('Error converting credit to advance:', error);
+            const msg = error.response?.data?.message || 'Error al transferir saldo a favor a adelantos';
+            toast.error(msg);
+        } finally {
+            setIsConvertingCredit(false);
+        }
+    };
+
     useEffect(() => {
         if (showAddForm && method === 'ADELANTO' && sale?.clientId) {
             loadClientAdvances();
@@ -605,6 +644,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
             if (!resp.data.invoiceNumber || (resp.data.sunatStatus !== 'ACEPTADO' && resp.data.sunatStatus !== 'ENVIADO')) {
                 setIsElectronic(false);
             }
+            await fetchCreditInfo();
         } catch (error) {
             console.error('Error fetching sale payments:', error);
         } finally {
@@ -831,7 +871,13 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
 
     const totalPaid = sale?.payments?.filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
     const totalPending = sale?.payments?.filter((p: any) => p.status === 'PENDIENTE').reduce((acc: number, p: any) => acc + p.amount, 0) || 0;
-    const pendingAmount = sale ? Math.max(0, Math.round((sale.totalAmount - totalPaid) * 100) / 100) : 0;
+    
+    // Effective total accounting for return credit info
+    const effectiveTotal = creditInfo?.effectiveTotal ?? sale?.totalAmount ?? 0;
+    const clientSurplus = creditInfo?.surplusAmount ?? (sale ? Math.max(0, Math.round((totalPaid - effectiveTotal) * 100) / 100) : 0);
+    const hasClientSurplus = clientSurplus > 0.009;
+
+    const pendingAmount = sale ? Math.max(0, Math.round((effectiveTotal - totalPaid) * 100) / 100) : 0;
     const pendingAmountWithPending = Math.round((pendingAmount - totalPending) * 100) / 100;
     const isLetraRefinanced = Boolean(sale?.letraGroupId || sale?.letraGroup);
     const isCompleted = sale?.paymentStatus === 'CANCELADO' || isLetraRefinanced || (sale && pendingAmount <= 0.01 && totalPaid > 0);
@@ -913,10 +959,15 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                         </div>
 
                         {/* SUMMARY CARDS - COMPACT */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className={`grid grid-cols-1 ${hasClientSurplus ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2.5`}>
                             <div className="bg-white/5 border border-white/5 rounded-2xl p-3.5 transition-all hover:bg-white/10">
                                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Monto Total</p>
-                                <p className="text-base sm:text-lg font-black font-mono">S/ {sale?.totalAmount?.toLocaleString()}</p>
+                                <p className="text-base sm:text-lg font-black font-mono">S/ {effectiveTotal.toLocaleString()}</p>
+                                {creditInfo?.unconvertedReturnedValue > 0 && (
+                                    <p className="text-[7.5px] font-bold text-amber-400/90 mt-0.5 uppercase tracking-wider">
+                                        Devolución: -S/ {creditInfo.unconvertedReturnedValue.toLocaleString()}
+                                    </p>
+                                )}
                             </div>
                             <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-3.5 transition-all hover:bg-emerald-500/10">
                                 <p className="text-[8px] font-black text-emerald-500/70 uppercase tracking-[0.2em] mb-0.5">Abonado</p>
@@ -926,6 +977,12 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                 <p className="text-[8px] font-black text-amber-500/70 uppercase tracking-[0.2em] mb-0.5">Pendiente</p>
                                 <p className="text-base sm:text-lg font-black text-amber-500 font-mono">S/ {pendingAmount > 0 ? pendingAmount.toLocaleString() : '0'}</p>
                             </div>
+                            {hasClientSurplus && (
+                                <div className="bg-gradient-to-br from-emerald-500/20 via-teal-500/15 to-indigo-500/20 border border-emerald-400/30 rounded-2xl p-3.5 transition-all shadow-sm animate-pulse">
+                                    <p className="text-[8px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-0.5">Saldo a Favor</p>
+                                    <p className="text-base sm:text-lg font-black text-emerald-300 font-mono">S/ {clientSurplus.toLocaleString()}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -950,6 +1007,64 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                 Esta factura está asociada a un canje de letras en el módulo <span className="underline font-black">Letras</span>. Por ello, figura como <b className="text-emerald-700 uppercase">CANCELADA</b> en Ventas y su cobranza se gestiona en dicho módulo.
                                             </p>
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* SALDO A FAVOR POR DEVOLUCIÓN */}
+                                {hasClientSurplus && (
+                                    <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/40 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <div className="flex items-start gap-3.5">
+                                            <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-2xl shrink-0 shadow-inner">
+                                                <Wallet className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-[8.5px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                        Saldo a favor del cliente
+                                                    </span>
+                                                    <span className="text-base sm:text-lg font-black font-mono text-emerald-400">
+                                                        S/ {clientSurplus.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] font-medium text-slate-300 mt-1 leading-relaxed">
+                                                    El cliente canceló la venta, pero devolvió prendas que ya reingresaron al inventario.
+                                                    Presione el botón para registrar este saldo a favor como un <strong>Adelanto</strong> disponible para sus siguientes pedidos o ventas.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleConvertCreditToAdvance}
+                                            disabled={isConvertingCredit}
+                                            className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                                        >
+                                            {isConvertingCredit ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    <span>Transfiriendo...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Wallet className="w-4 h-4" />
+                                                    <span>Enviar saldo a Adelantos</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {creditInfo?.convertedAdvance && !hasClientSurplus && (
+                                    <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 flex items-center justify-between text-indigo-950 shadow-sm">
+                                        <div className="flex items-center gap-2.5">
+                                            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                                            <span className="text-xs font-bold text-slate-700">
+                                                Saldo a favor transferido al Adelanto <strong className="font-mono text-indigo-700 font-black">{creditInfo.convertedAdvance.code}</strong> (S/ {creditInfo.convertedAdvance.amount?.toFixed(2)}).
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-black uppercase px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 shrink-0">
+                                            {creditInfo.convertedAdvance.status}
+                                        </span>
                                     </div>
                                 )}
                                 {/* SECTION TITLE */}
@@ -1030,13 +1145,17 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className="text-sm font-black text-slate-900 font-mono">S/ {payment.amount.toLocaleString()}</span>
+                                                                <span className={`text-sm font-black font-mono ${payment.amount < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                                                    {payment.amount < 0 ? `-S/ ${Math.abs(payment.amount).toLocaleString()}` : `S/ ${payment.amount.toLocaleString()}`}
+                                                                </span>
                                                                 <span className={`text-[7px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                                                    payment.amount < 0 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                                                     payment.method === 'ADELANTO' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                                                                     payment.method === 'NOTA_CREDITO' ? 'bg-violet-100 text-violet-700 border border-violet-200' :
                                                                     payment.method === 'LIQUIDACION' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
                                                                 }`}>
-                                                                    {payment.method === 'ADELANTO' ? 'ADELANTO' :
+                                                                    {payment.amount < 0 ? 'TRASPASO A ADELANTO' :
+                                                                     payment.method === 'ADELANTO' ? 'ADELANTO' :
                                                                      payment.method === 'NOTA_CREDITO' ? 'NOTA DE CRÉDITO' :
                                                                      payment.method === 'LIQUIDACION' ? 'LIQUIDACIÓN' : payment.method}
                                                                 </span>
@@ -1059,6 +1178,11 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                         <span className="ml-2 text-indigo-600 font-black">N° {payment.creditNoteNumber}</span>
                                                                     )}
                                                                 </p>
+                                                                {payment.notes && (
+                                                                    <p className="text-[8px] font-bold text-indigo-700/80 mt-0.5">
+                                                                        {payment.notes}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1092,7 +1216,7 @@ export default function SalePaymentsModal({ saleId, isOpen, onClose, onUpdate }:
                                                                 <FileText className="w-4 h-4" />
                                                             </a>
                                                         )}
-                                                        {payment.method !== 'LIQUIDACION' && payment.method !== 'ADELANTO' && (
+                                                        {payment.method !== 'LIQUIDACION' && payment.method !== 'ADELANTO' && payment.amount > 0 && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleEditClick(payment)}

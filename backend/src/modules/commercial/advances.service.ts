@@ -226,4 +226,226 @@ export class AdvancesService {
 
     return { success: true, message: `Adelanto ${advance.code} eliminado correctamente.` };
   }
+
+  async getSaleCreditInfo(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        client: true,
+        items: {
+          include: {
+            variant: {
+              include: { product: true }
+            }
+          }
+        },
+        payments: true
+      }
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada.');
+    }
+
+    const totalPaid = (sale.payments || [])
+      .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+
+    const invoiceNum = sale.invoiceNumber?.trim();
+    let unconvertedReturns: any[] = [];
+    let unconvertedReturnedValue = 0;
+
+    const sizeFields = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'];
+    const normalize = (str: string) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const normalizeFuzzy = (str: string) => normalize(str).replace(/Y/g, 'I');
+
+    if (invoiceNum) {
+      const allReturns = await this.prisma.returnRequest.findMany({
+        where: {
+          status: 'COMPLETADO',
+          OR: [
+            { reason: { contains: invoiceNum, mode: 'insensitive' } },
+            { clientId: sale.clientId || undefined }
+          ]
+        },
+        include: { items: true },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      unconvertedReturns = allReturns.filter((req: any) => {
+        const invoiceMatch = req.reason && req.reason.match(/\[Comprobante:\s*([^\]]+)\]/i);
+        const matchedInvoice = invoiceMatch ? invoiceMatch[1].trim() : null;
+        const directMention = req.reason && req.reason.toUpperCase().includes(invoiceNum.toUpperCase());
+        if (!matchedInvoice && !directMention) return false;
+        if (matchedInvoice && matchedInvoice.toUpperCase() !== invoiceNum.toUpperCase()) return false;
+
+        // Skip if already credited via credit note or advance
+        const hasNC = (req.reason && req.reason.match(/\[NC:\s*([^\]]+)\]/i)) || (req.qualityObservations && req.qualityObservations.match(/\[NC:\s*([^\]]+)\]/i));
+        const hasAdvance = (req.reason && req.reason.match(/\[Adelanto:\s*([^\]]+)\]/i)) || (req.qualityObservations && req.qualityObservations.match(/\[Adelanto:\s*([^\]]+)\]/i));
+        if (hasNC || hasAdvance) return false;
+
+        return true;
+      });
+
+      for (const ret of unconvertedReturns) {
+        let retTotal = 0;
+        for (const it of ret.items) {
+          const mNorm = normalize(it.modelName);
+          const mFuzzy = normalizeFuzzy(it.modelName);
+          const matchingSaleItem = (sale.items || []).find((si: any) =>
+            normalize(si.variant?.product?.name) === mNorm
+          ) || (sale.items || []).find((si: any) =>
+            normalizeFuzzy(si.variant?.product?.name) === mFuzzy
+          ) || (sale.items || []).find((si: any) => {
+            const pNorm = normalize(si.variant?.product?.name || '');
+            return pNorm.includes(mNorm) || mNorm.includes(pNorm);
+          });
+
+          let unitPrice = matchingSaleItem ? matchingSaleItem.unitPrice : 0;
+          if (!unitPrice || unitPrice <= 0) {
+            const totalSaleQty = (sale.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+            unitPrice = totalSaleQty > 0 ? (sale.totalAmount / totalSaleQty) : 0;
+          }
+          unitPrice = Math.round(unitPrice * 100) / 100;
+
+          let itemQty = it.quantity || 0;
+          if (!itemQty || itemQty === 0) {
+            itemQty = sizeFields.reduce((acc, field) => acc + ((it as any)[field] || 0), 0);
+          }
+          retTotal += Math.round(itemQty * unitPrice * 100) / 100;
+        }
+        unconvertedReturnedValue += retTotal;
+      }
+    }
+
+    // Determine effective total of sale:
+    const originalItemsSum = (sale.items || []).reduce((acc: number, it: any) => acc + ((it.quantity || 0) * (it.unitPrice || 0)), 0);
+    let effectiveTotal = sale.totalAmount;
+    if (unconvertedReturnedValue > 0 && Math.abs(sale.totalAmount - originalItemsSum) <= 0.05) {
+      effectiveTotal = Math.max(0, Math.round((sale.totalAmount - unconvertedReturnedValue) * 100) / 100);
+    }
+
+    // Surplus = what was paid above effectiveTotal
+    const surplusAmount = Math.max(0, Math.round((totalPaid - effectiveTotal) * 100) / 100);
+
+    const convertedPayment = (sale.payments || []).find((p: any) => p.advanceId && p.amount < 0);
+    let convertedAdvance: any = null;
+    if (convertedPayment && (convertedPayment as any).advanceId) {
+      convertedAdvance = await this.prisma.clientAdvance.findUnique({
+        where: { id: (convertedPayment as any).advanceId }
+      });
+    }
+
+    return {
+      saleId: sale.id,
+      invoiceNumber: sale.invoiceNumber,
+      clientName: sale.client?.name,
+      clientId: sale.clientId,
+      totalAmount: sale.totalAmount,
+      effectiveTotal,
+      totalPaid,
+      surplusAmount,
+      hasSurplus: surplusAmount > 0.009,
+      unconvertedReturnsCount: unconvertedReturns.length,
+      unconvertedReturnedValue,
+      activeCompletedReturns: unconvertedReturns.map((r: any) => ({
+        id: r.id,
+        returnNumber: r.returnNumber,
+        itemsCount: r.items?.length || 0,
+      })),
+      convertedAdvance
+    };
+  }
+
+  async convertFromSaleCredit(userId: string, data: { saleId: string; amount?: number; notes?: string }) {
+    const { saleId, amount, notes } = data;
+    if (!saleId) {
+      throw new BadRequestException('ID de venta requerido.');
+    }
+
+    const creditInfo = await this.getSaleCreditInfo(saleId);
+    if (!creditInfo.hasSurplus || creditInfo.surplusAmount <= 0.009) {
+      throw new BadRequestException('Esta venta no cuenta con saldo a favor por devolución disponible para transferir a adelantos.');
+    }
+    if (!creditInfo.clientId) {
+      throw new BadRequestException('La venta no tiene un cliente válido asignado para crear el adelanto.');
+    }
+
+    const targetAmount = amount && parseFloat(amount as any) > 0 
+      ? Math.min(parseFloat(amount as any), creditInfo.surplusAmount) 
+      : creditInfo.surplusAmount;
+
+    const code = await this.generateAdvanceCode();
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. If sale totalAmount needs to be updated to effectiveTotal
+      if (Math.abs(creditInfo.totalAmount - creditInfo.effectiveTotal) > 0.01) {
+        await tx.sale.update({
+          where: { id: saleId },
+          data: { totalAmount: creditInfo.effectiveTotal }
+        });
+      }
+
+      // 2. Create the ClientAdvance
+      const advance = await tx.clientAdvance.create({
+        data: {
+          code,
+          clientId: creditInfo.clientId as string,
+          amount: targetAmount,
+          usedAmount: 0,
+          remainingAmount: targetAmount,
+          paymentMethod: 'DEVOLUCION',
+          reference: creditInfo.invoiceNumber ? `Devolución ${creditInfo.invoiceNumber}` : `Devolución Venta #${saleId.slice(-6)}`,
+          description: notes || `Saldo a favor por devolución de prendas reingresadas a almacén (Comprobante: ${creditInfo.invoiceNumber || saleId})`,
+          status: 'DISPONIBLE',
+          createdById: userId,
+        },
+        include: {
+          client: true,
+          createdBy: { select: { id: true, name: true } }
+        }
+      });
+
+      // 3. Register the negative adjustment payment in the sale
+      await tx.salePayment.create({
+        data: {
+          saleId,
+          amount: -targetAmount,
+          paymentDate: new Date(),
+          method: 'ADELANTO',
+          notes: `Traspaso a módulo Adelantos (${code}) por saldo a favor de devolución`,
+          status: 'APROBADO',
+          registeredById: userId,
+          advanceId: advance.id
+        }
+      });
+
+      // 4. Tag the active completed returns so they aren't counted again
+      if (creditInfo.activeCompletedReturns && creditInfo.activeCompletedReturns.length > 0) {
+        for (const ret of creditInfo.activeCompletedReturns) {
+          const existingReq = await tx.returnRequest.findUnique({ where: { id: ret.id } });
+          if (existingReq) {
+            const updatedReason = `${existingReq.reason || ''} [Adelanto: ${code}]`.trim();
+            await tx.returnRequest.update({
+              where: { id: ret.id },
+              data: { reason: updatedReason }
+            });
+          }
+        }
+      }
+
+      // 5. Ensure sale payment status is CANCELADO
+      await tx.sale.update({
+        where: { id: saleId },
+        data: { paymentStatus: 'CANCELADO' }
+      });
+
+      return {
+        success: true,
+        advance,
+        surplus: targetAmount,
+        message: `Saldo a favor de S/ ${targetAmount.toFixed(2)} transferido correctamente a Adelantos (${code}).`
+      };
+    });
+  }
 }

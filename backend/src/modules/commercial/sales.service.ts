@@ -887,23 +887,33 @@ export class SalesService {
           try {
             const advance = await (tx as any).clientAdvance.findUnique({ where: { id: advId } });
             if (advance) {
-              const restoredUsed = Math.max(0, advance.usedAmount - payment.amount);
-              const restoredRemaining = advance.remainingAmount + payment.amount;
-              const restoredStatus = restoredUsed <= 0.01 ? 'DISPONIBLE' : 'PARCIAL';
-              await (tx as any).clientAdvance.update({
-                where: { id: advId },
-                data: {
-                  usedAmount: restoredUsed,
-                  remainingAmount: restoredRemaining,
-                  status: restoredStatus,
+              if (payment.amount < 0) {
+                // Si fue un abono negativo (traspaso de saldo a favor de devolución a adelanto)
+                if (advance.usedAmount > 0.01) {
+                  throw new BadRequestException(`No se puede anular el traspaso porque el adelanto ${advance.code} ya fue utilizado en otras ventas.`);
                 }
-              });
+                await (tx as any).clientAdvance.delete({ where: { id: advId } });
+              } else {
+                // Si fue un abono normal con saldo de adelanto
+                const restoredUsed = Math.max(0, advance.usedAmount - payment.amount);
+                const restoredRemaining = advance.remainingAmount + payment.amount;
+                const restoredStatus = restoredUsed <= 0.01 ? 'DISPONIBLE' : 'PARCIAL';
+                await (tx as any).clientAdvance.update({
+                  where: { id: advId },
+                  data: {
+                    usedAmount: restoredUsed,
+                    remainingAmount: restoredRemaining,
+                    status: restoredStatus,
+                  }
+                });
+              }
             }
             await (tx as any).clientAdvanceUsage.deleteMany({
               where: { paymentId: payment.id }
             });
           } catch (advErr) {
-            console.warn('Error restoring advance on deletePayment:', advErr);
+            console.warn('Error handling advance on deletePayment:', advErr);
+            if (advErr instanceof BadRequestException) throw advErr;
           }
         }
       }
