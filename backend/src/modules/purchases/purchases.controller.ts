@@ -12,7 +12,7 @@ export class PurchasesController {
     constructor(private readonly purchasesService: PurchasesService) { }
 
     @Post()
-    @Roles('LOGISTICA', 'ADMIN')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
     async create(@Request() req, @Body() dto: CreatePurchaseDto) {
         try {
             const result = await this.purchasesService.create(req.user.id, dto);
@@ -33,6 +33,17 @@ export class PurchasesController {
         }
     }
 
+    @Get('cost-summary')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD', 'UDP')
+    async getCostSummary() {
+        try {
+            const result = await this.purchasesService.getCostSummary();
+            return { success: true, data: result };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
     @Get('services/available')
     @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD', 'UDP')
     async getAvailableServices() {
@@ -40,6 +51,43 @@ export class PurchasesController {
             const all = await this.purchasesService.findAll();
             const services = all.filter((p: any) => p.type === 'SERVICE');
             return { success: true, data: services };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    @Patch(':id/finance-plan')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
+    async configureFinancePlan(@Param('id') id: string, @Body() body: any) {
+        try {
+            const result = await this.purchasesService.configureFinancePlan(id, body);
+            return { success: true, message: 'Configuración financiera guardada correctamente', data: result };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    @Post(':id/installments/:installmentNumber/pay')
+    @Roles('ADMIN', 'CONTABILIDAD')
+    async payInstallment(
+        @Param('id') id: string,
+        @Param('installmentNumber') installmentNumber: string,
+        @Body() body: any,
+    ) {
+        try {
+            const result = await this.purchasesService.payInstallment(id, Number(installmentNumber), body);
+            return { success: true, message: `Letra N° ${installmentNumber} pagada exitosamente`, data: result };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    @Post(':id/direct-payment')
+    @Roles('ADMIN', 'CONTABILIDAD')
+    async registerDirectPayment(@Param('id') id: string, @Body() body: any) {
+        try {
+            const result = await this.purchasesService.registerDirectPayment(id, body);
+            return { success: true, message: 'Pago registrado exitosamente', data: result };
         } catch (error) {
             return { success: false, message: error.message };
         }
@@ -68,7 +116,7 @@ export class PurchasesController {
     }
 
     @Put(':id')
-    @Roles('LOGISTICA', 'ADMIN')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
     async update(@Param('id') id: string, @Body() dto: CreatePurchaseDto) {
         try {
             const result = await this.purchasesService.update(id, dto);
@@ -79,7 +127,7 @@ export class PurchasesController {
     }
 
     @Delete(':id')
-    @Roles('LOGISTICA', 'ADMIN')
+    @Roles('LOGISTICA', 'ADMIN', 'CONTABILIDAD')
     async remove(@Param('id') id: string) {
         try {
             await this.purchasesService.remove(id);

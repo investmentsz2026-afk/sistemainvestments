@@ -161,7 +161,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ] : []),
     ...(user?.role === 'ADMIN' || user?.role === 'CONTABILIDAD' ? [
       { name: 'Cobro de Letras', href: '/admin/letras-collection', icon: Landmark },
-      { name: 'Contabilidad', href: '/admin/accounting', icon: Scale }
+      { name: 'Contabilidad y Costos', href: '/admin/accounting', icon: Scale },
+      { name: 'Finanzas y Tesorería', href: '/admin/finance', icon: Wallet }
     ] : []),
   ];
 
