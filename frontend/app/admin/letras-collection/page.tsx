@@ -37,7 +37,7 @@ export default function LetrasCollectionPage() {
     const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<'CANJES' | 'PAGOS_DIRECTOS'>('CANJES');
+    const [activeTab, setActiveTab] = useState<'CANJES' | 'PAGOS_DIRECTOS' | 'NOTAS_CREDITO' | 'DEVOLUCIONES'>('CANJES');
     const [isLoading, setIsLoading] = useState(true);
 
     // Letra Groups data
@@ -323,40 +323,87 @@ export default function LetrasCollectionPage() {
         );
     }, [groups, searchTerm]);
 
-    // Group pending payments by sale/invoice
+    // Group pending payments by sale/invoice and classify by category
     const groupedPendingSales = useMemo(() => {
         const map: { [saleId: string]: any } = {};
 
         pendingPayments.forEach(p => {
             if (!p.sale) return;
             const saleId = p.sale.id;
+            const summary = p.sale.adminSummary || {};
+            const category = p.sale.adminCategory || 'PAGO_DIRECTO';
+
             if (!map[saleId]) {
+                const allActivePayments = Array.isArray(summary.allActivePayments) && summary.allActivePayments.length > 0
+                    ? summary.allActivePayments
+                    : [];
                 map[saleId] = {
                     id: saleId,
                     invoiceNumber: p.sale.invoiceNumber || 'S/N',
-                    totalAmount: p.sale.totalAmount,
+                    totalAmount: summary.effectiveTotal ?? p.sale.totalAmount,
+                    originalSaleAmount: summary.originalSaleAmount ?? p.sale.totalAmount,
+                    directPaidAmount: summary.directPaidAmount ?? 0,
+                    creditNoteAmount: summary.creditNoteAmount ?? 0,
+                    creditNoteNumbers: summary.creditNoteNumbers || [],
+                    returnedAmount: summary.returnedAmount ?? 0,
+                    surplusAmount: summary.surplusAmount ?? 0,
+                    transferredAdvanceAmount: summary.transferredAdvanceAmount ?? 0,
+                    advanceCode: summary.advanceCode || null,
+                    returnNumbers: summary.returnNumbers || [],
+                    adminCategory: category,
                     client: p.sale.client,
                     seller: p.sale.seller || { name: p.registeredByName || 'Vendedor' },
                     createdAt: p.sale.createdAt,
-                    pendingPaymentsList: [],
+                    pendingPaymentsList: allActivePayments.length > 0 ? allActivePayments : [],
+                    hasCustomAllPayments: allActivePayments.length > 0,
                     totalPendingAmount: 0
                 };
             }
-            map[saleId].pendingPaymentsList.push(p);
-            map[saleId].totalPendingAmount += p.amount;
+
+            if (!map[saleId].hasCustomAllPayments) {
+                map[saleId].pendingPaymentsList.push(p);
+            }
+        });
+
+        Object.values(map).forEach((saleGroup: any) => {
+            const positiveApprovable = (saleGroup.pendingPaymentsList || []).filter(
+                (sp: any) => sp.status === 'APROBADO' && Number(sp.amount) > 0
+            );
+            const sumPositiveApprovable = positiveApprovable.reduce((acc: number, sp: any) => acc + Number(sp.amount || 0), 0);
+            saleGroup.approvablePaymentsCount = positiveApprovable.length;
+            saleGroup.totalPendingAmount = sumPositiveApprovable > 0
+                ? sumPositiveApprovable
+                : (saleGroup.directPaidAmount || saleGroup.totalAmount);
         });
 
         return Object.values(map);
     }, [pendingPayments]);
 
-    const filteredPendingSales = useMemo(() => {
-        if (!searchTerm) return groupedPendingSales;
+    const directSales = useMemo(
+        () => groupedPendingSales.filter((gs: any) => gs.adminCategory === 'PAGO_DIRECTO'),
+        [groupedPendingSales]
+    );
+    const creditNoteSales = useMemo(
+        () => groupedPendingSales.filter((gs: any) => gs.adminCategory === 'NOTA_CREDITO'),
+        [groupedPendingSales]
+    );
+    const devolutionSales = useMemo(
+        () => groupedPendingSales.filter((gs: any) => gs.adminCategory === 'DEVOLUCION'),
+        [groupedPendingSales]
+    );
+
+    const filterBySearch = (list: any[]) => {
+        if (!searchTerm) return list;
         const lower = searchTerm.toLowerCase();
-        return groupedPendingSales.filter((gs: any) => 
-            gs.client?.name?.toLowerCase().includes(lower) || 
+        return list.filter((gs: any) =>
+            gs.client?.name?.toLowerCase().includes(lower) ||
             gs.invoiceNumber?.toLowerCase().includes(lower)
         );
-    }, [groupedPendingSales, searchTerm]);
+    };
+
+    const filteredPendingSales = useMemo(() => filterBySearch(directSales), [directSales, searchTerm]);
+    const filteredCreditNoteSales = useMemo(() => filterBySearch(creditNoteSales), [creditNoteSales, searchTerm]);
+    const filteredDevolutionSales = useMemo(() => filterBySearch(devolutionSales), [devolutionSales, searchTerm]);
 
     // Financial Metrics for the Top Ribbon
     const metrics = useMemo(() => {
@@ -383,17 +430,21 @@ export default function LetrasCollectionPage() {
             }
         });
 
-        // Add direct pending payments awaiting verification
-        const pendingDirectSum = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+        // Add direct pending payments awaiting verification (only positive direct amounts, not credit notes)
+        const pendingDirectSum = pendingPayments
+            .filter(p => p.method !== 'NOTA_CREDITO' && Number(p.amount) > 0)
+            .reduce((sum, p) => sum + p.amount, 0);
 
         return {
             cartera: totalCartera,
             collected: totalCobradoLetras,
             pending: totalPendienteLetras + pendingDirectSum,
             overdue: totalMoraLetras,
-            pendingDirectCount: pendingPayments.length
+            pendingDirectCount: directSales.length,
+            pendingCreditNoteCount: creditNoteSales.length,
+            pendingDevolutionCount: devolutionSales.length
         };
-    }, [groups, pendingPayments]);
+    }, [groups, pendingPayments, directSales.length, creditNoteSales.length, devolutionSales.length]);
 
     const cardClass = "bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-xl";
 
@@ -444,7 +495,7 @@ export default function LetrasCollectionPage() {
                 </div>
 
                 {/* Tabs Selectors */}
-                <div className="flex border-b border-slate-100 gap-4">
+                <div className="flex flex-wrap border-b border-slate-100 gap-6">
                     <button
                         onClick={() => {
                             setActiveTab('CANJES');
@@ -473,6 +524,42 @@ export default function LetrasCollectionPage() {
                         {metrics.pendingDirectCount > 0 && (
                             <span className="bg-indigo-100 text-indigo-700 text-[9px] px-2 py-0.5 rounded-full font-black animate-pulse">
                                 {metrics.pendingDirectCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => {
+                            setActiveTab('NOTAS_CREDITO');
+                            setSearchTerm('');
+                        }}
+                        className={`pb-4 text-sm font-black uppercase tracking-wider border-b-2 transition flex items-center gap-2 ${
+                            activeTab === 'NOTAS_CREDITO' 
+                            ? 'border-violet-600 text-slate-900' 
+                            : 'border-transparent text-slate-400 hover:text-slate-650'
+                        }`}
+                    >
+                        Ventas con Nota de Crédito
+                        {metrics.pendingCreditNoteCount > 0 && (
+                            <span className="bg-violet-100 text-violet-700 text-[9px] px-2 py-0.5 rounded-full font-black animate-pulse">
+                                {metrics.pendingCreditNoteCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => {
+                            setActiveTab('DEVOLUCIONES');
+                            setSearchTerm('');
+                        }}
+                        className={`pb-4 text-sm font-black uppercase tracking-wider border-b-2 transition flex items-center gap-2 ${
+                            activeTab === 'DEVOLUCIONES' 
+                            ? 'border-teal-600 text-slate-900' 
+                            : 'border-transparent text-slate-400 hover:text-slate-650'
+                        }`}
+                    >
+                        Ventas con Devolución / Saldo
+                        {metrics.pendingDevolutionCount > 0 && (
+                            <span className="bg-teal-100 text-teal-700 text-[9px] px-2 py-0.5 rounded-full font-black animate-pulse">
+                                {metrics.pendingDevolutionCount}
                             </span>
                         )}
                     </button>
@@ -590,11 +677,11 @@ export default function LetrasCollectionPage() {
                             </table>
                         </div>
                     </div>
-                ) : (
+                ) : activeTab === 'PAGOS_DIRECTOS' ? (
                     <div className={`${cardClass} overflow-hidden`}>
                         <div className="border-b border-slate-100 pb-4 mb-6">
-                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Ventas con Abonos Pendientes</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Ventas con abonos en efectivo o transferencias registrados que requieren verificación de comprobantes.</p>
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Ventas con Abonos Directos Pendientes</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Ventas liquidadas al 100% con abonos en efectivo, depósito o transferencias que requieren verificación administrativa.</p>
                         </div>
                         
                         <div className="overflow-x-auto -mx-8">
@@ -612,7 +699,7 @@ export default function LetrasCollectionPage() {
                                 <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
                                     {filteredPendingSales.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="px-8 py-16 text-center text-slate-400 italic">No hay ventas con abonos pendientes de validación.</td>
+                                            <td colSpan={6} className="px-8 py-16 text-center text-slate-400 italic">No hay ventas con abonos directos pendientes de validación.</td>
                                         </tr>
                                     ) : (
                                         filteredPendingSales.map((gs: any) => (
@@ -646,6 +733,163 @@ export default function LetrasCollectionPage() {
                                                     >
                                                         <Eye className="w-3 h-3" />
                                                         Ver Abonos
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : activeTab === 'NOTAS_CREDITO' ? (
+                    <div className={`${cardClass} overflow-hidden`}>
+                        <div className="border-b border-slate-100 pb-4 mb-6">
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Ventas con Nota de Crédito</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Ventas canceladas parcial o totalmente mediante Nota de Crédito junto con sus abonos directos para revisión y aprobación.</p>
+                        </div>
+
+                        <div className="overflow-x-auto -mx-8">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                        <th className="px-8 py-4">Cliente / Venta</th>
+                                        <th className="px-8 py-4">Vendedor</th>
+                                        <th className="px-8 py-4 text-right">Monto Total Venta</th>
+                                        <th className="px-8 py-4 text-right">Abonos Directos</th>
+                                        <th className="px-8 py-4 text-right">Monto Nota de Crédito</th>
+                                        <th className="px-8 py-4 text-center">Registros</th>
+                                        <th className="px-8 py-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                                    {filteredCreditNoteSales.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-8 py-16 text-center text-slate-400 italic">No hay ventas con Nota de Crédito pendientes de validación.</td>
+                                        </tr>
+                                    ) : (
+                                        filteredCreditNoteSales.map((gs: any) => (
+                                            <tr key={gs.id} className="hover:bg-slate-50/30 transition">
+                                                <td className="px-8 py-4 uppercase">
+                                                    <div className="text-slate-900 font-black text-xs">{gs.client?.name || 'Cliente Genérico'}</div>
+                                                    <div className="text-[9px] text-indigo-650 font-black mt-0.5">Venta: {gs.invoiceNumber}</div>
+                                                    <div className="text-[8px] text-slate-400 font-medium">Registrado: {new Date(gs.createdAt).toLocaleDateString()}</div>
+                                                </td>
+                                                <td className="px-8 py-4 text-slate-550 uppercase">
+                                                    {gs.seller?.name || 'Vendedor'}
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-slate-900 text-xs">
+                                                    S/. {gs.originalSaleAmount.toFixed(2)}
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-emerald-600 text-xs">
+                                                    S/. {gs.directPaidAmount.toFixed(2)}
+                                                </td>
+                                                <td className="px-8 py-4 text-right">
+                                                    <div className="font-black text-violet-700 text-xs">S/. {gs.creditNoteAmount.toFixed(2)}</div>
+                                                    {gs.creditNoteNumbers?.length > 0 && (
+                                                        <div className="text-[8px] font-black text-violet-500 uppercase mt-0.5">
+                                                            NC: {gs.creditNoteNumbers.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-8 py-4 text-center">
+                                                    <span className="px-2.5 py-0.5 bg-violet-50 text-violet-700 border border-violet-100 rounded-lg text-[10px] font-black">
+                                                        {gs.pendingPaymentsList.length} registros
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-4 text-right">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedSaleDetails(gs);
+                                                            setLocallyApprovedPayments([]);
+                                                        }}
+                                                        className="bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition active:scale-95 flex items-center gap-1 shadow-sm ml-auto"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                        Ver Abonos y NC
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className={`${cardClass} overflow-hidden`}>
+                        <div className="border-b border-slate-100 pb-4 mb-6">
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Ventas Canceladas con Devolución / Saldo a Favor</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Ventas que ya estaban canceladas y tuvieron devolución de prendas al inventario, generando saldo a favor / adelanto para el cliente.</p>
+                        </div>
+
+                        <div className="overflow-x-auto -mx-8">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                        <th className="px-8 py-4">Cliente / Venta</th>
+                                        <th className="px-8 py-4">Vendedor</th>
+                                        <th className="px-8 py-4 text-right">Monto Original</th>
+                                        <th className="px-8 py-4 text-right">Devolución / Saldo Cliente</th>
+                                        <th className="px-8 py-4 text-right">Nuevo Total Neto</th>
+                                        <th className="px-8 py-4 text-right">Abonado por Cliente</th>
+                                        <th className="px-8 py-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                                    {filteredDevolutionSales.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="px-8 py-16 text-center text-slate-400 italic">No hay ventas canceladas con devolución o saldo a favor pendientes de revisión.</td>
+                                        </tr>
+                                    ) : (
+                                        filteredDevolutionSales.map((gs: any) => (
+                                            <tr key={gs.id} className="hover:bg-slate-50/30 transition">
+                                                <td className="px-8 py-4 uppercase">
+                                                    <div className="text-slate-900 font-black text-xs">{gs.client?.name || 'Cliente Genérico'}</div>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        <span className="text-[9px] text-indigo-650 font-black">Venta: {gs.invoiceNumber}</span>
+                                                        {gs.returnNumbers?.length > 0 && (
+                                                            <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded text-[8px] font-black">
+                                                                {gs.returnNumbers.join(', ')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[8px] text-slate-400 font-medium">Registrado: {new Date(gs.createdAt).toLocaleDateString()}</div>
+                                                </td>
+                                                <td className="px-8 py-4 text-slate-550 uppercase">
+                                                    {gs.seller?.name || 'Vendedor'}
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-slate-500 line-through text-xs">
+                                                    S/. {gs.originalSaleAmount.toFixed(2)}
+                                                </td>
+                                                <td className="px-8 py-4 text-right">
+                                                    <div className="font-black text-rose-600 text-xs">-S/. {gs.returnedAmount.toFixed(2)}</div>
+                                                    {gs.advanceCode ? (
+                                                        <span className="inline-block mt-0.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[8px] font-black uppercase">
+                                                            Adelanto: {gs.advanceCode}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-block mt-0.5 px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[8px] font-black uppercase">
+                                                            Saldo a Favor: S/. {gs.surplusAmount.toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-slate-900 text-xs">
+                                                    S/. {gs.totalAmount.toFixed(2)}
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-emerald-600 text-xs">
+                                                    S/. {gs.directPaidAmount.toFixed(2)}
+                                                </td>
+                                                <td className="px-8 py-4 text-right">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedSaleDetails(gs);
+                                                            setLocallyApprovedPayments([]);
+                                                        }}
+                                                        className="bg-slate-900 hover:bg-slate-800 text-white text-[9px] font-black uppercase px-3 py-2 rounded-xl transition active:scale-95 flex items-center gap-1 shadow-sm ml-auto"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                        Ver Detalle y Abonos
                                                     </button>
                                                 </td>
                                             </tr>
@@ -833,13 +1077,85 @@ export default function LetrasCollectionPage() {
                         </button>
 
                         <div>
-                            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                                Abonos de la Venta: {selectedSaleDetails.invoiceNumber}
-                            </h2>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                                    Abonos de la Venta: {selectedSaleDetails.invoiceNumber}
+                                </h2>
+                                {selectedSaleDetails.adminCategory === 'NOTA_CREDITO' && (
+                                    <span className="px-2.5 py-0.5 bg-violet-100 text-violet-800 border border-violet-200 rounded-full text-[9px] font-black uppercase">
+                                        Venta con Nota de Crédito
+                                    </span>
+                                )}
+                                {selectedSaleDetails.adminCategory === 'DEVOLUCION' && (
+                                    <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 border border-teal-200 rounded-full text-[9px] font-black uppercase">
+                                        Venta con Devolución / Saldo a Favor
+                                    </span>
+                                )}
+                            </div>
                             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
-                                Cliente: {selectedSaleDetails.client?.name} | Vendedor: {selectedSaleDetails.seller?.name} | Monto Total: S/. {selectedSaleDetails.totalAmount.toFixed(2)}
+                                Cliente: {selectedSaleDetails.client?.name} | Vendedor: {selectedSaleDetails.seller?.name} | Monto Total Neto: S/. {selectedSaleDetails.totalAmount.toFixed(2)}
                             </p>
                         </div>
+
+                        {/* Summary Breakdown for Nota de Crédito */}
+                        {selectedSaleDetails.adminCategory === 'NOTA_CREDITO' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-violet-50/60 border border-violet-100 p-4 rounded-2xl">
+                                <div className="bg-white p-3.5 rounded-xl border border-violet-100 shadow-sm">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Monto Total Factura</p>
+                                    <p className="text-base font-black text-slate-900 mt-0.5">S/. {selectedSaleDetails.originalSaleAmount.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-sm">
+                                    <p className="text-[8px] font-black text-emerald-600 uppercase tracking-wider">Abonos Directos (Cobrado)</p>
+                                    <p className="text-base font-black text-emerald-600 mt-0.5">S/. {selectedSaleDetails.directPaidAmount.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-xl border border-violet-200 shadow-sm">
+                                    <p className="text-[8px] font-black text-violet-600 uppercase tracking-wider">Monto Nota de Crédito</p>
+                                    <p className="text-base font-black text-violet-700 mt-0.5">S/. {selectedSaleDetails.creditNoteAmount.toFixed(2)}</p>
+                                    {selectedSaleDetails.creditNoteNumbers?.length > 0 && (
+                                        <p className="text-[8px] font-black text-violet-500 uppercase mt-0.5">
+                                            N° {selectedSaleDetails.creditNoteNumbers.join(', ')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Summary Breakdown for Devolución / Saldo a Favor */}
+                        {selectedSaleDetails.adminCategory === 'DEVOLUCION' && (
+                            <div className="space-y-3 bg-teal-50/60 border border-teal-200/70 p-4 rounded-2xl">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-teal-900">
+                                        Detalle de Modificación por Devolución en Inventario
+                                    </span>
+                                    {selectedSaleDetails.returnNumbers?.length > 0 && (
+                                        <span className="px-2 py-0.5 bg-teal-100 text-teal-800 rounded text-[9px] font-black uppercase">
+                                            Devolución: {selectedSaleDetails.returnNumbers.join(', ')}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                    <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Monto Original Venta</p>
+                                        <p className="text-sm font-black text-slate-500 line-through mt-0.5">S/. {selectedSaleDetails.originalSaleAmount.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
+                                        <p className="text-[8px] font-black text-rose-500 uppercase tracking-wider">Prendas Devueltas</p>
+                                        <p className="text-sm font-black text-rose-600 mt-0.5">-S/. {selectedSaleDetails.returnedAmount.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                        <p className="text-[8px] font-black text-slate-700 uppercase tracking-wider">Nuevo Total Neto</p>
+                                        <p className="text-sm font-black text-slate-900 mt-0.5">S/. {selectedSaleDetails.totalAmount.toFixed(2)}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm">
+                                        <p className="text-[8px] font-black text-emerald-700 uppercase tracking-wider">Saldo a Favor / Adelanto</p>
+                                        <p className="text-sm font-black text-emerald-600 mt-0.5">S/. {selectedSaleDetails.surplusAmount.toFixed(2)}</p>
+                                        <p className="text-[8px] font-black text-indigo-600 uppercase mt-0.5">
+                                            {selectedSaleDetails.advanceCode ? `Adelanto: ${selectedSaleDetails.advanceCode}` : 'Pendiente traspaso a Adelanto'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* List of pending payments for this sale */}
                         <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
@@ -849,98 +1165,133 @@ export default function LetrasCollectionPage() {
                                         <th className="px-6 py-3">Fecha Abono</th>
                                         <th className="px-6 py-3">Método</th>
                                         <th className="px-6 py-3 text-right">Monto</th>
-                                        <th className="px-6 py-3">Evidencia (Voucher)</th>
+                                        <th className="px-6 py-3">Evidencia / Documento</th>
                                         <th className="px-6 py-3">Glosa / Comentario</th>
                                         <th className="px-6 py-3 text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                                    {selectedSaleDetails.pendingPaymentsList?.map((p: any) => (
-                                        <tr key={p.id} className="hover:bg-slate-50/20 transition">
-                                            <td className="px-6 py-3 whitespace-nowrap">
-                                                {new Date(p.paymentDate).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[9px] font-black tracking-wider uppercase">
-                                                    {p.method}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3 text-right font-black text-slate-900 text-xs">
-                                                S/. {p.amount.toFixed(2)}
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                {p.evidenceUrl ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <img 
-                                                            src={getImageUrl(p.evidenceUrl)} 
-                                                            alt="Voucher" 
-                                                            onClick={() => setPreviewImageUrl(p.evidenceUrl)}
-                                                            className="w-10 h-10 object-cover rounded-xl cursor-zoom-in hover:scale-105 border border-slate-200 shadow-sm transition active:scale-95 flex-shrink-0"
-                                                        />
-                                                        <a 
-                                                            href={getImageUrl(p.evidenceUrl)} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="text-slate-400 hover:text-indigo-650 transition"
-                                                        >
-                                                            <ExternalLink className="w-3.5 h-3.5" />
-                                                        </a>
+                                    {selectedSaleDetails.pendingPaymentsList?.map((p: any) => {
+                                        const isNegativeTransfer = Number(p.amount) < 0;
+                                        const isAlreadyConciliated = p.status === 'CONCILIADO';
+                                        const isCreditNote = p.method === 'NOTA_CREDITO';
+
+                                        return (
+                                            <tr key={p.id} className={`hover:bg-slate-50/20 transition ${isNegativeTransfer ? 'bg-amber-50/20' : isCreditNote ? 'bg-violet-50/20' : ''}`}>
+                                                <td className="px-6 py-3 whitespace-nowrap">
+                                                    {new Date(p.paymentDate).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex flex-col items-start gap-0.5">
+                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase ${
+                                                            isNegativeTransfer
+                                                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                                : isCreditNote
+                                                                ? 'bg-violet-100 text-violet-700 border border-violet-200'
+                                                                : 'bg-slate-100 text-slate-700'
+                                                        }`}>
+                                                            {isNegativeTransfer ? 'TRASPASO A ADELANTO' : isCreditNote ? 'NOTA DE CRÉDITO' : p.method}
+                                                        </span>
+                                                        {isCreditNote && p.creditNoteNumber && (
+                                                            <span className="text-[8px] font-black text-violet-600 font-mono">
+                                                                N° {p.creditNoteNumber}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <span className="text-slate-355 italic font-medium">Sin comprobante</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-3 text-slate-400 font-medium italic">
-                                                {p.notes ? `"${p.notes}"` : '-'}
-                                            </td>
-                                            <td className="px-6 py-3 text-right">
-                                                <div className="flex gap-2 justify-end">
-                                                    <button
-                                                        onClick={() => {
-                                                            if (locallyApprovedPayments.includes(p.id)) {
-                                                                setLocallyApprovedPayments(prev => prev.filter(id => id !== p.id));
-                                                            } else {
-                                                                setLocallyApprovedPayments(prev => [...prev, p.id]);
-                                                            }
-                                                        }}
-                                                        disabled={processingPaymentId === p.id}
-                                                        className={`${locallyApprovedPayments.includes(p.id) ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg transition active:scale-95 inline-flex items-center gap-1 shadow-sm`}
-                                                    >
-                                                        {locallyApprovedPayments.includes(p.id) ? <Check className="w-2.5 h-2.5" /> : <Check className="w-2.5 h-2.5" />}
-                                                        {locallyApprovedPayments.includes(p.id) ? 'Verificado' : 'Aprobar'}
-                                                    </button>
-                                                    <button
-                                                        onClick={async () => {
-                                                            await handleRejectPayment(p.id);
-                                                            const updatedList = selectedSaleDetails.pendingPaymentsList.filter((x: any) => x.id !== p.id);
-                                                            if (updatedList.length === 0) {
-                                                                setSelectedSaleDetails(null);
-                                                            } else {
-                                                                setSelectedSaleDetails({
-                                                                    ...selectedSaleDetails,
-                                                                    pendingPaymentsList: updatedList,
-                                                                    totalPendingAmount: selectedSaleDetails.totalPendingAmount - p.amount
-                                                                });
-                                                            }
-                                                            setLocallyApprovedPayments(prev => prev.filter(id => id !== p.id));
-                                                        }}
-                                                        disabled={processingPaymentId === p.id}
-                                                        className="bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg transition active:scale-95 inline-flex items-center gap-1 shadow-sm"
-                                                    >
-                                                        {processingPaymentId === p.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <X className="w-2.5 h-2.5" />}
-                                                        Rechazar
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className={`px-6 py-3 text-right font-black text-xs ${
+                                                    isNegativeTransfer ? 'text-rose-600' : isCreditNote ? 'text-violet-700' : 'text-slate-900'
+                                                }`}>
+                                                    {isNegativeTransfer ? `-S/. ${Math.abs(p.amount).toFixed(2)}` : `S/. ${p.amount.toFixed(2)}`}
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    {p.evidenceUrl ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <img 
+                                                                src={getImageUrl(p.evidenceUrl)} 
+                                                                alt="Voucher" 
+                                                                onClick={() => setPreviewImageUrl(p.evidenceUrl)}
+                                                                className="w-10 h-10 object-cover rounded-xl cursor-zoom-in hover:scale-105 border border-slate-200 shadow-sm transition active:scale-95 flex-shrink-0"
+                                                            />
+                                                            <a 
+                                                                href={getImageUrl(p.evidenceUrl)} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                className="text-slate-400 hover:text-indigo-650 transition"
+                                                            >
+                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                            </a>
+                                                        </div>
+                                                    ) : isCreditNote && p.sunatPdfUrl ? (
+                                                        <a
+                                                            href={p.sunatPdfUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-[9px] font-black uppercase transition"
+                                                        >
+                                                            <FileText className="w-3 h-3" />
+                                                            Ver PDF SUNAT
+                                                        </a>
+                                                    ) : isNegativeTransfer ? (
+                                                        <span className="text-amber-700 font-black text-[9px] uppercase">Ajuste por Devolución</span>
+                                                    ) : (
+                                                        <span className="text-slate-355 italic font-medium">Sin comprobante</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-500 font-medium italic">
+                                                    {p.notes ? `"${p.notes}"` : '-'}
+                                                </td>
+                                                <td className="px-6 py-3 text-right">
+                                                    {isAlreadyConciliated ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[9px] font-black uppercase">
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            Ya Conciliado
+                                                        </span>
+                                                    ) : isNegativeTransfer ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[8px] font-black uppercase">
+                                                            Se aprueba con la venta
+                                                        </span>
+                                                    ) : (
+                                                        <div className="flex gap-2 justify-end">
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (locallyApprovedPayments.includes(p.id)) {
+                                                                        setLocallyApprovedPayments(prev => prev.filter(id => id !== p.id));
+                                                                    } else {
+                                                                        setLocallyApprovedPayments(prev => [...prev, p.id]);
+                                                                    }
+                                                                }}
+                                                                disabled={processingPaymentId === p.id}
+                                                                className={`${locallyApprovedPayments.includes(p.id) ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg transition active:scale-95 inline-flex items-center gap-1 shadow-sm`}
+                                                            >
+                                                                <Check className="w-2.5 h-2.5" />
+                                                                {locallyApprovedPayments.includes(p.id) ? 'Verificado' : 'Aprobar'}
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    await handleRejectPayment(p.id);
+                                                                    setSelectedSaleDetails(null);
+                                                                    setLocallyApprovedPayments([]);
+                                                                }}
+                                                                disabled={processingPaymentId === p.id}
+                                                                className="bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase px-2.5 py-1.5 rounded-lg transition active:scale-95 inline-flex items-center gap-1 shadow-sm"
+                                                            >
+                                                                {processingPaymentId === p.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <X className="w-2.5 h-2.5" />}
+                                                                Rechazar
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
 
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100">
                             <div className="text-[10px] font-black text-slate-500 uppercase">
-                                {locallyApprovedPayments.length} abonos verificados listos para procesar
+                                {locallyApprovedPayments.length} de {(selectedSaleDetails.pendingPaymentsList || []).filter((p: any) => p.status === 'APROBADO' && Number(p.amount) > 0).length} abonos verificados listos para procesar
                             </div>
                             <div className="flex gap-3">
                                 <button
@@ -951,13 +1302,35 @@ export default function LetrasCollectionPage() {
                                 </button>
                                 <button
                                     onClick={async () => {
-                                        if (locallyApprovedPayments.length === 0) {
-                                            toast.error('Debe aprobar al menos un pago para procesar la venta');
+                                        const approvablePositive = (selectedSaleDetails.pendingPaymentsList || []).filter(
+                                            (p: any) => p.status === 'APROBADO' && Number(p.amount) > 0
+                                        );
+                                        const negativeApprovable = (selectedSaleDetails.pendingPaymentsList || []).filter(
+                                            (p: any) => p.status === 'APROBADO' && Number(p.amount) < 0
+                                        );
+
+                                        if (approvablePositive.length > 0 && locallyApprovedPayments.length === 0) {
+                                            toast.error('Debe aprobar los abonos de la venta antes de confirmar');
                                             return;
                                         }
+
                                         setProcessingPaymentId('bulk');
                                         try {
-                                            await api.post(`/sales/${selectedSaleDetails.id}/conciliate-payments`, { paymentIds: locallyApprovedPayments });
+                                            // If this is a DEVOLUCION sale with surplus that hasn't been converted to Adelanto yet, auto-convert it so the client gets their Adelanto
+                                            if (selectedSaleDetails.adminCategory === 'DEVOLUCION' && selectedSaleDetails.surplusAmount > 0.009 && !selectedSaleDetails.advanceCode) {
+                                                await api.post('/commercial/advances/convert-from-sale-credit', {
+                                                    saleId: selectedSaleDetails.id
+                                                });
+                                            }
+
+                                            const idsToSend = Array.from(new Set([
+                                                ...locallyApprovedPayments,
+                                                ...negativeApprovable.map((np: any) => np.id)
+                                            ]));
+
+                                            if (idsToSend.length > 0) {
+                                                await api.post(`/sales/${selectedSaleDetails.id}/conciliate-payments`, { paymentIds: idsToSend });
+                                            }
                                             toast.success('Pagos conciliados exitosamente. Transferidos a contabilidad.');
                                             setSelectedSaleDetails(null);
                                             setLocallyApprovedPayments([]);
@@ -969,7 +1342,10 @@ export default function LetrasCollectionPage() {
                                             setProcessingPaymentId(null);
                                         }
                                     }}
-                                    disabled={locallyApprovedPayments.length === 0 || processingPaymentId === 'bulk'}
+                                    disabled={
+                                        ((selectedSaleDetails.pendingPaymentsList || []).filter((p: any) => p.status === 'APROBADO' && Number(p.amount) > 0).length > 0 && locallyApprovedPayments.length === 0) ||
+                                        processingPaymentId === 'bulk'
+                                    }
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase px-6 py-3 rounded-xl transition active:scale-95 shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {processingPaymentId === 'bulk' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

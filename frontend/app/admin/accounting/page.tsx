@@ -34,6 +34,7 @@ export default function AccountingPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [monthFilter, setMonthFilter] = useState('');
+    const [typeFilter, setTypeFilter] = useState<'ALL' | 'DIRECT_ONLY' | 'WITH_CREDIT_NOTE' | 'LETRAS_ONLY'>('ALL');
     const [selectedSaleDetails, setSelectedSaleDetails] = useState<any | null>(null);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
@@ -113,14 +114,20 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                 concept: `INGRESOS DE LETRAS`,
                 voucher: 'Múltiples',
                 amount: totalAmount,
+                netCollectedAmount: totalAmount,
+                creditNoteAmount: 0,
+                grossAmount: totalAmount,
+                creditNoteNumbers: [],
+                hasCreditNote: false,
+                hasDevolutionAdjustment: false,
                 invoices: groupInfo?.sales?.map((s: any) => s.invoiceNumber || 'S/N').join(', ') || '-',
                 notes: `${groupLetras.length} letras cobradas`,
                 isGroup: true,
                 saleDetails: {
                     ...groupInfo,
                     invoiceNumber: groupInfo?.sales?.map((s: any) => s.invoiceNumber || 'S/N').join(', ') || 'Varias Facturas',
-                    totalAmount: totalAmount, // Show the total of paid Letras
-                    isLetraGroup: true // flag for the modal
+                    totalAmount: totalAmount,
+                    isLetraGroup: true
                 },
                 paymentsList: groupLetras.map(l => ({
                     ...l,
@@ -137,7 +144,20 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
             const conciliatedPayments = sale.payments.filter((p: any) => p.status === 'CONCILIADO' && p.method !== 'LETRAS');
             
             if (conciliatedPayments.length > 0) {
-                const totalAmount = conciliatedPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
+                const directPayments = conciliatedPayments.filter((p: any) => p.method !== 'NOTA_CREDITO');
+                const creditNotePayments = conciliatedPayments.filter((p: any) => p.method === 'NOTA_CREDITO');
+
+                const netCollectedAmount = Math.round(
+                    directPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) * 100
+                ) / 100;
+                const creditNoteAmount = Math.round(
+                    creditNotePayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) * 100
+                ) / 100;
+                const grossAmount = Math.round((netCollectedAmount + creditNoteAmount) * 100) / 100;
+                const creditNoteNumbers = creditNotePayments.map((p: any) => p.creditNoteNumber).filter(Boolean);
+                const hasCreditNote = creditNoteAmount > 0.009;
+                const hasDevolutionAdjustment = directPayments.some((p: any) => Number(p.amount) < 0);
+
                 // Use the latest payment date for sorting
                 const latestDate = conciliatedPayments.reduce((latest: string, p: any) => {
                     return new Date(p.paymentDate) > new Date(latest) ? p.paymentDate : latest;
@@ -148,11 +168,19 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                     type: 'VENTA DIRECTA',
                     paymentDate: latestDate,
                     clientName: sale.client?.name || 'Cliente',
-                    concept: `INGRESOS DE VENTA`,
-                    voucher: 'Múltiples',
-                    amount: totalAmount,
+                    concept: hasCreditNote ? `VENTA CON NOTA DE CRÉDITO` : `INGRESOS DE VENTA`,
+                    voucher: creditNoteNumbers.length > 0 ? `NC: ${creditNoteNumbers.join(', ')}` : 'Múltiples',
+                    amount: netCollectedAmount,
+                    netCollectedAmount,
+                    creditNoteAmount,
+                    grossAmount,
+                    creditNoteNumbers,
+                    hasCreditNote,
+                    hasDevolutionAdjustment,
                     invoices: sale.invoiceNumber || 'S/N',
-                    notes: `${conciliatedPayments.length} abonos conciliados`,
+                    notes: hasCreditNote
+                        ? `${directPayments.length} abono(s) + ${creditNotePayments.length} NC (S/. ${creditNoteAmount.toFixed(2)})`
+                        : `${conciliatedPayments.length} abonos conciliados`,
                     isGroup: true,
                     saleDetails: sale,
                     paymentsList: conciliatedPayments
@@ -169,21 +197,33 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
             const clientName = inc.clientName?.toLowerCase() || '';
             const invoiceNum = inc.invoices?.toLowerCase() || '';
             const matchesSearch = clientName.includes(searchTerm.toLowerCase()) || invoiceNum.includes(searchTerm.toLowerCase());
-            
-            if (!monthFilter) return matchesSearch;
+
+            if (!matchesSearch) return false;
+
+            if (typeFilter === 'WITH_CREDIT_NOTE' && !inc.hasCreditNote) return false;
+            if (typeFilter === 'DIRECT_ONLY' && (inc.type !== 'VENTA DIRECTA' || inc.hasCreditNote)) return false;
+            if (typeFilter === 'LETRAS_ONLY' && inc.type !== 'CRONOGRAMA LETRAS') return false;
+
+            if (!monthFilter) return true;
             const paymentMonth = new Date(inc.paymentDate).toISOString().substring(0, 7); // YYYY-MM
-            return paymentMonth === monthFilter && matchesSearch;
+            return paymentMonth === monthFilter;
         });
-    }, [unifiedIncomes, searchTerm, monthFilter]);
+    }, [unifiedIncomes, searchTerm, monthFilter, typeFilter]);
 
     // Financial calculations
     const metrics = useMemo(() => {
-        let totalIncome = 0;
+        let totalIncome = 0; // Monto Neto Real Cobrado (Letras + Pagos Directos sin NC)
         let totalLetrasIncome = 0;
         let totalDirectIncome = 0;
+        let totalCreditNotes = 0;
+        let creditNotesCount = 0;
 
         filteredIncomes.forEach(inc => {
             totalIncome += inc.amount;
+            totalCreditNotes += (inc.creditNoteAmount || 0);
+            if (inc.hasCreditNote) {
+                creditNotesCount += 1;
+            }
             if (inc.type === 'CRONOGRAMA LETRAS' || inc.type === 'LETRA') {
                 totalLetrasIncome += inc.amount;
             } else {
@@ -200,7 +240,7 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
             lastDeposit = maxDate.toLocaleDateString();
         }
 
-        return { totalIncome, totalLetrasIncome, totalDirectIncome, count, lastDeposit };
+        return { totalIncome, totalLetrasIncome, totalDirectIncome, totalCreditNotes, creditNotesCount, count, lastDeposit };
     }, [filteredIncomes]);
 
     const cardClass = "bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-xl print:shadow-none print:border-none print:p-0";
@@ -225,7 +265,7 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                             <Scale className="w-8 h-8 text-indigo-600" />
                             Libro Contable de Ingresos
                         </h1>
-                        <p className="text-slate-500 font-medium text-lg mt-1">Control de fondos consolidados: abonos directos y letras reconciliadas.</p>
+                        <p className="text-slate-500 font-medium text-lg mt-1">Control de fondos consolidados: monto neto cobrado, letras reconciliadas y notas de crédito.</p>
                     </div>
                     <div>
                         <button
@@ -246,12 +286,12 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                 </div>
 
                 {/* Dashboard Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 print:grid-cols-4 print:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-5 print:grid-cols-5 print:gap-3">
                     <div className="bg-slate-950 text-white rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden print:bg-slate-100 print:text-slate-900 print:border print:border-slate-200">
                         <div className="absolute right-4 bottom-4 text-white/5 print:hidden"><TrendingUp className="w-24 h-24" /></div>
-                        <div className="text-[10px] text-slate-400 print:text-slate-500 font-black uppercase tracking-wider">Total Ingresos Consolidados</div>
+                        <div className="text-[10px] text-slate-400 print:text-slate-500 font-black uppercase tracking-wider">Total Neto Cobrado</div>
                         <div className="text-2xl font-black mt-2">S/. {metrics.totalIncome.toFixed(2)}</div>
-                        <div className="text-[9px] text-indigo-400 print:text-indigo-650 font-bold uppercase mt-1">Suma de abonos validados</div>
+                        <div className="text-[9px] text-indigo-400 print:text-indigo-650 font-bold uppercase mt-1">Dinero real cobrado (sin NC)</div>
                     </div>
                     <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-md print:border-slate-200">
                         <div className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Ingresos por Letras</div>
@@ -259,20 +299,38 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                         <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Recaudado de letras reconciliadas</div>
                     </div>
                     <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-md print:border-slate-200">
-                        <div className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Ingresos Directos</div>
+                        <div className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Ventas Monto Neto</div>
                         <div className="text-2xl font-black text-indigo-600 mt-2">S/. {metrics.totalDirectIncome.toFixed(2)}</div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Abonos directos de ventas</div>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Abonos directos cobrados</div>
+                    </div>
+                    <div
+                        onClick={() => setTypeFilter(prev => prev === 'WITH_CREDIT_NOTE' ? 'ALL' : 'WITH_CREDIT_NOTE')}
+                        className={`cursor-pointer transition rounded-[2.5rem] p-6 shadow-md border ${
+                            typeFilter === 'WITH_CREDIT_NOTE'
+                                ? 'bg-violet-900 text-white border-violet-700 ring-2 ring-violet-400'
+                                : 'bg-white border-violet-100 hover:border-violet-300'
+                        } print:border-slate-200`}
+                    >
+                        <div className={`text-[10px] font-black uppercase tracking-wider ${typeFilter === 'WITH_CREDIT_NOTE' ? 'text-violet-200' : 'text-violet-600'}`}>
+                            Total Notas de Crédito
+                        </div>
+                        <div className={`text-2xl font-black mt-2 ${typeFilter === 'WITH_CREDIT_NOTE' ? 'text-white' : 'text-violet-700'}`}>
+                            S/. {metrics.totalCreditNotes.toFixed(2)}
+                        </div>
+                        <div className={`text-[9px] font-bold uppercase mt-1 ${typeFilter === 'WITH_CREDIT_NOTE' ? 'text-violet-300' : 'text-violet-400'}`}>
+                            {metrics.creditNotesCount} ventas con NC (Click filtrar)
+                        </div>
                     </div>
                     <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-md print:border-slate-200">
-                        <div className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Transacciones y Conciliación</div>
-                        <div className="text-2xl font-black text-slate-800 mt-2">{metrics.count} Transacciones</div>
+                        <div className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Transacciones</div>
+                        <div className="text-2xl font-black text-slate-800 mt-2">{metrics.count} Registros</div>
                         <div className="text-[9px] text-slate-400 font-bold uppercase mt-1">Última: {metrics.lastDeposit}</div>
                     </div>
                 </div>
 
                 {/* Filters */}
                 <div className={`${cardClass} p-5 flex flex-wrap items-center gap-4 print:hidden`}>
-                    <div className="flex-1 min-w-[300px] relative">
+                    <div className="flex-1 min-w-[260px] relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input
                             type="text"
@@ -281,6 +339,19 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3 font-bold text-slate-850 outline-none text-xs focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder-slate-400"
                         />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value as any)}
+                            className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 font-black text-slate-700 outline-none text-xs cursor-pointer uppercase"
+                        >
+                            <option value="ALL">Todos los Ingresos</option>
+                            <option value="DIRECT_ONLY">Solo Ventas Directas (Sin NC)</option>
+                            <option value="WITH_CREDIT_NOTE">Ventas con Nota de Crédito</option>
+                            <option value="LETRAS_ONLY">Solo Cronograma de Letras</option>
+                        </select>
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -304,7 +375,7 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                                     <th className="px-8 py-4 print:px-2">Cliente</th>
                                     <th className="px-8 py-4 print:px-2">Tipo / Concepto</th>
                                     <th className="px-8 py-4 print:px-2">Ref. Depósito / Comprobante</th>
-                                    <th className="px-8 py-4 print:px-2 text-right">Monto</th>
+                                    <th className="px-8 py-4 print:px-2 text-right">Monto Neto Cobrado</th>
                                     <th className="px-8 py-4 print:px-2">Documentos Relacionados</th>
                                     <th className="px-8 py-4 print:px-2 font-medium">Glosa / Notas</th>
                                     <th className="px-8 py-4 print:hidden text-right">Acciones</th>
@@ -327,10 +398,19 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                                             <td className="px-8 py-4 print:px-2 uppercase whitespace-nowrap">
                                                 <div className="flex flex-col gap-1 items-start">
                                                     <span className={`px-2 py-0.5 rounded text-[8px] font-black tracking-wider ${
-                                                        inc.type === 'CRONOGRAMA LETRAS' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                                                        inc.type === 'CRONOGRAMA LETRAS'
+                                                            ? 'bg-emerald-50 text-emerald-600'
+                                                            : inc.hasCreditNote
+                                                            ? 'bg-violet-100 text-violet-700'
+                                                            : 'bg-indigo-50 text-indigo-600'
                                                     }`}>
                                                         {inc.concept}
                                                     </span>
+                                                    {inc.hasDevolutionAdjustment && (
+                                                        <span className="px-2 py-0.5 rounded text-[7px] font-black tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                                                            AJUSTADO POR DEVOLUCIÓN / ADELANTO
+                                                        </span>
+                                                    )}
                                                     {inc.saleDetails?.isLetraGroup && (
                                                         <span className={`px-2 py-0.5 rounded text-[7px] font-black tracking-wider ${
                                                             inc.saleDetails.status === 'COMPLETADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -343,8 +423,15 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                                             <td className="px-8 py-4 print:px-2 font-mono text-slate-500 uppercase">
                                                 {inc.voucher || 'S/REF'}
                                             </td>
-                                            <td className="px-8 py-4 print:px-2 text-right font-black text-emerald-600 text-xs">
-                                                S/. {inc.amount.toFixed(2)}
+                                            <td className="px-8 py-4 print:px-2 text-right">
+                                                <div className="font-black text-emerald-600 text-xs">
+                                                    S/. {inc.amount.toFixed(2)}
+                                                </div>
+                                                {inc.hasCreditNote && (
+                                                    <div className="text-[9px] font-black text-violet-600 mt-0.5">
+                                                        + NC: S/. {inc.creditNoteAmount.toFixed(2)} (Total: S/. {inc.grossAmount.toFixed(2)})
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-8 py-4 print:px-2 max-w-xs truncate uppercase text-slate-400 font-medium">
                                                 {inc.invoices || '-'}
@@ -384,7 +471,7 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                         </button>
 
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 {selectedSaleDetails.saleDetails?.isLetraGroup && (
                                     <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                         selectedSaleDetails.saleDetails.status === 'COMPLETADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
@@ -392,14 +479,41 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                                         {selectedSaleDetails.saleDetails.status === 'COMPLETADO' ? 'COMPLETADO' : 'EN PROCESO'}
                                     </span>
                                 )}
+                                {selectedSaleDetails.hasCreditNote && (
+                                    <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-violet-100 text-violet-700">
+                                        CON NOTA DE CRÉDITO
+                                    </span>
+                                )}
                                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
                                     {selectedSaleDetails.saleDetails?.isLetraGroup ? 'Letras Cobradas del Cronograma:' : 'Abonos Conciliados de la Venta:'} {selectedSaleDetails.saleDetails?.invoiceNumber || 'S/N'}
                                 </h2>
                             </div>
                             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
-                                Cliente: {selectedSaleDetails.saleDetails?.client?.name || selectedSaleDetails.clientName} | {selectedSaleDetails.saleDetails?.isLetraGroup ? `Registrado por: ${selectedSaleDetails.saleDetails?.registeredByName || '-'}` : `Vendedor: ${selectedSaleDetails.saleDetails?.seller?.name || '-'}`} | Monto {selectedSaleDetails.saleDetails?.isLetraGroup ? 'Cobrado' : 'Total'}: S/. {selectedSaleDetails.saleDetails?.totalAmount?.toFixed(2) || selectedSaleDetails.amount.toFixed(2)}
+                                Cliente: {selectedSaleDetails.saleDetails?.client?.name || selectedSaleDetails.clientName} | {selectedSaleDetails.saleDetails?.isLetraGroup ? `Registrado por: ${selectedSaleDetails.saleDetails?.registeredByName || '-'}` : `Vendedor: ${selectedSaleDetails.saleDetails?.seller?.name || '-'}`} | Monto Neto Cobrado: S/. {selectedSaleDetails.amount.toFixed(2)}
                             </p>
                         </div>
+
+                        {!selectedSaleDetails.saleDetails?.isLetraGroup && (selectedSaleDetails.hasCreditNote || selectedSaleDetails.hasDevolutionAdjustment) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                                <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Monto Total Operación</p>
+                                    <p className="text-base font-black text-slate-900 mt-0.5">S/. {(selectedSaleDetails.grossAmount || selectedSaleDetails.amount).toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-sm">
+                                    <p className="text-[8px] font-black text-emerald-600 uppercase tracking-wider">Monto Neto Cobrado</p>
+                                    <p className="text-base font-black text-emerald-600 mt-0.5">S/. {selectedSaleDetails.amount.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-xl border border-violet-100 shadow-sm">
+                                    <p className="text-[8px] font-black text-violet-600 uppercase tracking-wider">Total Nota de Crédito</p>
+                                    <p className="text-base font-black text-violet-700 mt-0.5">S/. {(selectedSaleDetails.creditNoteAmount || 0).toFixed(2)}</p>
+                                    {selectedSaleDetails.creditNoteNumbers?.length > 0 && (
+                                        <p className="text-[8px] font-black text-violet-500 uppercase mt-0.5">
+                                            N° {selectedSaleDetails.creditNoteNumbers.join(', ')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* List of conciliated payments for this sale */}
                         <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
@@ -409,57 +523,88 @@ const SERVER_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/ap
                                         <th className="px-6 py-3">Fecha Abono</th>
                                         <th className="px-6 py-3">Método</th>
                                         <th className="px-6 py-3 text-right">Monto</th>
-                                        <th className="px-6 py-3">Evidencia (Voucher)</th>
+                                        <th className="px-6 py-3">Evidencia / Documento</th>
                                         <th className="px-6 py-3">Glosa / Comentario</th>
                                         <th className="px-6 py-3 text-center">Estado</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                                    {selectedSaleDetails.paymentsList?.map((p: any) => (
-                                        <tr key={p.id} className="hover:bg-slate-50/20 transition">
-                                            <td className="px-6 py-3 whitespace-nowrap">
-                                                {new Date(p.paymentDate).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[9px] font-black tracking-wider uppercase">
-                                                    {p.method}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3 text-right font-black text-slate-900 text-xs">
-                                                S/. {p.amount.toFixed(2)}
-                                            </td>
-                                            <td className="px-6 py-3">
-                                                {p.evidenceUrl ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <img 
-                                                            src={getImageUrl(p.evidenceUrl)} 
-                                                            alt="Voucher" 
-                                                            onClick={() => setPreviewImageUrl(p.evidenceUrl)}
-                                                            className="w-10 h-10 object-cover rounded-xl cursor-zoom-in hover:scale-105 border border-slate-200 shadow-sm transition active:scale-95 flex-shrink-0"
-                                                        />
-                                                        <a 
-                                                            href={getImageUrl(p.evidenceUrl)} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="text-slate-400 hover:text-indigo-650 transition"
-                                                        >
-                                                            <ExternalLink className="w-3.5 h-3.5" />
-                                                        </a>
+                                    {selectedSaleDetails.paymentsList?.map((p: any) => {
+                                        const isCreditNote = p.method === 'NOTA_CREDITO';
+                                        const isNegativeTransfer = Number(p.amount) < 0;
+                                        return (
+                                            <tr key={p.id} className={`hover:bg-slate-50/20 transition ${isCreditNote ? 'bg-violet-50/20' : isNegativeTransfer ? 'bg-amber-50/20' : ''}`}>
+                                                <td className="px-6 py-3 whitespace-nowrap">
+                                                    {new Date(p.paymentDate).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <div className="flex flex-col items-start gap-0.5">
+                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase ${
+                                                            isNegativeTransfer
+                                                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                                                : isCreditNote
+                                                                ? 'bg-violet-100 text-violet-700 border border-violet-200'
+                                                                : 'bg-slate-100 text-slate-700'
+                                                        }`}>
+                                                            {isNegativeTransfer ? 'TRASPASO A ADELANTO' : isCreditNote ? 'NOTA DE CRÉDITO' : p.method}
+                                                        </span>
+                                                        {isCreditNote && p.creditNoteNumber && (
+                                                            <span className="text-[8px] font-black text-violet-600 font-mono">
+                                                                N° {p.creditNoteNumber}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <span className="text-slate-355 italic font-medium">Sin comprobante</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-3 text-slate-400 font-medium italic">
-                                                {p.notes ? `"${p.notes}"` : '-'}
-                                            </td>
-                                            <td className="px-6 py-3 text-center">
-                                                <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider">
-                                                    {p.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className={`px-6 py-3 text-right font-black text-xs ${
+                                                    isNegativeTransfer ? 'text-rose-600' : isCreditNote ? 'text-violet-700' : 'text-slate-900'
+                                                }`}>
+                                                    {isNegativeTransfer ? `-S/. ${Math.abs(p.amount).toFixed(2)}` : `S/. ${p.amount.toFixed(2)}`}
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    {p.evidenceUrl ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <img 
+                                                                src={getImageUrl(p.evidenceUrl)} 
+                                                                alt="Voucher" 
+                                                                onClick={() => setPreviewImageUrl(p.evidenceUrl)}
+                                                                className="w-10 h-10 object-cover rounded-xl cursor-zoom-in hover:scale-105 border border-slate-200 shadow-sm transition active:scale-95 flex-shrink-0"
+                                                            />
+                                                            <a 
+                                                                href={getImageUrl(p.evidenceUrl)} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer" 
+                                                                className="text-slate-400 hover:text-indigo-650 transition"
+                                                            >
+                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                            </a>
+                                                        </div>
+                                                    ) : isCreditNote && p.sunatPdfUrl ? (
+                                                        <a
+                                                            href={p.sunatPdfUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-[9px] font-black uppercase transition"
+                                                        >
+                                                            <FileText className="w-3 h-3" />
+                                                            Ver PDF SUNAT
+                                                        </a>
+                                                    ) : isNegativeTransfer ? (
+                                                        <span className="text-amber-700 font-black text-[9px] uppercase">Ajuste por Devolución</span>
+                                                    ) : (
+                                                        <span className="text-slate-355 italic font-medium">Sin comprobante</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-3 text-slate-400 font-medium italic">
+                                                    {p.notes ? `"${p.notes}"` : '-'}
+                                                </td>
+                                                <td className="px-6 py-3 text-center">
+                                                    <span className="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider">
+                                                        {p.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

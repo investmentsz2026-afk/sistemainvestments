@@ -578,11 +578,17 @@ export class ReturnsService {
         }
 
         if (returnTotal > 0) {
+          const salePayments = await tx.salePayment.findMany({ where: { saleId: linkedSale.id } });
+          const totalPaid = salePayments
+            .filter((p: any) => p.status === 'APROBADO' || p.status === 'CONCILIADO')
+            .reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
           const newSaleTotal = Math.max(0, Math.round((linkedSale.totalAmount - returnTotal) * 100) / 100);
-          await tx.sale.update({
-            where: { id: linkedSale.id },
-            data: { totalAmount: newSaleTotal }
-          });
+          if (totalPaid > newSaleTotal + 0.009) {
+            await tx.sale.update({
+              where: { id: linkedSale.id },
+              data: { totalAmount: newSaleTotal }
+            });
+          }
         }
       }
     });

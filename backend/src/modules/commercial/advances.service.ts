@@ -321,8 +321,9 @@ export class AdvancesService {
     // Determine effective total of sale:
     const originalItemsSum = (sale.items || []).reduce((acc: number, it: any) => acc + ((it.quantity || 0) * (it.unitPrice || 0)), 0);
     let effectiveTotal = sale.totalAmount;
-    if (unconvertedReturnedValue > 0 && Math.abs(sale.totalAmount - originalItemsSum) <= 0.05) {
-      effectiveTotal = Math.max(0, Math.round((sale.totalAmount - unconvertedReturnedValue) * 100) / 100);
+    const candidateEffectiveTotal = Math.max(0, Math.round((sale.totalAmount - unconvertedReturnedValue) * 100) / 100);
+    if (unconvertedReturnedValue > 0 && Math.abs(sale.totalAmount - originalItemsSum) <= 0.05 && totalPaid > candidateEffectiveTotal + 0.009) {
+      effectiveTotal = candidateEffectiveTotal;
     }
 
     // Surplus = what was paid above effectiveTotal

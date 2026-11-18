@@ -1006,25 +1006,298 @@ export class SalesService {
 
   async getPendingPayments(status: string = 'PENDIENTE') {
     const whereClause: any = { status };
-    
-    // Administration only wants to validate payments when the entire sale is marked as CANCELADO
-    if (status === 'APROBADO') {
-      whereClause.sale = { paymentStatus: 'CANCELADO' };
+
+    if (status !== 'APROBADO') {
+      return this.prisma.salePayment.findMany({
+        where: whereClause,
+        include: {
+          letraDetails: true,
+          sale: {
+            include: {
+              client: true,
+              seller: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     }
 
-    return this.prisma.salePayment.findMany({
-      where: whereClause,
+    // For Administration (status === 'APROBADO'):
+    // Validate that each sale is genuinely completely paid (CANCELADO), not partial/pending,
+    // and classify into PAGO_DIRECTO, NOTA_CREDITO, or DEVOLUCION.
+    const rawPayments = await this.prisma.salePayment.findMany({
+      where: { status: 'APROBADO' },
       include: {
         letraDetails: true,
         sale: {
           include: {
             client: true,
             seller: true,
+            letraGroup: {
+              select: { id: true, status: true }
+            },
+            payments: {
+              orderBy: { createdAt: 'desc' }
+            },
+            items: {
+              include: {
+                variant: {
+                  include: { product: true }
+                }
+              }
+            }
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    const completedReturns = await this.prisma.returnRequest.findMany({
+      where: { status: 'COMPLETADO' },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const returnInvoiceNums = Array.from(new Set(
+      completedReturns
+        .map((r: any) => {
+          const m = r.reason && r.reason.match(/\[Comprobante:\s*([^\]]+)\]/i);
+          return m ? m[1].trim() : null;
+        })
+        .filter(Boolean)
+    )) as string[];
+
+    if (returnInvoiceNums.length > 0) {
+      const existingSaleIds = new Set(rawPayments.map((p: any) => p.saleId));
+      const extraReturnSales = await this.prisma.sale.findMany({
+        where: {
+          invoiceNumber: { in: returnInvoiceNums },
+          id: { notIn: Array.from(existingSaleIds) },
+          status: { not: 'ANULADO' }
+        },
+        include: {
+          client: true,
+          seller: true,
+          letraGroup: { select: { id: true, status: true } },
+          payments: { orderBy: { createdAt: 'desc' } },
+          items: { include: { variant: { include: { product: true } } } }
+        }
+      });
+
+      for (const extraSale of extraReturnSales) {
+        const activePs = (extraSale.payments || []).filter((sp: any) => sp.status === 'APROBADO' || sp.status === 'CONCILIADO');
+        if (activePs.length > 0) {
+          rawPayments.push({
+            ...activePs[0],
+            sale: extraSale
+          } as any);
+        }
+      }
+    }
+
+    const sizeFields = ['s28', 'm30', 'l32', 'xl34', 'xxl36', 'size38', 'size40', 'size42', 'size44', 'size46', 'size48', 'size50', 'size52'];
+    const normalize = (str: string) => (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const normalizeFuzzy = (str: string) => normalize(str).replace(/Y/g, 'I');
+
+    const saleEvaluationCache = new Map<string, { isValid: boolean; enrichedSale?: any }>();
+    const outOfSyncSales: { id: string; status: string }[] = [];
+
+    for (const p of rawPayments) {
+      const sale = p.sale as any;
+      if (!sale) continue;
+      if (saleEvaluationCache.has(sale.id)) continue;
+
+      if (sale.status === 'ANULADO') {
+        saleEvaluationCache.set(sale.id, { isValid: false });
+        continue;
+      }
+
+      // Exclude sales managed in Canjes por Letras
+      if (sale.letraGroupId || (sale.letraGroup && sale.letraGroup.status !== 'RECHAZADO')) {
+        saleEvaluationCache.set(sale.id, { isValid: false });
+        continue;
+      }
+
+      const originalItemsAmount = Math.round(
+        (sale.items || []).reduce((acc: number, it: any) => acc + ((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0)), 0) * 100
+      ) / 100;
+
+      const activePayments = (sale.payments || []).filter(
+        (sp: any) => sp.status === 'APROBADO' || sp.status === 'CONCILIADO'
+      );
+      const totalPaid = Math.round(
+        activePayments.reduce((acc: number, sp: any) => acc + (Number(sp.amount) || 0), 0) * 100
+      ) / 100;
+
+      const invoiceNum = sale.invoiceNumber?.trim();
+      const matchingReturns = invoiceNum ? completedReturns.filter((req: any) => {
+        const invoiceMatch = req.reason && req.reason.match(/\[Comprobante:\s*([^\]]+)\]/i);
+        const matchedInvoice = invoiceMatch ? invoiceMatch[1].trim() : null;
+        const directMention = req.reason && req.reason.toUpperCase().includes(invoiceNum.toUpperCase());
+        if (!matchedInvoice && !directMention) return false;
+        if (matchedInvoice && matchedInvoice.toUpperCase() !== invoiceNum.toUpperCase()) return false;
+        return true;
+      }) : [];
+
+      let uncreditedReturnTotal = 0;
+      for (const ret of matchingReturns) {
+        const hasNC = (ret.reason && ret.reason.match(/\[NC:\s*([^\]]+)\]/i)) || (ret.qualityObservations && ret.qualityObservations.match(/\[NC:\s*([^\]]+)\]/i));
+        const hasAdvance = (ret.reason && ret.reason.match(/\[Adelanto:\s*([^\]]+)\]/i)) || (ret.qualityObservations && ret.qualityObservations.match(/\[Adelanto:\s*([^\]]+)\]/i));
+        if (hasNC || hasAdvance) continue;
+
+        let retTotal = 0;
+        for (const it of ret.items || []) {
+          const mNorm = normalize(it.modelName);
+          const mFuzzy = normalizeFuzzy(it.modelName);
+          const matchingSaleItem = (sale.items || []).find((si: any) =>
+            normalize(si.variant?.product?.name) === mNorm
+          ) || (sale.items || []).find((si: any) =>
+            normalizeFuzzy(si.variant?.product?.name) === mFuzzy
+          ) || (sale.items || []).find((si: any) => {
+            const pNorm = normalize(si.variant?.product?.name || '');
+            return pNorm.includes(mNorm) || mNorm.includes(pNorm);
+          });
+
+          let unitPrice = matchingSaleItem ? matchingSaleItem.unitPrice : 0;
+          if (!unitPrice || unitPrice <= 0) {
+            const totalSaleQty = (sale.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+            unitPrice = totalSaleQty > 0 ? (sale.totalAmount / totalSaleQty) : 0;
+          }
+          unitPrice = Math.round(unitPrice * 100) / 100;
+
+          let itemQty = it.quantity || 0;
+          if (!itemQty || itemQty === 0) {
+            itemQty = sizeFields.reduce((acc, field) => acc + ((it as any)[field] || 0), 0);
+          }
+          retTotal += Math.round(itemQty * unitPrice * 100) / 100;
+        }
+        uncreditedReturnTotal += retTotal;
+      }
+
+      let effectiveTotal = sale.totalAmount;
+      const candidateEffective = Math.max(0, Math.round((sale.totalAmount - uncreditedReturnTotal) * 100) / 100);
+      if (uncreditedReturnTotal > 0 && Math.abs(sale.totalAmount - originalItemsAmount) <= 0.05 && totalPaid > candidateEffective + 0.009) {
+        effectiveTotal = candidateEffective;
+      }
+
+      const pendingBalance = effectiveTotal - totalPaid;
+      const isFullyPaid = (pendingBalance <= 0.01 || Math.round(totalPaid * 100) >= Math.round(effectiveTotal * 100)) && totalPaid > 0;
+
+      if (!isFullyPaid) {
+        const realStatus = totalPaid > 0 ? 'PARCIAL' : 'PENDIENTE';
+        if (sale.paymentStatus !== realStatus) {
+          outOfSyncSales.push({ id: sale.id, status: realStatus });
+        }
+        saleEvaluationCache.set(sale.id, { isValid: false });
+        continue;
+      }
+
+      const hasApprovedPayment = activePayments.some((sp: any) => sp.status === 'APROBADO');
+      const hasPendingDevolutionSurplus = totalPaid > effectiveTotal + 0.01;
+      if (!hasApprovedPayment && !hasPendingDevolutionSurplus) {
+        saleEvaluationCache.set(sale.id, { isValid: false });
+        continue;
+      }
+
+      const creditNotePayments = activePayments.filter((sp: any) => sp.method === 'NOTA_CREDITO');
+      const creditNoteAmount = Math.round(
+        creditNotePayments.reduce((acc: number, sp: any) => acc + (Number(sp.amount) || 0), 0) * 100
+      ) / 100;
+      const directPaidAmount = Math.round(
+        activePayments.filter((sp: any) => sp.method !== 'NOTA_CREDITO' && Number(sp.amount) > 0).reduce((acc: number, sp: any) => acc + (Number(sp.amount) || 0), 0) * 100
+      ) / 100;
+
+      const negativeTransferPayments = activePayments.filter((sp: any) => Number(sp.amount) < 0);
+      const transferredAdvanceAmount = Math.round(
+        Math.abs(negativeTransferPayments.reduce((acc: number, sp: any) => acc + (Number(sp.amount) || 0), 0)) * 100
+      ) / 100;
+
+      const priceReductionFromReturn = Math.max(0, Math.round((originalItemsAmount - effectiveTotal) * 100) / 100);
+      const hasDevolutionSurplus = transferredAdvanceAmount > 0.009 || priceReductionFromReturn > 0.05 || (totalPaid > effectiveTotal + 0.01);
+
+      const returnedAmount = Math.max(transferredAdvanceAmount, priceReductionFromReturn, uncreditedReturnTotal);
+      const originalSaleAmount = originalItemsAmount > effectiveTotal + 0.01
+        ? originalItemsAmount
+        : Math.round((effectiveTotal + returnedAmount) * 100) / 100;
+      const surplusAmount = Math.max(transferredAdvanceAmount, Math.round((directPaidAmount - effectiveTotal) * 100) / 100);
+
+      let advanceCode: string | null = null;
+      for (const np of negativeTransferPayments) {
+        const m = np.notes && np.notes.match(/\((AD-\d+)\)/i);
+        if (m) {
+          advanceCode = m[1].toUpperCase();
+          break;
+        }
+      }
+      if (!advanceCode) {
+        for (const mr of matchingReturns) {
+          const m = mr.reason && mr.reason.match(/\[Adelanto:\s*([^\]]+)\]/i);
+          if (m) {
+            advanceCode = m[1].trim().toUpperCase();
+            break;
+          }
+        }
+      }
+
+      const returnNumbers = matchingReturns.map((r: any) => r.returnNumber).filter(Boolean);
+      const creditNoteNumbers = creditNotePayments.map((cp: any) => cp.creditNoteNumber).filter(Boolean);
+
+      let adminCategory: 'PAGO_DIRECTO' | 'NOTA_CREDITO' | 'DEVOLUCION' = 'PAGO_DIRECTO';
+      if (hasDevolutionSurplus) {
+        adminCategory = 'DEVOLUCION';
+      } else if (creditNoteAmount > 0.009) {
+        adminCategory = 'NOTA_CREDITO';
+      }
+
+      const enrichedSale = {
+        ...sale,
+        totalAmount: effectiveTotal,
+        adminCategory,
+        adminSummary: {
+          originalSaleAmount,
+          effectiveTotal,
+          directPaidAmount,
+          creditNoteAmount,
+          creditNoteNumbers,
+          hasCreditNote: creditNoteAmount > 0.009,
+          hasDevolutionSurplus,
+          returnedAmount,
+          surplusAmount,
+          transferredAdvanceAmount,
+          advanceCode,
+          returnNumbers,
+          allActivePayments: activePayments,
+        }
+      };
+
+      saleEvaluationCache.set(sale.id, { isValid: true, enrichedSale });
+    }
+
+    if (outOfSyncSales.length > 0) {
+      Promise.all(
+        outOfSyncSales.map(item =>
+          this.prisma.sale.update({
+            where: { id: item.id },
+            data: { paymentStatus: item.status }
+          }).catch(err => console.error(`Error syncing sale ${item.id} paymentStatus:`, err))
+        )
+      ).catch(err => console.error('Error in batch sale status sync:', err));
+    }
+
+    return rawPayments
+      .filter((p: any) => {
+        if (!p.sale || p.method === 'LETRAS') return false;
+        const evalResult = saleEvaluationCache.get(p.sale.id);
+        return Boolean(evalResult && evalResult.isValid);
+      })
+      .map((p: any) => {
+        const evalResult = saleEvaluationCache.get(p.sale.id)!;
+        return {
+          ...p,
+          sale: evalResult.enrichedSale
+        };
+      });
   }
 
   async approvePayment(paymentId: string) {
@@ -1143,9 +1416,22 @@ export class SalesService {
         throw new BadRequestException('Algunos de los pagos seleccionados no son válidos o no pertenecen a esta venta.');
       }
 
+      // Also automatically include any negative adjustment (Traspaso a Adelanto) of this sale so it gets conciliated with the sale
+      const negativeAdjustments = await tx.salePayment.findMany({
+        where: {
+          saleId,
+          status: 'APROBADO',
+          amount: { lt: 0 }
+        }
+      });
+      const allIdsToConciliate = Array.from(new Set([
+        ...paymentIds,
+        ...negativeAdjustments.map(np => np.id)
+      ]));
+
       await tx.salePayment.updateMany({
         where: { 
-          id: { in: paymentIds }
+          id: { in: allIdsToConciliate }
         },
         data: { status: 'CONCILIADO' }
       });
@@ -1154,7 +1440,7 @@ export class SalesService {
         where: { saleId }
       });
 
-      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments);
+      const paymentStatus = this.calculatePaymentStatus(sale.totalAmount, allPayments, sale);
       await tx.sale.update({
         where: { id: saleId },
         data: { paymentStatus }
@@ -1167,10 +1453,11 @@ export class SalesService {
   async rejectPayment(paymentId: string) {
     const payment = await this.prisma.salePayment.findUnique({
       where: { id: paymentId },
+      include: { sale: true }
     });
 
     if (!payment) throw new NotFoundException('Pago no encontrado');
-    if (payment.status !== 'PENDIENTE') {
+    if (payment.status !== 'PENDIENTE' && payment.status !== 'APROBADO') {
       throw new BadRequestException('El pago ya ha sido procesado');
     }
 
@@ -1180,7 +1467,7 @@ export class SalesService {
         if (advId) {
           try {
             const advance = await (tx as any).clientAdvance.findUnique({ where: { id: advId } });
-            if (advance) {
+            if (advance && payment.amount > 0) {
               const restoredUsed = Math.max(0, advance.usedAmount - payment.amount);
               const restoredRemaining = advance.remainingAmount + payment.amount;
               const restoredStatus = restoredUsed <= 0.01 ? 'DISPONIBLE' : 'PARCIAL';
@@ -1202,10 +1489,23 @@ export class SalesService {
         }
       }
 
-      return tx.salePayment.update({
+      const rejected = await tx.salePayment.update({
         where: { id: paymentId },
         data: { status: 'RECHAZADO' },
       });
+
+      if (payment.sale) {
+        const allPayments = await tx.salePayment.findMany({
+          where: { saleId: payment.saleId }
+        });
+        const paymentStatus = this.calculatePaymentStatus(payment.sale.totalAmount, allPayments, payment.sale);
+        await tx.sale.update({
+          where: { id: payment.saleId },
+          data: { paymentStatus }
+        });
+      }
+
+      return rejected;
     });
   }
 
