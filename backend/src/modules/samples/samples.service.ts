@@ -47,7 +47,8 @@ export class SamplesService {
             entalle,
             entalleCode: resolvedEntalleCode,
             size: entalleMeasurements?.baseSize || '32',
-            quantity: 1
+            quantity: 1,
+            entalleData: entalleMeasurements || undefined
           }]
         : null;
 
@@ -802,13 +803,15 @@ export class SamplesService {
               ...item,
               entalle: entalle,
               entalleCode: resolvedEntalleCode || item.entalleCode || null,
+              entalleData: entalleMeasurements || item.entalleData || undefined,
             }));
           } else {
             nextProductionSizeData = [{
               entalle,
               entalleCode: resolvedEntalleCode,
               size: entalleMeasurements?.baseSize || '32',
-              quantity: 1
+              quantity: 1,
+              entalleData: entalleMeasurements || undefined,
             }];
           }
         } else {

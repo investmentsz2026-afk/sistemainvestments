@@ -23,6 +23,7 @@ import api from '../../lib/axios';
 import { getImageUrl } from '../../lib/imageUrl';
 import toast from 'react-hot-toast';
 import { SelectVariantModal } from './SelectVariantModal';
+import { buildEntalleFormattedText, stripEntalleFromText } from '../../lib/entalleUtils';
 
 interface UDPEditSampleModalProps {
   sample: any;
@@ -128,14 +129,10 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
     setEntalleSearch('');
     const found = officialEntalles.find(e => e.name.toUpperCase() === entalleName.toUpperCase());
     if (found) {
-      const codeText = found.code ? `[${found.code}] ` : '';
-      const entalleText = `Entalle Oficial: ${codeText}${found.name} (${found.cinturaType}) • Base: Talla ${found.baseSize || '32'} • Cintura: ${found.cintura || '-'} • Cadera: ${found.cadera || '-'} • Muslo: ${found.muslo || '-'} • Rodilla: ${found.rodilla || '-'} • Botapie: ${found.botaPie || '-'} • Largo: ${found.largoTotal || '-'}`;
+      const entalleText = buildEntalleFormattedText(found);
       setCharacteristics(prev => {
-        let currentChars = prev || '';
-        if (currentChars.includes('Entalle Oficial:')) {
-          currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
-        }
-        const updated = currentChars ? `${currentChars} • ${entalleText}` : entalleText;
+        const currentChars = stripEntalleFromText(prev || '');
+        const updated = currentChars ? `${currentChars}\n\n${entalleText}` : entalleText;
         return updated;
       });
     }
@@ -145,13 +142,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
     setSelectedEntalleName('');
     setEntalleSearch('');
     setIsEntalleDropdownOpen(false);
-    setCharacteristics(prev => {
-      let currentChars = prev || '';
-      if (currentChars.includes('Entalle Oficial:')) {
-        currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
-      }
-      return currentChars;
-    });
+    setCharacteristics(prev => stripEntalleFromText(prev || ''));
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

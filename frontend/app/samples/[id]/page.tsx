@@ -38,6 +38,7 @@ import { DeleteSampleModal } from '../../../components/samples/DeleteSampleModal
 import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 import { getImageUrl } from '../../../lib/imageUrl';
 import { generateOpGarmentSku } from '../../../lib/sku-generator';
+import { formatCharacteristicsDisplay } from '../../../lib/entalleUtils';
 
 export default function SampleDetailPage() {
     const { id } = useParams();
@@ -1046,7 +1047,7 @@ export default function SampleDetailPage() {
                                         />
                                     ) : (
                                         <p className="text-gray-900 font-bold bg-gray-50 p-6 rounded-3xl leading-relaxed whitespace-pre-wrap">
-                                            {sample.characteristics || 'No se especificaron características técnicas.'}
+                                            {formatCharacteristicsDisplay(sample.characteristics) || 'No se especificaron características técnicas.'}
                                         </p>
                                     )}
                                 </div>

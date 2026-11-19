@@ -29,6 +29,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { getImageUrl } from '../../../lib/imageUrl';
 import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
+import { buildEntalleFormattedText, stripEntalleFromText } from '../../../lib/entalleUtils';
 
 export default function NewSamplePage() {
     const { user } = useAuth();
@@ -102,14 +103,10 @@ export default function NewSamplePage() {
         setEntalleSearch('');
         const found = officialEntalles.find(e => e.name.toUpperCase() === entalleName.toUpperCase());
         if (found) {
-            const codeText = found.code ? `[${found.code}] ` : '';
-            const entalleText = `Entalle Oficial: ${codeText}${found.name} (${found.cinturaType}) • Base: Talla ${found.baseSize || '32'} • Cintura: ${found.cintura || '-'} • Cadera: ${found.cadera || '-'} • Muslo: ${found.muslo || '-'} • Rodilla: ${found.rodilla || '-'} • Botapie: ${found.botaPie || '-'} • Largo: ${found.largoTotal || '-'}`;
+            const entalleText = buildEntalleFormattedText(found);
             setFormData(prev => {
-                let currentChars = prev.characteristics || '';
-                if (currentChars.includes('Entalle Oficial:')) {
-                    currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
-                }
-                const updated = currentChars ? `${currentChars} • ${entalleText}` : entalleText;
+                const currentChars = stripEntalleFromText(prev.characteristics || '');
+                const updated = currentChars ? `${currentChars}\n\n${entalleText}` : entalleText;
                 return {
                     ...prev,
                     characteristics: updated
@@ -122,16 +119,10 @@ export default function NewSamplePage() {
         setSelectedEntalleName('');
         setEntalleSearch('');
         setIsEntalleDropdownOpen(false);
-        setFormData(prev => {
-            let currentChars = prev.characteristics || '';
-            if (currentChars.includes('Entalle Oficial:')) {
-                currentChars = currentChars.replace(/Entalle Oficial:.*?(•|$)/g, '').trim();
-            }
-            return {
-                ...prev,
-                characteristics: currentChars
-            };
-        });
+        setFormData(prev => ({
+            ...prev,
+            characteristics: stripEntalleFromText(prev.characteristics || '')
+        }));
     };
 
     useEffect(() => {
