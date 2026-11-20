@@ -106,12 +106,12 @@ export function SampleMeasurementsModal({ sample, onClose }: SampleMeasurementsM
     let matchedEnt: any = null;
     if (officialEntalles.length > 0) {
       if (targetName) {
-        matchedEnt = officialEntalles.find(e => 
+        matchedEnt = officialEntalles.find(e =>
           (e.name || '').trim().toUpperCase() === targetName.trim().toUpperCase()
         );
       }
       if (!matchedEnt && targetCode) {
-        matchedEnt = officialEntalles.find(e => 
+        matchedEnt = officialEntalles.find(e =>
           (e.code || '').trim().toUpperCase() === targetCode.trim().toUpperCase()
         );
       }
@@ -188,7 +188,7 @@ export function SampleMeasurementsModal({ sample, onClose }: SampleMeasurementsM
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto print:p-0 print:bg-white">
       <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col my-auto max-h-[90vh] print:max-h-none print:shadow-none print:border-0 print:rounded-none">
-        
+
         {/* HEADER */}
         <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-indigo-950 p-6 md:p-8 text-white flex items-center justify-between relative print:bg-white print:text-black print:p-4 print:border-b">
           <div className="flex items-center gap-4">
@@ -239,11 +239,10 @@ export function SampleMeasurementsModal({ sample, onClose }: SampleMeasurementsM
               <button
                 key={stage.id}
                 onClick={() => setActiveStage(stage.id)}
-                className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 ${
-                  isActive
+                className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 ${isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200/60'
-                }`}
+                  }`}
               >
                 <span>{stage.label}</span>
                 {countForStage > 0 && (
@@ -293,7 +292,7 @@ export function SampleMeasurementsModal({ sample, onClose }: SampleMeasurementsM
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                     <div className="px-4 py-2 bg-white rounded-2xl border border-purple-200 shadow-sm text-center">
                       <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Talla Base</span>

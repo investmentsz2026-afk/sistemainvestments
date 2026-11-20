@@ -78,12 +78,12 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
         const list = resp.data || [];
         setOfficialEntalles(list);
 
-        const currentName = selectedEntalleName || 
-          sample.entalle || 
+        const currentName = selectedEntalleName ||
+          sample.entalle ||
           (Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.entalle);
 
         if (currentName) {
-          const found = list.find((e: any) => 
+          const found = list.find((e: any) =>
             e.name.toUpperCase() === currentName.toUpperCase() ||
             (e.code && e.code.toUpperCase() === currentName.toUpperCase())
           );
@@ -106,7 +106,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
 
   const selectedEntalleObj = useMemo(() => {
     if (!selectedEntalleName) return null;
-    return officialEntalles.find(e => 
+    return officialEntalles.find(e =>
       e.name.toUpperCase() === selectedEntalleName.toUpperCase() ||
       (e.code && e.code.toUpperCase() === selectedEntalleName.toUpperCase())
     ) || null;
@@ -316,7 +316,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col my-auto max-h-[92vh]">
-        
+
         {/* HEADER */}
         <div className="bg-gray-900 p-6 md:p-8 text-white flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -342,7 +342,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
 
         {/* BODY */}
         <div className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1">
-          
+
           {/* NAME & CODE */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 space-y-1.5">
@@ -449,9 +449,8 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
                           key={ent.id || ent.name}
                           type="button"
                           onClick={() => handleSelectEntalle(ent.name)}
-                          className={`w-full text-left px-4 py-3 hover:bg-amber-50/80 transition flex items-center justify-between gap-3 group ${
-                            selectedEntalleName.toUpperCase() === ent.name.toUpperCase() ? 'bg-amber-100/50' : ''
-                          }`}
+                          className={`w-full text-left px-4 py-3 hover:bg-amber-50/80 transition flex items-center justify-between gap-3 group ${selectedEntalleName.toUpperCase() === ent.name.toUpperCase() ? 'bg-amber-100/50' : ''
+                            }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 border border-indigo-200 shrink-0">
@@ -633,11 +632,10 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
 
             <label
               htmlFor="edit-sample-file-upload"
-              className={`w-full border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${
-                isUploadingImage
+              className={`w-full border-2 border-dashed rounded-3xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${isUploadingImage
                   ? 'bg-indigo-50/60 border-indigo-300 cursor-wait'
                   : 'bg-gray-50/60 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'
-              }`}
+                }`}
             >
               {isUploadingImage ? (
                 <>
