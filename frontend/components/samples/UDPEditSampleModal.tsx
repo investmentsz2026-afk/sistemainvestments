@@ -23,7 +23,7 @@ import api from '../../lib/axios';
 import { getImageUrl } from '../../lib/imageUrl';
 import toast from 'react-hot-toast';
 import { SelectVariantModal } from './SelectVariantModal';
-import { buildEntalleFormattedText, stripEntalleFromText } from '../../lib/entalleUtils';
+import { buildEntalleFormattedText, stripEntalleFromText, cleanDirtyEntallePrefix } from '../../lib/entalleUtils';
 
 interface UDPEditSampleModalProps {
   sample: any;
@@ -35,7 +35,7 @@ export function UDPEditSampleModal({ sample, onClose, onUpdated }: UDPEditSample
   const [name, setName] = useState(sample.name || '');
   const [code, setCode] = useState(sample.code || '');
   const [description, setDescription] = useState(sample.description || '');
-  const [characteristics, setCharacteristics] = useState(sample.characteristics || '');
+  const [characteristics, setCharacteristics] = useState(cleanDirtyEntallePrefix(sample.characteristics || ''));
   const [images, setImages] = useState<string[]>(sample.images || []);
   const [materials, setMaterials] = useState<any[]>(
     (sample.materials || []).map((m: any) => ({

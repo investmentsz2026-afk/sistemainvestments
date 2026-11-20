@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Ruler, Printer, Loader2, Sparkles, Tag, Layers, CheckCircle2 } from 'lucide-react';
 import api from '../../lib/axios';
 import { getImageUrl } from '../../lib/imageUrl';
+import { cleanDirtyEntallePrefix } from '../../lib/entalleUtils';
 
 interface SampleMeasurementsModalProps {
   sample: any;
@@ -412,7 +413,7 @@ export function SampleMeasurementsModal({ sample, onClose }: SampleMeasurementsM
             {sample.characteristics && (
               <div className="max-w-md">
                 <span className="text-gray-400 uppercase text-[10px] font-black block">Ficha Técnica / Características</span>
-                <span className="text-gray-800 line-clamp-1">{sample.characteristics}</span>
+                <span className="text-gray-800 line-clamp-1">{cleanDirtyEntallePrefix(sample.characteristics)}</span>
               </div>
             )}
             <div>

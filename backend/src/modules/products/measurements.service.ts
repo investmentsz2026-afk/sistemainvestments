@@ -628,9 +628,20 @@ export class MeasurementsService {
   }
 
   async deleteMeasurement(id: string) {
-    return this.prisma.productMeasurement.delete({
+    const existing = await this.prisma.productMeasurement.findUnique({
       where: { id },
     });
+    const result = await this.prisma.productMeasurement.delete({
+      where: { id },
+    });
+    if (existing?.sampleId && existing.stage === 'DESPUES_LAVAR') {
+      try {
+        await this.syncSampleWashCharacteristics(existing.sampleId);
+      } catch (err) {
+        console.warn('Error syncing sample wash characteristics after delete:', err);
+      }
+    }
+    return result;
   }
 
   async saveMeasurement(data: {
@@ -678,15 +689,92 @@ export class MeasurementsService {
       largoTotal: data.largoTotal || null,
     };
 
+    let result;
     if (existing) {
-      return this.prisma.productMeasurement.update({
+      result = await this.prisma.productMeasurement.update({
         where: { id: existing.id },
         data: payload,
       });
     } else {
-      return this.prisma.productMeasurement.create({
+      result = await this.prisma.productMeasurement.create({
         data: payload,
       });
+    }
+
+    if (data.sampleId && data.stage === 'DESPUES_LAVAR') {
+      try {
+        await this.syncSampleWashCharacteristics(data.sampleId);
+      } catch (err) {
+        console.warn('Error syncing sample wash characteristics:', err);
+      }
+    }
+
+    return result;
+  }
+
+  async syncSampleWashCharacteristics(sampleId: string) {
+    if (!sampleId) return;
+    try {
+      const sample = await (this.prisma as any).productSample.findUnique({
+        where: { id: sampleId },
+      });
+      if (!sample) return;
+
+      const washList = await this.prisma.productMeasurement.findMany({
+        where: {
+          sampleId,
+          stage: 'DESPUES_LAVAR',
+        },
+        orderBy: { size: 'asc' },
+      });
+
+      let currentChars = sample.characteristics || '';
+
+      // Clean dirty entalle prefixes
+      for (let i = 0; i < 5; i++) {
+        currentChars = currentChars.replace(/(?:•\s*)?Base:\s*Talla\s*[^•\n]+(?:•\s*(?:Cintura|Cadera|Muslo|Rodilla|Bota\s*pie|Botapie|Largo|Tiro)[^•\n]*)+(?:\s*•\s*)?/gi, '');
+      }
+      currentChars = currentChars.replace(/^\s*•\s*/, '').trim();
+
+      // Strip previous wash block
+      currentChars = currentChars
+        .replace(/(?:💧|🌊)?\s*MEDIDAS DESPUÉS DE LAVAR(?:\s*\(ACABADO\))?:[\s\S]*?(?=(?:\n\n[^\s•\-💧🌊⚠️📐]|\n\n⚠️|\n\n📐|$))/gi, '')
+        .trim();
+
+      if (washList.length > 0) {
+        const sorted = [...washList].sort((a, b) => {
+          const numA = parseFloat(a.size);
+          const numB = parseFloat(b.size);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return String(a.size || '').localeCompare(String(b.size || ''));
+        });
+
+        const lines = [
+          `💧 MEDIDAS DESPUÉS DE LAVAR (ACABADO):`
+        ];
+
+        sorted.forEach(m => {
+          lines.push(`• Talla ${m.size || '32'}:`);
+          if (m.cintura) lines.push(`  - Cintura: ${m.cintura}`);
+          if (m.cadera) lines.push(`  - Cadera: ${m.cadera}`);
+          if (m.muslo) lines.push(`  - Muslo: ${m.muslo}`);
+          if (m.rodilla) lines.push(`  - Rodilla: ${m.rodilla}`);
+          if (m.botaPie) lines.push(`  - Bota Pie: ${m.botaPie}`);
+          if (m.tiroDel) lines.push(`  - Tiro Delantero: ${m.tiroDel}`);
+          if (m.tiroPos) lines.push(`  - Tiro Posterior: ${m.tiroPos}`);
+          if (m.largoTotal) lines.push(`  - Largo Total: ${m.largoTotal}`);
+        });
+
+        const washBlock = lines.join('\n');
+        currentChars = currentChars ? `${currentChars}\n\n${washBlock}` : washBlock;
+      }
+
+      await (this.prisma as any).productSample.update({
+        where: { id: sampleId },
+        data: { characteristics: currentChars },
+      });
+    } catch (err) {
+      console.warn('Could not sync sample wash characteristics:', err);
     }
   }
 }

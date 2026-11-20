@@ -136,7 +136,8 @@ export class SamplesService {
             }
           }
         },
-        processAudits: true
+        processAudits: true,
+        measurements: true
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -163,7 +164,8 @@ export class SamplesService {
             }
           }
         },
-        processAudits: true
+        processAudits: true,
+        measurements: true
       },
     });
     if (!sample) throw new NotFoundException('Muestra no encontrada');

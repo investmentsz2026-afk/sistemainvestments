@@ -40,7 +40,7 @@ export const SampleBarcodeModal: React.FC<SampleBarcodeModalProps> = ({ sample, 
     sample?.baseSize ||
     sample?.udpRequirements?.baseSize ||
     (sample?.productionSizeData && Array.isArray(sample.productionSizeData) && sample.productionSizeData[0]?.size) ||
-    sample?.characteristics?.match(/Base:\s*Talla\s*(\d+|ST)/i)?.[1] ||
+    sample?.characteristics?.match(/(?:Base:\s*Talla|Talla\s*Base:)\s*(\d+|ST)/i)?.[1] ||
     'ST'
   ).toString().toUpperCase();
 

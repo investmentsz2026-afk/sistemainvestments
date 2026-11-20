@@ -38,7 +38,7 @@ import { DeleteSampleModal } from '../../../components/samples/DeleteSampleModal
 import { SelectVariantModal } from '../../../components/samples/SelectVariantModal';
 import { getImageUrl } from '../../../lib/imageUrl';
 import { generateOpGarmentSku } from '../../../lib/sku-generator';
-import { formatCharacteristicsDisplay } from '../../../lib/entalleUtils';
+import { formatCharacteristicsDisplay, cleanDirtyEntallePrefix } from '../../../lib/entalleUtils';
 
 export default function SampleDetailPage() {
     const { id } = useParams();
@@ -47,6 +47,7 @@ export default function SampleDetailPage() {
 
     const [sample, setSample] = useState<any>(null);
     const [products, setProducts] = useState<any[]>([]);
+    const [washMeasurements, setWashMeasurements] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Review State
@@ -284,14 +285,21 @@ export default function SampleDetailPage() {
 
     const fetchData = async () => {
         try {
-            const [sResp, pResp] = await Promise.all([
+            const [sResp, pResp, mResp] = await Promise.all([
                 api.get(`/samples/${id}`),
-                api.get('/products')
+                api.get('/products'),
+                api.get('/products-measurements', { params: { sampleId: id } }).catch(() => ({ data: [] }))
             ]);
 
             const sampleData = sResp.data;
             setSample(sampleData);
             setProducts(pResp.data || []);
+
+            const allMeasurements = Array.isArray(mResp?.data) && mResp.data.length > 0
+                ? mResp.data
+                : (sampleData.measurements || []);
+            const washList = allMeasurements.filter((m: any) => m.stage === 'DESPUES_LAVAR');
+            setWashMeasurements(washList);
 
             // Sync local state with sample data
             setReviewStatus(sampleData.status);
@@ -300,7 +308,7 @@ export default function SampleDetailPage() {
             setEditData({
                 name: sampleData.name,
                 description: sampleData.description || '',
-                characteristics: sampleData.characteristics || '',
+                characteristics: cleanDirtyEntallePrefix(sampleData.characteristics || ''),
                 images: sampleData.images || []
             });
             if (sampleData.materials && sampleData.materials.length > 0) {
@@ -1047,7 +1055,7 @@ export default function SampleDetailPage() {
                                         />
                                     ) : (
                                         <p className="text-gray-900 font-bold bg-gray-50 p-6 rounded-3xl leading-relaxed whitespace-pre-wrap">
-                                            {formatCharacteristicsDisplay(sample.characteristics) || 'No se especificaron características técnicas.'}
+                                            {formatCharacteristicsDisplay(sample.characteristics, washMeasurements) || 'No se especificaron características técnicas.'}
                                         </p>
                                     )}
                                 </div>
@@ -2360,7 +2368,10 @@ export default function SampleDetailPage() {
             {showMeasurementsModal && (
                 <SampleMeasurementsModal 
                     sample={sample} 
-                    onClose={() => setShowMeasurementsModal(false)} 
+                    onClose={() => {
+                        setShowMeasurementsModal(false);
+                        fetchData();
+                    }} 
                 />
             )}
             {/* UDP EDIT SAMPLE MODAL */}
