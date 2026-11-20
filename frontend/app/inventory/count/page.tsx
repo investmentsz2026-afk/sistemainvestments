@@ -338,9 +338,13 @@ export default function InventoryCountPage() {
         if (item.variantId === variantId) {
           const updated = { ...item, ...updates };
           const counted = updated.countedStock !== undefined ? Number(updated.countedStock) : item.systemStock;
-          const diff = updated.isChecked ? (counted - item.systemStock) : 0;
+          const isExplicitlyChecked = updated.isChecked !== undefined 
+            ? updated.isChecked 
+            : (counted !== item.systemStock ? true : item.isChecked);
+          const diff = isExplicitlyChecked ? (counted - item.systemStock) : (counted !== item.systemStock ? (counted - item.systemStock) : 0);
           return {
             ...updated,
+            isChecked: isExplicitlyChecked,
             countedStock: counted,
             difference: diff,
           };
@@ -453,29 +457,40 @@ export default function InventoryCountPage() {
         period: selectedPeriod,
         inventoryType: selectedInventoryType,
         notes: auditNotes,
-        items: scopeItems.map(i => ({
-          variantId: i.variantId,
-          productId: i.productId,
-          productName: i.productName,
-          variantSku: i.variantSku,
-          size: i.size,
-          color: i.color,
-          location: i.location,
-          systemStock: i.systemStock,
-          countedStock: i.countedStock,
-          isChecked: i.isChecked,
-          observation: i.observation,
-        })),
+        items: scopeItems.map(i => {
+          const systemStock = Number(i.systemStock || 0);
+          const countedStock = Number(i.countedStock !== undefined ? i.countedStock : systemStock);
+          const hasChange = Math.abs(countedStock - systemStock) > 0.0001;
+          const isChecked = !!i.isChecked || hasChange;
+          const difference = isChecked ? (countedStock - systemStock) : 0;
+          return {
+            variantId: i.variantId,
+            productId: i.productId,
+            productName: i.productName,
+            variantSku: i.variantSku,
+            size: i.size,
+            color: i.color,
+            location: i.location,
+            systemStock,
+            countedStock,
+            isChecked,
+            difference,
+            observation: i.observation,
+          };
+        }),
       };
 
       const resp = await api.post('/inventory/audits/save', payload);
-      setAuditId(resp.data.id);
+      if (resp.data?.id) {
+        setAuditId(resp.data.id);
+      }
       if (!silent) {
         toast.success('Progreso de conteo guardado exitosamente.');
       }
     } catch (err: any) {
-      console.error(err);
-      toast.error('Error al guardar el progreso');
+      console.error('Error al guardar progreso:', err);
+      const msg = err.response?.data?.message || err.message || 'Error al guardar el progreso';
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -496,19 +511,27 @@ export default function InventoryCountPage() {
         period: selectedPeriod,
         inventoryType: selectedInventoryType,
         notes: finalizeNotes || auditNotes,
-        items: scopeItems.map(i => ({
-          variantId: i.variantId,
-          productId: i.productId,
-          productName: i.productName,
-          variantSku: i.variantSku,
-          size: i.size,
-          color: i.color,
-          location: i.location,
-          systemStock: i.systemStock,
-          countedStock: i.countedStock,
-          isChecked: i.isChecked,
-          observation: i.observation,
-        })),
+        items: scopeItems.map(i => {
+          const systemStock = Number(i.systemStock || 0);
+          const countedStock = Number(i.countedStock !== undefined ? i.countedStock : systemStock);
+          const hasChange = Math.abs(countedStock - systemStock) > 0.0001;
+          const isChecked = !!i.isChecked || hasChange;
+          const difference = isChecked ? (countedStock - systemStock) : 0;
+          return {
+            variantId: i.variantId,
+            productId: i.productId,
+            productName: i.productName,
+            variantSku: i.variantSku,
+            size: i.size,
+            color: i.color,
+            location: i.location,
+            systemStock,
+            countedStock,
+            isChecked,
+            difference,
+            observation: i.observation,
+          };
+        }),
       });
 
       const currentAuditId = saveResp.data.id;

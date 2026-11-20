@@ -486,10 +486,11 @@ export class InventoryService implements OnModuleInit {
     let totalDifference = 0;
 
     for (const item of items) {
-      const isChecked = !!item.isChecked;
       const systemStock = Number(item.systemStock || 0);
       const countedStock = Number(item.countedStock !== undefined ? item.countedStock : systemStock);
-      const diff = isChecked ? (countedStock - systemStock) : 0;
+      const hasStockChange = Math.abs(countedStock - systemStock) > 0.0001;
+      const isChecked = !!item.isChecked || hasStockChange;
+      const diff = countedStock - systemStock;
 
       if (isChecked) {
         if (Math.abs(diff) < 0.001) {
@@ -503,74 +504,100 @@ export class InventoryService implements OnModuleInit {
 
     const now = new Date();
 
-    if (isNew) {
+    try {
+      if (isNew) {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "inventory_audits" 
+           ("id", "period", "inventory_type", "status", "total_items", "matched_items", "mismatched_items", "total_difference", "applied_adjustment", "notes", "user_id", "user_name", "created_at", "updated_at")
+           VALUES ($1, $2, $3, 'EN_PROCESO', $4, $5, $6, $7, FALSE, $8, $9, $10, $11, $12)`,
+          auditId,
+          period,
+          inventoryType,
+          totalItems,
+          matchedItems,
+          mismatchedItems,
+          totalDifference,
+          notes || null,
+          userId,
+          userName,
+          now,
+          now
+        );
+      } else {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "inventory_audits" 
+           SET "total_items" = $1, "matched_items" = $2, "mismatched_items" = $3, "total_difference" = $4, "notes" = $5, "updated_at" = $6, "user_name" = $7
+           WHERE "id" = $8`,
+          totalItems,
+          matchedItems,
+          mismatchedItems,
+          totalDifference,
+          notes || null,
+          now,
+          userName,
+          auditId
+        );
+      }
+
+      // Refresh items
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "inventory_audits" 
-         ("id", "period", "inventory_type", "status", "total_items", "matched_items", "mismatched_items", "total_difference", "applied_adjustment", "notes", "user_id", "user_name", "created_at", "updated_at")
-         VALUES ($1, $2, $3, 'EN_PROCESO', $4, $5, $6, $7, FALSE, $8, $9, $10, $11, $11)`,
-        auditId,
-        period,
-        inventoryType,
-        totalItems,
-        matchedItems,
-        mismatchedItems,
-        totalDifference,
-        notes || null,
-        userId,
-        userName,
-        now
-      );
-    } else {
-      await this.prisma.$executeRawUnsafe(
-        `UPDATE "inventory_audits" 
-         SET "total_items" = $1, "matched_items" = $2, "mismatched_items" = $3, "total_difference" = $4, "notes" = $5, "updated_at" = $6, "user_name" = $7
-         WHERE "id" = $8`,
-        totalItems,
-        matchedItems,
-        mismatchedItems,
-        totalDifference,
-        notes || null,
-        now,
-        userName,
+        `DELETE FROM "inventory_audit_items" WHERE "audit_id" = $1`,
         auditId
       );
+
+      // Insertar en lotes (batch) de 50 para evitar sobrecarga y timeouts
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
+        const valueClauses: string[] = [];
+        const params: any[] = [];
+        let pIdx = 1;
+
+        for (const item of chunk) {
+          const itemId = `ITEM-${randomUUID().slice(0, 12)}`;
+          const systemStock = Number(item.systemStock || 0);
+          const countedStock = Number(item.countedStock !== undefined ? item.countedStock : systemStock);
+          const isChecked = !!item.isChecked || Math.abs(countedStock - systemStock) > 0.0001;
+          const difference = isChecked ? (countedStock - systemStock) : 0;
+
+          valueClauses.push(
+            `($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, $${pIdx + 9}, $${pIdx + 10}, $${pIdx + 11}, $${pIdx + 12}, $${pIdx + 13}, $${pIdx + 14})`
+          );
+          params.push(
+            itemId,
+            auditId,
+            item.variantId || '',
+            item.productId || null,
+            item.productName || 'Producto',
+            item.variantSku || '',
+            item.size || null,
+            item.color || null,
+            item.location || 'A1',
+            systemStock,
+            countedStock,
+            difference,
+            isChecked,
+            item.observation || null,
+            now
+          );
+          pIdx += 15;
+        }
+
+        if (valueClauses.length > 0) {
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO "inventory_audit_items" 
+             ("id", "audit_id", "variant_id", "product_id", "product_name", "variant_sku", "size", "color", "location", "system_stock", "counted_stock", "difference", "is_checked", "observation", "updated_at")
+             VALUES ${valueClauses.join(', ')}`,
+            ...params
+          );
+        }
+      }
+
+      return await this.getAuditDetails(auditId);
+    } catch (err: any) {
+      console.error('Error al guardar progreso en auditoría:', err);
+      throw new BadRequestException(err?.message || 'Error al guardar el progreso en base de datos');
     }
-
-    // Refresh items
-    await this.prisma.$executeRawUnsafe(
-      `DELETE FROM "inventory_audit_items" WHERE "audit_id" = $1`,
-      auditId
-    );
-
-    for (const item of items) {
-      const itemId = `ITEM-${randomUUID().slice(0, 12)}`;
-      const systemStock = Number(item.systemStock || 0);
-      const countedStock = Number(item.countedStock !== undefined ? item.countedStock : systemStock);
-      const difference = item.isChecked ? (countedStock - systemStock) : 0;
-
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "inventory_audit_items" 
-         ("id", "audit_id", "variant_id", "product_id", "product_name", "variant_sku", "size", "color", "location", "system_stock", "counted_stock", "difference", "is_checked", "observation", "updated_at")
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        itemId,
-        auditId,
-        item.variantId || '',
-        item.productId || null,
-        item.productName || 'Producto',
-        item.variantSku || '',
-        item.size || null,
-        item.color || null,
-        item.location || 'A1',
-        systemStock,
-        countedStock,
-        difference,
-        !!item.isChecked,
-        item.observation || null,
-        now
-      );
-    }
-
-    return this.getAuditDetails(auditId);
   }
 
   async finalizeAudit(userId: string, auditId: string, applyStockAdjustment: boolean, notes?: string) {
